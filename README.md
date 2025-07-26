@@ -40,3 +40,7 @@ An LLM-powered form agent that:
 - Question set + required flags + qualification rubric (provided by marketer)
 - Conversational UX patterns from high-converting chatbot scripts (could be used to fine-tune)
 - Optionally, pre-built industry-specific funnel templates to bootstrap marketers
+
+## Selected Brand Name: Varyq
+
+Domain name available and captures the essence of the idea.
