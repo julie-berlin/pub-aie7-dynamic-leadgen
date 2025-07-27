@@ -1,0 +1,124 @@
+{
+  "metadata": {
+    "created_at": "2025-07-25T17:07:21+00:00",
+    "updated_at": "2025-07-25T17:08:07+00:00",
+    "user": "julie",
+    "name": "dog walking questions",
+    "id": "dogwalk_34397"
+  },
+  "questions": [
+    {
+      "id": 1,
+      "question": "Where do you live?",
+      "data_type": "location",
+      "html_input_type": "text",
+      "is_required": true,
+      "scoring_rubric": "Within 20 minutes driving distance from business location is best. More than 45 minutes driving distance will be rejected."
+    },
+    {
+      "id": 2,
+      "question": "What is the breed of your dog?",
+      "data_type": "text",
+      "html_input_type": "text",
+      "is_required": true,
+      "scoring_rubric": "Dog breeds that are judged to be dangerous score lowest, except German Shepherds which score highest."
+    },
+    {
+      "id": 3,
+      "question": "Does your dog pull when walking on a leash?",
+      "data_type": "boolean",
+      "html_input_type": "radio",
+      "is_required": true,
+      "scoring_rubric": "A dog that pulls scores lower."
+    },
+    {
+      "id": 4,
+      "question": "How many times per week do you want your dog walked?",
+      "data_type": "text",
+      "html_input_type": "radio",
+      "html_input_options": ["5 times per week", "4 times per week", "3 times per week", "2 times per week", "Once per week"],
+      "scoring_rubric": "No more than 5 times per week. At least 2 times is desirable. Once per week is lowest score."
+    },
+    {
+      "id": 5,
+      "question": "Is your dog up to date on rabies vaccination?",
+      "data_type": "boolean",
+      "html_input_type": "radio",
+      "scoring_rubric": "Dog must be vaccinated for rabies. No exceptions."
+    },
+    {
+      "id": 6,
+      "question": "What environments does your dog enjoy?",
+      "data_type": "text",
+      "html_input_type": "checkbox",
+      "scoring_rubric": "All choices are good."
+    },
+    {
+      "id": 7,
+      "question": "What is your full name?",
+      "data_type": "text",
+      "html_input_type": "text",
+      "is_required": true,
+      "scoring_rubric": ""
+    },
+    {
+      "id": 8,
+      "question": "What is the best phone number to reach you at during the day?",
+      "data_type": "text",
+      "html_input_type": "text:phone",
+      "is_required": true,
+      "scoring_rubric": ""
+    },
+    {
+      "id": 9,
+      "question": "How do you prefer to be contacted?",
+      "data_type": "text",
+      "html_input_type": "checkbox",
+      "html_input_options": ["call on mobile phone", "call on landline phone", "email"],
+      "scoring_rubric": ""
+    },
+    {
+      "id": 10,
+      "question": "What is the biggest benefit for you to having a dog walker?",
+      "data_type": "text",
+      "html_input_type": "textarea",
+      "scoring_rubric": ""
+    },
+    {
+      "id": 11,
+      "question": "How long of a walk is needed for your dog?",
+      "data_type": "text",
+      "html_input_type": "radio",
+      "html_input_options": ["30 minutes", "45 minutes", "60 minutes", "90 minutes"],
+      "scoring_rubric": ""
+    },
+    {
+      "id": 12,
+      "question": "Can your dog be walked with up to two other dogs?",
+      "data_type": "boolean",
+      "html_input_type": "radio",
+      "scoring_rubric": "Yes is a positive here."
+    },
+    {
+      "id": 13,
+      "question": "Are you interested in my dog training services?",
+      "data_type": "boolean",
+      "html_input_type": "text",
+      "scoring_rubric": ""
+    },
+    {
+      "id": 14,
+      "question": "What behaviors does your dog need training for?",
+      "data_type": "text",
+      "html_input_type": "textarea",
+      "scoring_rubric": ""
+    },
+    {
+      "id": 15,
+      "question": "Tell me something you love about your dog.",
+      "data_type": "text",
+      "html_input_type": "textarea",
+      "scoring_rubric": ""
+    }
+  ]
+}
