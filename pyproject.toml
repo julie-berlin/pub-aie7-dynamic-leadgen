@@ -1,0 +1,16 @@
+[project]
+name = "dynamic-leadgen"
+version = "0.1.0"
+description = "Dynamic Lead Gen with Agents PoC"
+authors = [
+    { name = "Julie Berlin", email = "ai@jkwb.mozmail.com" }
+]
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "jupyter>=1.1.1",
+    "langchain>=0.3.26",
+    "langchain-community>=0.3.27",
+    "langchain-openai>=0.3.28",
+    "langgraph>=0.5.4",
+]
