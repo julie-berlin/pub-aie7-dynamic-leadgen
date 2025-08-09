@@ -7,37 +7,76 @@ class AgentState(TypedDict):
     """State schema for agent graphs, storing a message list with add_messages."""
     messages: Annotated[List, add_messages]
 
-class SurveyState(TypedDict):
-    """State schema for survey flow graphs, containing all session and flow data."""
-    # Core session identifiers
+# Core shared state for basic survey information
+class CoreSurveyState(TypedDict):
+    """Core survey state shared across all supervisors."""
     session_id: str
     form_id: str
     client_id: Optional[str]
-    
-    # Timestamps
-    started_at: str  # ISO datetime string
-    last_updated: str  # ISO datetime string
-    
-    # Flow control
+    started_at: str
+    last_updated: str
     step: int
     completed: bool
+
+# Master flow supervisor state
+class MasterFlowState(TypedDict):
+    """State for master flow supervisor coordination."""
+    core: CoreSurveyState
+    flow_phase: Literal["initializing", "questioning", "scoring", "completing"]
+    completion_probability: float
+    flow_strategy: str  # Current high-level strategy
+    supervisor_consensus: Dict[str, Any]  # Consensus between supervisors
+    coordination_messages: List[Dict[str, Any]]  # Inter-supervisor messages
+
+# Question strategy supervisor state  
+class QuestionStrategyState(TypedDict):
+    """State for question selection and strategy."""
+    all_questions: List[Dict[str, Any]]
+    asked_questions: List[int]
+    current_questions: List[Dict[str, Any]]
+    phrased_questions: List[str]
+    question_strategy: Dict[str, Any]  # Current strategy
+    selection_history: List[Dict[str, Any]]  # Question selection decisions
+
+# Lead intelligence supervisor state
+class LeadIntelligenceState(TypedDict):
+    """State for lead scoring and qualification."""
+    responses: List[Dict[str, Any]]
+    current_score: int
+    score_history: List[Dict[str, Any]]
+    lead_status: Literal["unknown", "yes", "maybe", "no"]
+    qualification_reasoning: List[Dict[str, Any]]
+    risk_factors: List[str]
+    positive_indicators: List[str]
+
+# Engagement supervisor state
+class EngagementState(TypedDict):
+    """State for user engagement and retention."""
+    abandonment_risk: float
+    engagement_metrics: Dict[str, Any]
+    step_headline: str
+    step_motivation: str
+    engagement_history: List[Dict[str, Any]]
+    retention_strategies: List[str]
+
+# Main graph state that coordinates all supervisor states
+class SurveyGraphState(TypedDict):
+    """Main state for the survey graph that coordinates all supervisor states."""
+    # Shared core state
+    core: CoreSurveyState
     
-    # Questions and responses
-    all_questions: List[Dict[str, Any]]  # Complete question bank
-    asked_questions: List[int]  # List of question IDs already asked
-    current_step_questions: List[Dict[str, Any]]  # Questions for current step
-    phrased_questions: List[str]  # LLM-adapted question text for current step
-    responses: List[Dict[str, Any]]  # Complete response history
+    # Supervisor-specific states
+    master_flow: MasterFlowState
+    question_strategy: QuestionStrategyState  
+    lead_intelligence: LeadIntelligenceState
+    engagement: EngagementState
     
-    # Lead scoring and qualification
-    score: int  # Lead score (0-100)
-    lead_status: Literal["unknown", "yes", "maybe", "no"]  # Qualification status
-    min_questions_met: bool  # Whether minimum 4 questions have been asked
-    failed_required: bool  # Whether user failed critical required questions
+    # Cross-supervisor communication
+    supervisor_messages: List[Dict[str, Any]]
+    shared_context: Dict[str, Any]  # Minimal shared context
     
-    # Engagement content
-    step_headline: str  # AI-generated engaging headline for current step
-    step_motivation: str  # AI-generated motivational text for current step
-    
-    # Additional metadata
-    metadata: Dict[str, Any]  # Additional session metadata
+    # Error handling
+    error_log: List[Dict[str, Any]]
+
+# Legacy state for backward compatibility during transition
+SurveyState = SurveyGraphState  # Alias for existing code
