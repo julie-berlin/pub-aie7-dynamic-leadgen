@@ -12,41 +12,33 @@ from __future__ import annotations
 from langgraph.graph import StateGraph, END
 
 from ..state import SurveyGraphState
-from .nodes.initialize_session_node import initialize_session_with_tracking_node
-from .nodes.supervisor_integration_nodes import (
-    master_flow_coordination_node,
-    question_strategy_node,
-    lead_intelligence_node,
-    engagement_supervision_node,
-    supervisor_coordination_node
-)
-from .nodes.response_processing_nodes import (
+from .nodes.tracking_and_response_nodes import (
+    initialize_session_with_tracking_node,
     process_user_responses_node,
     save_responses_immediately_node,
-    check_abandonment_node
-)
-from .nodes.step_preparation_nodes import (
+    check_abandonment_node,
     prepare_step_for_frontend_node,
-    update_step_node
-)
-from .nodes.persistence_nodes import (
-    update_session_node,
-    save_completion_node
-)
-from .nodes.completion_nodes import (
     qualified_message_generation_node,
-    unqualified_completion_node,
-    finalization_node
+    unqualified_completion_node
+)
+from .nodes.question_selection_node import question_selection_node
+from .nodes.question_phrasing_node import question_phrasing_node
+from .nodes.routing_logic import (
+    should_wait_or_continue,
+    should_continue_or_complete,
+    route_completion_type,
+    is_abandoned
 )
 
 
 def build_survey_graph_v2() -> StateGraph:
     """
-    Build the real-world survey flow graph.
+    Build the real-world survey flow graph with proper nodes from Phases 2-5.
     
-    Two main entry points:
+    Multiple entry points:
     1. initialize_with_tracking - First visit with UTM params
-    2. process_responses - When user submits answers
+    2. process_responses - When user submits answers  
+    3. check_abandonment - Timeout/abandonment checks
     """
     graph = StateGraph(SurveyGraphState)
     
@@ -55,176 +47,143 @@ def build_survey_graph_v2() -> StateGraph:
     graph.add_node("initialize_with_tracking", initialize_session_with_tracking_node)
     
     # === QUESTION GENERATION FLOW ===
-    # Supervisor coordination for question selection
-    graph.add_node("master_coordination", master_flow_coordination_node)
-    graph.add_node("question_strategy", question_strategy_node)
-    graph.add_node("lead_intelligence", lead_intelligence_node)
-    graph.add_node("engagement_supervision", engagement_supervision_node)
-    graph.add_node("supervisor_coordination", supervisor_coordination_node)
+    graph.add_node("question_selection", question_selection_node)
+    graph.add_node("question_phrasing", question_phrasing_node)
     
     # === RESPONSE PROCESSING FLOW ===
     # Entry point 2: User submits answers
     graph.add_node("process_responses", process_user_responses_node)
     graph.add_node("save_responses_immediately", save_responses_immediately_node)
-    graph.add_node("check_abandonment", check_abandonment_node)
     
     # === STEP MANAGEMENT ===
     graph.add_node("prepare_step_for_frontend", prepare_step_for_frontend_node)
-    graph.add_node("update_step", update_step_node)
-    graph.add_node("update_session", update_session_node)
+    
+    # === ABANDONMENT CHECKING ===
+    # Entry point 3: Timeout checks
+    graph.add_node("check_abandonment", check_abandonment_node)
     
     # === COMPLETION FLOW ===
     graph.add_node("qualified_message_generation", qualified_message_generation_node)
     graph.add_node("unqualified_completion", unqualified_completion_node)
-    graph.add_node("save_completion", save_completion_node)
-    graph.add_node("finalization", finalization_node)
     
     # === FLOW CONNECTIONS ===
     
-    # Initialization flow
+    # === MULTIPLE ENTRY POINTS ===
+    # Default entry point: New session initialization
     graph.set_entry_point("initialize_with_tracking")
-    graph.add_edge("initialize_with_tracking", "master_coordination")
     
-    # Supervisor flow (parallel execution)
-    graph.add_edge("master_coordination", "question_strategy")
-    graph.add_edge("master_coordination", "lead_intelligence") 
-    graph.add_edge("master_coordination", "engagement_supervision")
+    # Note: Other entry points are handled by the API layer invoking specific nodes
     
-    # Supervisors converge
-    graph.add_edge("question_strategy", "supervisor_coordination")
-    graph.add_edge("lead_intelligence", "supervisor_coordination")
-    graph.add_edge("engagement_supervision", "supervisor_coordination")
+    # After initialization, generate first questions
+    graph.add_edge("initialize_with_tracking", "question_selection")
+    graph.add_edge("question_selection", "question_phrasing")
+    graph.add_edge("question_phrasing", "prepare_step_for_frontend")
     
-    # Prepare step for frontend
-    graph.add_edge("supervisor_coordination", "prepare_step_for_frontend")
-    graph.add_edge("prepare_step_for_frontend", "update_step")
-    
-    # Update session in parallel (fire-and-forget)
-    graph.add_edge("update_step", "update_session")
-    
-    # First decision point: Wait for user or continue
+    # After preparing step, wait for user or continue based on state
     graph.add_conditional_edges(
-        "update_step",
+        "prepare_step_for_frontend",
         should_wait_or_continue,
         {
-            "wait_for_user": END,  # Return questions to frontend
-            "continue_flow": "master_coordination",  # Process more
-            "check_abandonment": "check_abandonment"  # Check if abandoned
+            END: END,  # Wait for user input (first questions)
+            "process_responses": "process_responses",  # Has pending responses
+            "continue_flow": "question_selection"  # Continue to next step
         }
     )
     
-    # Response processing flow (alternate entry)
+    # === ENTRY POINT 2: RESPONSE PROCESSING FLOW ===
+    # When user submits responses, save immediately then continue
     graph.add_edge("process_responses", "save_responses_immediately")
-    graph.add_edge("save_responses_immediately", "lead_intelligence")  # Re-score with new responses
     
-    # After processing responses, check if we should continue
+    # After saving responses, check if we should continue or complete
     graph.add_conditional_edges(
-        "lead_intelligence",
+        "save_responses_immediately",
         should_continue_or_complete,
         {
-            "continue": "master_coordination",  # Get more questions
-            "complete_qualified": "qualified_message_generation",  # Qualified/Maybe
-            "complete_unqualified": "unqualified_completion"  # Not qualified
+            "continue": "question_selection",  # Get more questions
+            "complete": "route_to_completion"  # Ready to complete
         }
     )
     
-    # Abandonment check
+    # === COMPLETION ROUTING ===
+    # Route to appropriate completion based on lead status
+    graph.add_node("route_to_completion", lambda state: state)  # Pass-through node
+    graph.add_conditional_edges(
+        "route_to_completion",
+        route_completion_type,
+        {
+            "qualified_completion": "qualified_message_generation",
+            "unqualified_completion": "unqualified_completion",
+            "abandoned_completion": "mark_abandoned"  # Handle abandonment separately
+        }
+    )
+    
+    # === ABANDONMENT HANDLING ===
+    graph.add_node("mark_abandoned", lambda state: {
+        **state,
+        'core': {
+            **state.get('core', {}),
+            'completed': True,
+            'completion_type': 'abandoned'
+        },
+        'engagement': {
+            **state.get('engagement', {}),
+            'abandonment_status': 'abandoned',
+            'abandonment_risk': 1.0
+        }
+    })
+    
+    # === ENTRY POINT 3: ABANDONMENT CHECK ===
+    # Abandonment detection flow
     graph.add_conditional_edges(
         "check_abandonment",
         is_abandoned,
         {
-            "abandoned": "unqualified_completion",  # Mark as abandoned
-            "active": END  # Still active, wait more
+            "abandoned": "mark_abandoned",  # Mark as abandoned, don't complete
+            "active": END  # Still active, return to wait
         }
     )
     
-    # Completion flows
-    graph.add_edge("qualified_message_generation", "save_completion")
-    graph.add_edge("unqualified_completion", "save_completion")
-    graph.add_edge("save_completion", "finalization")
-    graph.add_edge("finalization", END)
+    # === COMPLETION FLOWS ===
+    # All completion types end the flow
+    graph.add_edge("qualified_message_generation", END)
+    graph.add_edge("unqualified_completion", END)
+    graph.add_edge("mark_abandoned", END)  # Abandonment also ends flow
     
     return graph
 
 
-def should_wait_or_continue(state: SurveyGraphState) -> str:
-    """
-    Determine if we should wait for user input or continue processing.
-    """
-    # Check if we have responses to process
-    lead_intelligence = state.get('lead_intelligence', {})
-    responses = lead_intelligence.get('responses', [])
-    
-    # If no responses yet, wait for user
-    if not responses:
-        return "wait_for_user"
-    
-    # Check if enough time has passed for abandonment check
-    engagement = state.get('engagement', {})
-    last_activity = engagement.get('last_activity_timestamp')
-    if last_activity and should_check_abandonment(last_activity):
-        return "check_abandonment"
-    
-    # Otherwise continue flow
-    return "continue_flow"
-
-
-def should_continue_or_complete(state: SurveyGraphState) -> str:
-    """
-    After processing responses, decide next action.
-    """
-    master_flow = state.get('master_flow', {})
-    lead_intelligence = state.get('lead_intelligence', {})
-    
-    # Check completion criteria
-    responses = lead_intelligence.get('responses', [])
-    lead_status = lead_intelligence.get('lead_status', 'unknown')
-    
-    # Business rules
-    if len(responses) >= 10:  # Max questions
-        if lead_status in ['yes', 'maybe']:
-            return "complete_qualified"
-        else:
-            return "complete_unqualified"
-    
-    if lead_status == 'no' and len(responses) >= 4:  # Failed after minimum
-        return "complete_unqualified"
-    
-    if lead_status == 'yes' and len(responses) >= 6:  # Qualified with enough data
-        return "complete_qualified"
-    
-    # Default: continue getting more questions
-    return "continue"
-
-
-def is_abandoned(state: SurveyGraphState) -> str:
-    """
-    Check if session is abandoned.
-    """
-    engagement = state.get('engagement', {})
-    abandonment_risk = engagement.get('abandonment_risk', 0)
-    
-    if abandonment_risk > 0.8:  # High confidence of abandonment
-        return "abandoned"
-    else:
-        return "active"
-
-
-def should_check_abandonment(last_activity: str) -> bool:
-    """
-    Determine if enough time has passed to check abandonment.
-    """
-    from datetime import datetime, timedelta
-    
-    try:
-        last_time = datetime.fromisoformat(last_activity)
-        time_since = datetime.now() - last_time
-        
-        # Check if more than 5 minutes of inactivity
-        return time_since > timedelta(minutes=5)
-    except:
-        return False
+# Note: All routing functions are imported from .nodes.routing_logic
 
 
 # Export compiled graph
 survey_graph_v2 = build_survey_graph_v2().compile()
+
+
+# Helper functions for API entry points
+async def start_new_session(initial_state: dict) -> dict:
+    """
+    Entry point 1: Start new session with tracking.
+    Used by POST /api/survey/start
+    """
+    return await survey_graph_v2.ainvoke(initial_state)
+
+
+async def process_user_responses(state_with_responses: dict) -> dict:
+    """
+    Entry point 2: Process user responses.
+    Used by POST /api/survey/step
+    """
+    # Start from the response processing node
+    return await survey_graph_v2.ainvoke(state_with_responses, {
+        "recursion_limit": 25,
+        "debug": False
+    })
+
+
+async def check_session_abandonment(session_state: dict) -> dict:
+    """
+    Entry point 3: Check for abandonment.
+    Used by timeout/cron jobs
+    """
+    # Start from abandonment check node
+    return await survey_graph_v2.ainvoke(session_state)
