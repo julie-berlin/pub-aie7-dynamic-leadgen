@@ -15,14 +15,14 @@ class SupabaseClient:
     
     def __init__(self):
         self.url = os.getenv("SUPABASE_URL")
-        self.anon_key = os.getenv("SUPABASE_ANON_KEY")
-        self.service_key = os.getenv("SUPABASE_SERVICE_KEY")
+        self.publishable_key = os.getenv("SUPABASE_PUBLISHABLE_KEY")
+        self.secret_key = os.getenv("SUPABASE_SECRET_KEY")
         
-        if not all([self.url, self.anon_key, self.service_key]):
-            raise ValueError("Missing Supabase environment variables")
+        if not all([self.url, self.publishable_key, self.secret_key]):
+            raise ValueError("Missing Supabase environment variables: SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, SUPABASE_SECRET_KEY required")
         
-        # Use service key for backend operations
-        self.client: Client = create_client(self.url, self.service_key)
+        # Use secret key for backend operations (replaces service_role key)
+        self.client: Client = create_client(self.url, self.secret_key)
     
     def test_connection(self) -> bool:
         """Test database connection"""
@@ -32,10 +32,7 @@ class SupabaseClient:
             return True
         except Exception as e:
             error_str = str(e)
-            if "Legacy API keys are disabled" in error_str:
-                print("🔐 Legacy API keys are disabled. Please get new publishable/secret keys from your Supabase dashboard.")
-                print("   Go to: Settings → API → Get new publishable and secret keys")
-            elif "does not exist" in error_str or "relation" in error_str:
+            if "does not exist" in error_str or "relation" in error_str:
                 print("🔧 Database connection works, but tables don't exist yet.")
                 print("   Run the database_schema_fixed.sql file in your Supabase SQL Editor first.")
                 return False

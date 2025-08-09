@@ -14,14 +14,6 @@ def load_env_vars():
     load_dotenv()
 
 
-@pytest.fixture
-def legacy_env_vars():
-    """Environment variables for legacy authentication."""
-    return {
-        "SUPABASE_URL": os.getenv("SUPABASE_URL"),
-        "SUPABASE_ANON_KEY": os.getenv("SUPABASE_ANON_KEY"),
-        "SUPABASE_SERVICE_KEY": os.getenv("SUPABASE_SERVICE_KEY"),
-    }
 
 
 @pytest.fixture
