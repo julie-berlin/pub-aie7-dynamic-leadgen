@@ -4,8 +4,8 @@
   "env": ".env",
   "python_version": "3.13",
   "graphs": {
-    "simple_agent": "app.graphs.simple_agent:graph",
-    "survey_agent": "app.graphs.survey_graph:graph"
+    "simple_agent": "backend.app.graphs.simple_agent:graph",
+    "survey_graph": "backend.app.graphs.survey_graph:survey_graph"
   },
   "assistants": {
     "agent": {
@@ -13,10 +13,10 @@
       "name": "Simple Agent",
       "description": "Agent with tools using conditional tool-calling."
     },
-    "survey_agent": {
+    "survey_assistant": {
       "graph_id": "survey_graph",
-      "name": "Survey Agent",
-      "description": "Survey completion."
+      "name": "Intelligent Survey Assistant",
+      "description": "AI-powered adaptive survey with supervisor hierarchy for intelligent question selection, lead scoring, and engagement optimization."
     }
   }
 }
