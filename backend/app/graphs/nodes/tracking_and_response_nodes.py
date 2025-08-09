@@ -16,7 +16,7 @@ from ....pydantic_models import (
     AbandonmentStatus,
     create_initial_state
 )
-from ..toolbelts.persistence_toolbelt import persistence_toolbelt
+from ...utils.async_operations import async_db
 
 logger = logging.getLogger(__name__)
 
@@ -116,12 +116,8 @@ def initialize_session_with_tracking_node(state: Dict[str, Any]) -> Dict[str, An
             'landing_page': metadata.get('landing_page')
         }
         
-        # Save tracking data immediately to database
-        tracking_json = json.dumps(tracking_data)
-        persistence_toolbelt.save_tracking_data.invoke({
-            "session_id": session_id,
-            "tracking_data": tracking_json
-        })
+        # Save tracking data immediately to database (fire-and-forget)
+        async_db.save_tracking_data(session_id, tracking_data)
         
         logger.info(f"Initialized session {session_id} with tracking")
         
@@ -259,7 +255,8 @@ def save_responses_immediately_node(state: SurveyGraphState) -> Dict[str, Any]:
             # Fallback: save last few responses if timestamp matching fails
             new_responses = responses[-3:] if len(responses) >= 3 else responses
         
-        # Save each new response
+        # Save responses to database (fire-and-forget)
+        response_batch = []
         for response in new_responses:
             response_data = {
                 'session_id': session_id,
@@ -269,12 +266,10 @@ def save_responses_immediately_node(state: SurveyGraphState) -> Dict[str, Any]:
                 'submitted_at': response.get('submitted_at'),
                 'step': response.get('step')
             }
-            
-            response_json = json.dumps(response_data)
-            persistence_toolbelt.save_response.invoke({
-                "session_id": session_id,
-                "response_data": response_json
-            })
+            response_batch.append(response_data)
+        
+        # Use batched fire-and-forget operation
+        async_db.save_response_batch(session_id, response_batch)
         
         logger.info(f"Saved {len(new_responses)} new responses for session {session_id}")
         return {}

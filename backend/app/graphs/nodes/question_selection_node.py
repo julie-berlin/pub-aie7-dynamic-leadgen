@@ -9,7 +9,7 @@ Replaces the old AgentExecutor pattern with direct function calls for better per
 from typing import Dict, Any, List
 import json
 from ...state import SurveyGraphState
-from ..toolbelts.persistence_toolbelt import persistence_toolbelt
+from ...utils.cached_data_loader import data_loader
 
 
 def question_selection_node(state: SurveyGraphState) -> Dict[str, Any]:
@@ -31,13 +31,11 @@ def question_selection_node(state: SurveyGraphState) -> Dict[str, Any]:
         form_id = core.get('form_id', 'dogwalk_demo_form')
         step = core.get('step', 0)
         
-        # Load questions if not already loaded
+        # Load questions if not already loaded (with caching)
         all_questions = question_strategy.get('all_questions', [])
         if not all_questions:
-            # Load questions from JSON using tools
-            from ...tools import load_questions
-            questions_json = load_questions.invoke({'form_id': form_id})
-            all_questions = json.loads(questions_json)
+            # Load questions using cached data loader
+            all_questions = data_loader.get_questions(form_id)
         
         asked_ids = question_strategy.get('asked_questions', [])
         responses = lead_intelligence.get('responses', [])
