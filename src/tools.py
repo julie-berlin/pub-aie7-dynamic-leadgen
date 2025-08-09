@@ -5,12 +5,18 @@ graphs can bind to their language models.
 """
 from __future__ import annotations
 from typing import List
-from langchain_community.tools.tavily_search import TavilySearchResults
-from langchain_community.tools.arxiv.tool import ArxivQueryRun
-from app.rag import retrieve_information
+from langchain_tavily import TavilySearch
 
 
 def get_tool_belt() -> List:
-    """Return the list of tools available to agents (Tavily, Arxiv, RAG)."""
-    tavily_tool = TavilySearchResults(max_results=5)
-    return [tavily_tool, ArxivQueryRun(), retrieve_information]
+    """Return the list of tools available to agents (Tavily, GoogleMaps."""
+    tavily_tool = TavilySearch(
+            tavily_api_key=settings.tavily_api_key,
+            max_results=settings.tavily_max_results,
+            search_depth=settings.tavily_search_depth,
+            include_domains=settings.tavily_include_domains # ["akc.org", "breedmap.com"]
+        )
+
+    # google_maps_tool = TODO
+
+    return [tavily_tool] # TODO add google maps tool
