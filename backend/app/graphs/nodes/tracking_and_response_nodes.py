@@ -43,11 +43,18 @@ def initialize_session_with_tracking_node(state: SurveyGraphState) -> Dict[str, 
         import uuid
         session_id = str(uuid.uuid4())
         
+        # Validate form exists in database
+        form_id = metadata.get('form_id', 'default')
+        from ...database import db
+        form_config = db.get_form(form_id)
+        if not form_config:
+            raise ValueError(f"Form {form_id} not found in database")
+        
         # Initialize core state with all tracking fields
         core_state = {
             'session_id': session_id,
-            'form_id': metadata.get('form_id', 'default'),
-            'client_id': metadata.get('client_id'),
+            'form_id': form_id,
+            'client_id': form_config.get('client_id') or metadata.get('client_id'),
             'started_at': datetime.now().isoformat(),
             'last_updated': datetime.now().isoformat(),
             'step': 0,
@@ -198,12 +205,17 @@ def save_responses_immediately_node(state: SurveyGraphState) -> Dict[str, Any]:
         if not responses:
             return {}
         
-        # Get only the most recent responses to save
-        # (In production, track which are already saved)
-        recent_responses = responses[-5:]  # Last 5 responses
+        # Get only responses that have just been submitted (have submitted_at timestamp)
+        # Filter to just the newest responses from this step
+        current_timestamp = datetime.now().isoformat()[:19]  # YYYY-MM-DDTHH:MM:SS
+        new_responses = [r for r in responses if r.get('submitted_at', '').startswith(current_timestamp[:16])]  # Same minute
         
-        # Save each response
-        for response in recent_responses:
+        if not new_responses:
+            # Fallback: save last few responses if timestamp matching fails
+            new_responses = responses[-3:] if len(responses) >= 3 else responses
+        
+        # Save each new response
+        for response in new_responses:
             response_data = {
                 'session_id': session_id,
                 'question_id': response.get('question_id'),
@@ -219,7 +231,7 @@ def save_responses_immediately_node(state: SurveyGraphState) -> Dict[str, Any]:
                 "response_data": response_json
             })
         
-        logger.info(f"Saved {len(recent_responses)} responses for session {session_id}")
+        logger.info(f"Saved {len(new_responses)} new responses for session {session_id}")
         return {}
         
     except Exception as e:

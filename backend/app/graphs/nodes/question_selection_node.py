@@ -7,30 +7,53 @@ Replaces the old AgentExecutor pattern with direct function calls for better per
 """
 
 from typing import Dict, Any, List
-from ...state import SurveyState
+import json
+from ...state import SurveyGraphState
+from ..toolbelts.persistence_toolbelt import persistence_toolbelt
 
 
-def question_selection_node(state: SurveyState) -> Dict[str, Any]:
+def question_selection_node(state: SurveyGraphState) -> Dict[str, Any]:
     """
     Select questions for the next form step based on current state.
     
     Args:
-        state: Current SurveyState containing questions, responses, etc.
+        state: Current SurveyGraphState containing hierarchical state
     
     Returns:
-        Dict with current_step_questions update for state
+        Dict with question_strategy updates for state
     """
     try:
-        all_questions = state.get('all_questions', [])
-        asked_ids = state.get('asked_questions', [])
-        step = state.get('step', 0)
-        response_count = len(state.get('responses', []))
+        # Extract state from hierarchical structure
+        core = state.get('core', {})
+        question_strategy = state.get('question_strategy', {})
+        lead_intelligence = state.get('lead_intelligence', {})
+        
+        form_id = core.get('form_id', 'dogwalk_demo_form')
+        step = core.get('step', 0)
+        
+        # Load questions if not already loaded
+        all_questions = question_strategy.get('all_questions', [])
+        if not all_questions:
+            # Load questions from JSON using tools
+            from ...tools import load_questions
+            questions_json = load_questions.invoke({'form_id': form_id})
+            all_questions = json.loads(questions_json)
+        
+        asked_ids = question_strategy.get('asked_questions', [])
+        responses = lead_intelligence.get('responses', [])
+        response_count = len(responses)
         
         # Filter available questions
         available = [q for q in all_questions if q['id'] not in asked_ids]
         
         if not available:
-            return {"current_step_questions": []}
+            return {
+                'question_strategy': {
+                    **question_strategy,
+                    'all_questions': all_questions,
+                    'current_questions': []
+                }
+            }
         
         # Business rules for selection
         tough_questions = [q for q in available
@@ -78,23 +101,47 @@ def question_selection_node(state: SurveyState) -> Dict[str, Any]:
         if not selected and candidates:
             selected = [candidates[0]]
         
-        return {"current_step_questions": selected}
+        # Record selection history for supervisor analysis
+        selection_entry = {
+            'step': step,
+            'selected_ids': [q['id'] for q in selected],
+            'selection_reasoning': 'Early step easy questions' if step < 2 else 'Mixed difficulty questions',
+            'available_count': len(available)
+        }
+        
+        # Update question strategy state
+        updated_strategy = {
+            **question_strategy,
+            'all_questions': all_questions,
+            'current_questions': selected,
+            'selection_history': question_strategy.get('selection_history', []) + [selection_entry]
+        }
+        
+        return {
+            'question_strategy': updated_strategy
+        }
         
     except Exception as e:
         print(f"Error in question selection node: {e}")
         # Return empty selection on error
-        return {"current_step_questions": []}
+        return {
+            'question_strategy': {
+                **state.get('question_strategy', {}),
+                'current_questions': []
+            }
+        }
 
 
-def get_selected_question_ids(state: SurveyState) -> List[int]:
+def get_selected_question_ids(state: SurveyGraphState) -> List[int]:
     """
     Utility function to extract question IDs from current step questions.
     
     Args:
-        state: Current SurveyState
+        state: Current SurveyGraphState
         
     Returns:
         List of selected question IDs
     """
-    current_questions = state.get('current_step_questions', [])
+    question_strategy = state.get('question_strategy', {})
+    current_questions = question_strategy.get('current_questions', [])
     return [q['id'] for q in current_questions]

@@ -8,34 +8,55 @@ Replaces the old direct LLM call pattern with a proper LangGraph node.
 
 import os
 from typing import Dict, Any, List
-from ...state import SurveyState
+import json
+from ...state import SurveyGraphState
 from ...models import get_chat_model
 
 
-def question_phrasing_node(state: SurveyState, client_info: Dict[str, Any] = None) -> Dict[str, Any]:
+def question_phrasing_node(state: SurveyGraphState) -> Dict[str, Any]:
     """
     Rephrase questions for business context and user engagement.
     
     Args:
-        state: Current SurveyState containing current_step_questions
-        client_info: Optional business information for context
+        state: Current SurveyGraphState containing hierarchical state
         
     Returns:
-        Dict with phrased_questions update for state
+        Dict with question_strategy updates including phrased questions
     """
     try:
-        current_questions = state.get('current_step_questions', [])
+        # Extract from hierarchical state
+        core = state.get('core', {})
+        question_strategy = state.get('question_strategy', {})
+        
+        current_questions = question_strategy.get('current_questions', [])
         
         if not current_questions:
-            return {"phrased_questions": []}
+            return {
+                'question_strategy': {
+                    **question_strategy,
+                    'phrased_questions': []
+                }
+            }
+        
+        # Load client information for context
+        form_id = core.get('form_id', 'dogwalk_demo_form')
+        client_info = _load_client_info(form_id)
         
         # Extract business information for context
         business_name = "Our Business"
         business_type = "service provider"
         
-        if client_info and 'information' in client_info:
-            business_name = client_info['information'].get('name', 'Our Business')
-            business_type = client_info['information'].get('business_type', 'service provider')
+        # Handle both database format and JSON file format
+        if client_info:
+            if 'client' in client_info:
+                # Database format: {"client": {...}}
+                client_data = client_info['client']
+                business_name = client_data.get('business_name', client_data.get('name', 'Our Business'))
+                business_type = client_data.get('business_type', client_data.get('industry', 'service provider'))
+            elif 'information' in client_info:
+                # JSON file format: {"information": {...}}
+                business_name = client_info['information'].get('name', 'Our Business')
+                business_type = client_info['information'].get('business_type', 'service provider')
         
         # Rephrase questions using LLM
         phrased_questions = _rephrase_questions_with_llm(
@@ -44,13 +65,26 @@ def question_phrasing_node(state: SurveyState, client_info: Dict[str, Any] = Non
             business_type
         )
         
-        return {"phrased_questions": phrased_questions}
+        return {
+            'question_strategy': {
+                **question_strategy,
+                'phrased_questions': phrased_questions
+            }
+        }
         
     except Exception as e:
         print(f"Error in question phrasing node: {e}")
         # Fallback to original questions on error
-        original_questions = [q.get('question', '') for q in state.get('current_step_questions', [])]
-        return {"phrased_questions": original_questions}
+        question_strategy = state.get('question_strategy', {})
+        current_questions = question_strategy.get('current_questions', [])
+        original_questions = [q.get('question', '') for q in current_questions]
+        
+        return {
+            'question_strategy': {
+                **question_strategy,
+                'phrased_questions': original_questions
+            }
+        }
 
 
 def _rephrase_questions_with_llm(
@@ -173,3 +207,14 @@ def validate_phrased_questions(
         
     except Exception:
         return False
+
+
+def _load_client_info(form_id: str) -> Dict[str, Any]:
+    """Load client information for the given form_id."""
+    try:
+        from ...tools import load_client_info
+        client_json = load_client_info.invoke({'form_id': form_id})
+        return json.loads(client_json)
+    except Exception as e:
+        print(f"Failed to load client info: {e}")
+        return {}
