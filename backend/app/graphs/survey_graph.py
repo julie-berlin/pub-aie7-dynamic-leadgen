@@ -7,327 +7,28 @@ This replaces the FlowEngine with a proper LangGraph implementation.
 """
 
 from __future__ import annotations
-from typing import Dict, Any
-from datetime import datetime
-import json
-
 from langgraph.graph import StateGraph, END
 
 from ..state import SurveyState
-from .nodes.question_selection_node import question_selection_node
-from .nodes.question_phrasing_node import question_phrasing_node
-from .nodes.engagement_node import engagement_node
-from .nodes.lead_scoring_node import lead_scoring_node
-from ..tools import load_questions, load_client_info, save_responses, update_session, finalize_session, create_session
-
-
-def initialize_session_node(state: SurveyState) -> Dict[str, Any]:
-    """
-    Initialize a new survey session with questions and client info.
-    
-    Args:
-        state: Initial SurveyState (may have minimal data)
-        
-    Returns:
-        Dict with all_questions and other initialization updates
-    """
-    try:
-        form_id = state.get('form_id', 'dogwalk_demo_form')
-        
-        # Load questions using our tool
-        questions_json = load_questions.invoke({"form_id": form_id})
-        all_questions = json.loads(questions_json) if questions_json else []
-        
-        # Initialize step counter and empty collections
-        updates = {
-            'all_questions': all_questions,
-            'asked_questions': [],
-            'current_step_questions': [],
-            'phrased_questions': [],
-            'responses': [],
-            'step': 0,
-            'score': 0,
-            'lead_status': 'unknown',
-            'min_questions_met': False,
-            'failed_required': False,
-            'step_headline': '',
-            'step_motivation': '',
-            'last_updated': datetime.now().isoformat()
-        }
-        
-        return updates
-        
-    except Exception as e:
-        print(f"Error initializing session: {e}")
-        return {
-            'all_questions': [],
-            'step': 0,
-            'last_updated': datetime.now().isoformat()
-        }
-
-
-def select_questions_node(state: SurveyState) -> Dict[str, Any]:
-    """Wrapper node for question selection."""
-    return question_selection_node(state)
-
-
-def phrase_questions_node(state: SurveyState) -> Dict[str, Any]:
-    """
-    Wrapper node for question phrasing with client info.
-    
-    Args:
-        state: Current SurveyState
-        
-    Returns:
-        Dict with phrased_questions update
-    """
-    try:
-        form_id = state.get('form_id', 'dogwalk_demo_form')
-        
-        # Load client info using our tool
-        client_json = load_client_info.invoke({"form_id": form_id})
-        client_info = json.loads(client_json) if client_json else {}
-        
-        return question_phrasing_node(state, client_info)
-        
-    except Exception as e:
-        print(f"Error in phrase questions node: {e}")
-        # Fallback to original questions
-        original_questions = [q.get('question', '') for q in state.get('current_step_questions', [])]
-        return {"phrased_questions": original_questions}
-
-
-def create_engagement_node(state: SurveyState) -> Dict[str, Any]:
-    """
-    Wrapper node for engagement with client info.
-    
-    Args:
-        state: Current SurveyState
-        
-    Returns:
-        Dict with step_headline and step_motivation updates
-    """
-    try:
-        form_id = state.get('form_id', 'dogwalk_demo_form')
-        
-        # Load client info using our tool
-        client_json = load_client_info.invoke({"form_id": form_id})
-        client_info = json.loads(client_json) if client_json else {}
-        
-        return engagement_node(state, client_info)
-        
-    except Exception as e:
-        print(f"Error in engagement node: {e}")
-        # Fallback engagement content
-        return {
-            "step_headline": "Let's continue! 🚀",
-            "step_motivation": "Thanks for taking the time to share with us."
-        }
-
-
-def score_lead_node(state: SurveyState) -> Dict[str, Any]:
-    """Wrapper node for lead scoring."""
-    return lead_scoring_node(state)
-
-
-def update_step_node(state: SurveyState) -> Dict[str, Any]:
-    """
-    Update step counter and last_updated timestamp.
-    
-    Args:
-        state: Current SurveyState
-        
-    Returns:
-        Dict with step and last_updated updates
-    """
-    return {
-        'step': state.get('step', 0) + 1,
-        'last_updated': datetime.now().isoformat()
-    }
-
-
-def should_continue_survey(state: SurveyState) -> str:
-    """
-    Determine if survey should continue or complete based on business rules.
-    
-    This is the key decision point: 
-    - If no responses yet, we've prepared the first step → END (wait for user)
-    - If responses exist, check if we need more questions → continue or complete
-    
-    Args:
-        state: Current SurveyState
-        
-    Returns:
-        String routing decision: "continue", "complete", or END
-    """
-    try:
-        responses = state.get('responses', [])
-        
-        # CRITICAL: If no responses yet, we've just prepared the first step
-        # The graph should END here and wait for user to provide responses
-        if not responses:
-            print("Decision: END (waiting for user responses)")
-            return END
-        
-        # If we have responses, check normal completion criteria
-        all_questions = state.get('all_questions', [])
-        asked_questions = state.get('asked_questions', [])
-        current_step_questions = state.get('current_step_questions', [])
-        
-        available_questions = [q for q in all_questions if q['id'] not in asked_questions]
-        
-        lead_status = state.get('lead_status', 'unknown')
-        failed_required = state.get('failed_required', False)
-        step = state.get('step', 0)
-        
-        # Business rules for completion (when we have responses)
-        should_complete = (
-            not all_questions or  # No questions loaded at all
-            not available_questions or  # No more questions available
-            not current_step_questions or  # No questions selected for current step
-            failed_required or  # Failed critical requirement
-            len(responses) >= 6 or  # Maximum questions asked
-            step >= 10 or  # Maximum steps reached (safety valve)
-            (lead_status in ['yes', 'no'] and len(responses) >= 4)  # Clear qualification with minimum questions
-        )
-        
-        print(f"Continue check - Step: {step}, Available: {len(available_questions)}, Current: {len(current_step_questions)}, Responses: {len(responses)}, Status: {lead_status}")
-        
-        if should_complete:
-            print("Decision: COMPLETE")
-            return "complete"
-        else:
-            print("Decision: CONTINUE")
-            return "continue"
-            
-    except Exception as e:
-        print(f"Error in should_continue_survey: {e}")
-        # Default to complete on error to avoid infinite loops
-        return "complete"
-
-
-def save_responses_node(state: SurveyState) -> Dict[str, Any]:
-    """
-    Save user responses to database.
-    
-    Args:
-        state: Current SurveyState with responses to save
-        
-    Returns:
-        Dict with success status (doesn't modify state)
-    """
-    try:
-        responses = state.get('responses', [])
-        if not responses:
-            return {}  # No responses to save
-            
-        # Get only the latest responses that need to be saved
-        # In a real implementation, you'd track which responses are already saved
-        session_id = state.get('session_id', '')
-        
-        # Save responses using our tool
-        responses_json = json.dumps(responses)
-        result = save_responses.invoke({
-            "session_id": session_id,
-            "responses_data": responses_json
-        })
-        
-        print(f"Saved responses: {result}")
-        return {}  # Don't modify state, just persist to DB
-        
-    except Exception as e:
-        print(f"Error saving responses: {e}")
-        return {}
-
-
-def update_session_node(state: SurveyState) -> Dict[str, Any]:
-    """
-    Update session data in database.
-    
-    Args:
-        state: Current SurveyState
-        
-    Returns:
-        Dict with success status (doesn't modify state)
-    """
-    try:
-        session_id = state.get('session_id', '')
-        
-        # Prepare session update data
-        update_data = {
-            'step_count': state.get('step', 0),
-            'final_score': state.get('score', 0),
-            'lead_status': state.get('lead_status', 'unknown'),
-            'completed': state.get('completed', False),
-            'updated_at': state.get('last_updated', datetime.now().isoformat())
-        }
-        
-        # Update session using our tool
-        updates_json = json.dumps(update_data)
-        result = update_session.invoke({
-            "session_id": session_id,
-            "updates_data": updates_json
-        })
-        
-        print(f"Updated session: {result}")
-        return {}  # Don't modify state, just persist to DB
-        
-    except Exception as e:
-        print(f"Error updating session: {e}")
-        return {}
-
-
-def save_completion_node(state: SurveyState) -> Dict[str, Any]:
-    """
-    Finalize session with completion data in database.
-    
-    Args:
-        state: Current SurveyState with final data
-        
-    Returns:
-        Dict with success status (doesn't modify state)
-    """
-    try:
-        session_id = state.get('session_id', '')
-        
-        # Prepare final completion data
-        final_data = {
-            'final_score': state.get('score', 0),
-            'lead_status': state.get('lead_status', 'unknown'),
-            'completed_at': datetime.now().isoformat(),
-            'step_count': state.get('step', 0),
-            'response_count': len(state.get('responses', []))
-        }
-        
-        # Finalize session using our tool
-        final_json = json.dumps(final_data)
-        result = finalize_session.invoke({
-            "session_id": session_id,
-            "final_data": final_json
-        })
-        
-        print(f"Finalized session: {result}")
-        return {}  # Don't modify state, just persist to DB
-        
-    except Exception as e:
-        print(f"Error finalizing session: {e}")
-        return {}
-
-
-def completion_node(state: SurveyState) -> Dict[str, Any]:
-    """
-    Mark survey as completed and prepare final state.
-    
-    Args:
-        state: Current SurveyState
-        
-    Returns:
-        Dict with completed flag and final timestamp
-    """
-    return {
-        'completed': True,
-        'last_updated': datetime.now().isoformat()
-    }
+from .nodes.initialize_session_node import initialize_session_node
+from .nodes.supervisor_nodes import (
+    select_questions_node,
+    phrase_questions_node, 
+    create_engagement_node,
+    score_lead_node
+)
+from .nodes.update_step_node import update_step_node
+from .nodes.persistence_nodes import (
+    save_responses_node,
+    update_session_node,
+    save_completion_node
+)
+from .nodes.completion_nodes import (
+    message_generation_node,
+    finalization_node,
+    completion_node
+)
+from .nodes.routing_logic import should_continue_survey
 
 
 def build_survey_graph() -> StateGraph:
@@ -356,7 +57,9 @@ def build_survey_graph() -> StateGraph:
     graph.add_node("update_session", update_session_node)
     graph.add_node("save_completion", save_completion_node)
     
-    # Add completion node
+    # Add completion flow nodes
+    graph.add_node("message_generation", message_generation_node)
+    graph.add_node("finalization", finalization_node)
     graph.add_node("completion", completion_node)
     
     # Set entry point
@@ -376,13 +79,15 @@ def build_survey_graph() -> StateGraph:
         should_continue_survey,
         {
             "continue": "select_questions",  # Loop back to select more questions
-            "complete": "save_completion",  # Save final data before completion
+            "complete": "message_generation",  # Start completion flow
             END: END  # End graph (wait for user responses)
         }
     )
     
-    # Completion flow with database persistence
-    graph.add_edge("save_completion", "completion")
+    # Completion flow with message generation and finalization
+    graph.add_edge("message_generation", "save_completion")
+    graph.add_edge("save_completion", "finalization")
+    graph.add_edge("finalization", "completion")
     graph.add_edge("completion", END)
     
     return graph

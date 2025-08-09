@@ -1,20 +1,9 @@
-# this is the planning agent
-engagement_agent:
-  model: gpt-4o-mini
-  temperature: 0.1
-  max_tokens: 1000
-  timeout_seconds: 30
+# tavily search dog breed info
+tavily:
+  max_results: 3
+  search_depth: basic
+  include_domains: ['akc.org', 'breedmap.com']
 
-#
-lead_scoring_agent:
-  model: gpt-4o-mini
-  temperature: 0.1
-  max_tokens: 1000
-  timeout_seconds: 30
-
-# can be fast
-question_selection_agent:
-  model: gpt-4o-mini
-  temperature: 0.1
-  max_tokens: 1000
-  timeout_seconds: 30
+# google maps for distance calculation
+google_maps:
+  setting: driving_distance

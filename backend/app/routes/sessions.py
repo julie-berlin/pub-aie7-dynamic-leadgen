@@ -2,6 +2,7 @@
 Session Management Routes
 
 API endpoints for form session lifecycle management.
+Uses SurveyFlowManager with LangGraph implementation.
 """
 
 from fastapi import APIRouter, HTTPException, Depends
@@ -25,13 +26,13 @@ from backend.py_models import (
     QuestionResponse, ErrorResponse
 )
 
-# Import our LangGraph flow and utilities
-from flow_engine import FormFlowEngine
+# Import our LangGraph-based flow manager
+from survey_flow_manager import SurveyFlowManager
 
 router = APIRouter()
 
-# Global flow engine instance
-flow_engine = FormFlowEngine()
+# Global flow manager instance
+flow_manager = SurveyFlowManager()
 
 @router.post("/sessions/start", response_model=SessionStepResponse)
 async def start_session(request: SessionStartRequest):
@@ -41,8 +42,8 @@ async def start_session(request: SessionStartRequest):
     Creates a new session, initializes state, and returns the first form step.
     """
     try:
-        # Initialize session with flow engine
-        session_result = await flow_engine.start_session(
+        # Initialize session with LangGraph flow manager
+        session_result = await flow_manager.start_session(
             form_id=request.form_id,
             client_id=request.client_id,
             metadata=request.metadata
@@ -87,8 +88,8 @@ async def process_step(request: SessionStepRequest):
     Processes user responses, advances the form flow, and returns the next step.
     """
     try:
-        # Advance session step with flow engine
-        step_result = await flow_engine.advance_session_step(
+        # Advance session step with LangGraph flow manager
+        step_result = await flow_manager.advance_session_step(
             session_id=request.session_id,
             responses=request.responses
         )
@@ -143,7 +144,7 @@ async def get_session_status(session_id: str):
     Returns the current state of a session without advancing the flow.
     """
     try:
-        status = await flow_engine.get_session_status(session_id)
+        status = await flow_manager.get_session_status(session_id)
 
         if not status:
             raise HTTPException(
@@ -179,8 +180,8 @@ async def complete_session(session_id: str, request: SessionCompleteRequest = No
     Finalizes the session, generates completion message, and returns final status.
     """
     try:
-        # Finalize session with flow engine
-        completion_result = await flow_engine.finalize_session(
+        # Finalize session with LangGraph flow manager
+        completion_result = await flow_manager.finalize_session(
             session_id=session_id,
             final_responses=request.final_responses if request else []
         )
@@ -208,7 +209,7 @@ async def abandon_session(session_id: str):
     Records session abandonment for analytics and cleanup.
     """
     try:
-        result = await flow_engine.mark_session_abandoned(session_id)
+        result = await flow_manager.mark_session_abandoned(session_id)
 
         return {
             "message": f"Session {session_id} marked as abandoned",

@@ -5,12 +5,18 @@
   "python_version": "3.13",
   "graphs": {
     "simple_agent": "app.graphs.simple_agent:graph",
+    "survey_agent": "app.graphs.survey_graph:graph"
   },
   "assistants": {
     "agent": {
       "graph_id": "simple_agent",
       "name": "Simple Agent",
       "description": "Agent with tools using conditional tool-calling."
+    },
+    "survey_agent": {
+      "graph_id": "survey_graph",
+      "name": "Survey Agent",
+      "description": "Survey completion."
     }
   }
 }
