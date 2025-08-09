@@ -1,4 +1,0 @@
-# models used
-engagement_agent: 'gpt-4o-mini'
-lead_scoring_agent: 'gpt-4o-mini'
-question_selection_agent: 'gpt-4o-mini'

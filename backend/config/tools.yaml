@@ -1,0 +1,9 @@
+# tavily search dog breed info
+tavily:
+  max_results: 3
+  search_depth: basic
+  include_domains: ['akc.org', 'breedmap.com']
+
+# google maps for distance calculation
+google_maps:
+  setting: driving_distance

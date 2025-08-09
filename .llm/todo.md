@@ -1,239 +1,156 @@
-# Task 1, Phase 4: Update Supabase Authentication
+# Dynamic Survey LangGraph Refactor Plan
 
 ## Overview
-Migrate from current authentication method to new public key authentication method for Supabase integration.
+Complete refactor from agent-based flow to LangGraph orchestration. No backward compatibility required - clean slate approach.
 
-## Implementation Tasks
+## Phase 1: Foundation Setup
 
-- [x] Research current Supabase authentication setup
-  - Examine `src/database.py` to understand current implementation
-  - Document current authentication flow and dependencies
-  - Identify all files that use Supabase authentication
+- [x] Create get_chat_model function in models.py
+  - ✅ Added get_chat_model() function 
+  - ✅ Renamed original models.py to py_models.py for Pydantic models
 
-**FINDINGS:**
+- [x] Fix tools.py import issue
+  - Remove settings import, use environment variables directly
+  - Ensure tools.py can be imported without errors
 
-**Current Authentication Implementation:**
-- Uses legacy JWT-based service key authentication in `src/database.py:25`
-- Client initialization: `create_client(self.url, self.service_key)`
-- Environment variables: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_KEY`
-- **Status**: Currently working (✅ DB connected) but marked for migration in `.env` comment
+- [ ] Extend state.py for survey-specific state
+  - Add SurveyState class with all necessary fields from FlowEngine
+  - Include: session_id, form_id, step, questions, responses, scores, lead_status, etc.
+  - Use TypedDict and proper type annotations
 
-**Authentication Flow:**
-1. `SupabaseClient.__init__()` reads environment variables (lines 17-19)
-2. Validates all required keys are present (lines 21-22)
-3. Creates client using service key for backend operations (line 25)
-4. Test connection uses simple table query (lines 30-31)
-5. Has error detection for "Legacy API keys are disabled" (lines 35-37)
+- [ ] Update tools.py to include survey-specific tools
+  - Add database tools: save_responses, update_session, finalize_session
+  - Add question loading tools
+  - Add scoring/validation tools
 
-**Files Using Supabase Authentication:**
-- `src/database.py` - Main client wrapper (singleton instance `db`)
-- `src/api/main.py:58` - Health check imports `from database import db`
-- `src/flow_engine.py:19` - LangGraph integration imports `from database import db`
-- `notebooks/enhanced_lead_funnel.ipynb:61` - Notebook imports `from database import db`
+## Phase 2: Convert Agents to LangGraph Nodes
 
-**Dependencies & Impact:**
-- All database operations go through singleton `db` instance
-- API endpoints rely on database for session management
-- LangGraph flow uses database for real-time persistence
-- Test connection detects legacy key deprecation automatically
-- No direct Supabase client usage outside of `src/database.py` wrapper
+- [ ] Create app/graphs/nodes/ directory structure
 
-- [x] Research new public key authentication method
-  - Review Supabase documentation for new authentication patterns
-  - Understand migration requirements and breaking changes
-  - Document security improvements and compliance benefits
+- [ ] Convert question_selection_agent.py to question_selection_node.py
+  - Extract logic from agent, create pure node function
+  - Return state updates compatible with SurveyState
+  - Remove AgentExecutor pattern completely
 
-**FINDINGS:**
+- [ ] Convert engagement_agent.py to engagement_node.py
+  - Create node function for headline/motivation generation
+  - Remove AgentExecutor pattern completely
 
-**New Authentication System (Available Now, Required by Q2/Q3 2025):**
+- [ ] Convert lead_scoring_agent.py to lead_scoring_node.py
+  - Create node function for score calculation
+  - Remove AgentExecutor pattern completely
 
-**1. New API Key Types:**
-- **Publishable Key** (`sb_publishable_...`) - Replaces `SUPABASE_ANON_KEY`
-- **Secret Key** (`sb_secret_...`) - Replaces `SUPABASE_SERVICE_KEY`
-- Multiple secret keys can be created per project
-- Single publishable key per project (like anon key)
+- [ ] Create question_phrasing_node.py
+  - Extract phrasing logic from FlowEngine
+  - Create node function with LLM integration
 
-**2. JWT Signing Keys System:**
-- **Legacy**: Single shared JWT secret (symmetric HS256)
-- **New**: Asymmetric keys (RS256, ES256) or improved shared secrets
-- **Benefits**: Local JWT validation, zero-downtime rotation, enhanced security
-- **Timeline**: New projects use asymmetric JWTs by default from October 1, 2025
+## Phase 3: Build Main Survey Graph
 
-**3. Migration Timeline:**
-- **Current Status**: Legacy keys still working, new keys available as opt-in
-- **Deadline**: Legacy API keys disabled November 1, 2025
-- **No Action Required Until**: At least November 1, 2025
-- **Python Client**: supabase-py supports both systems during transition
+- [ ] Create app/graphs/survey_graph.py
+  - Define complete survey orchestration graph
+  - Implement flow: Question Selection → Phrasing → Engagement → Score → Continue/Complete
 
-**4. Security Improvements:**
-- Zero-downtime key rotation without forcing user sign-outs
-- Better security compliance framework alignment
-- Improved performance with local JWT validation
-- Enhanced reliability and reduced dependency on central services
+- [ ] Add conditional routing logic
+  - should_continue function for completion criteria
+  - Route between question flow and completion flow
+  - Handle all business rules (min questions, scoring thresholds)
 
-**5. Breaking Changes & Compatibility:**
-- Secret keys cannot be used in browser environments (same as service keys)
-- Some third-party integrations may need updates
-- Edge Functions and database type generation may need adjustments
-- Realtime connections may have 24-hour session limitations
+- [ ] Add database persistence nodes
+  - save_responses_node
+  - update_session_node  
+  - save_completion_node
 
-**6. Migration Requirements:**
-- Update client libraries to latest versions
-- Replace environment variables: `SUPABASE_ANON_KEY` → `SUPABASE_PUBLISHABLE_KEY`
-- Replace `SUPABASE_SERVICE_KEY` → `SUPABASE_SECRET_KEY`
-- Update JWT verification logic to use new signing keys
-- Test authentication flows with new keys
+- [ ] Create completion flow nodes
+  - message_generation_node
+  - finalization_node
 
-- [x] Create test cases for authentication functionality
-  - Add tests for database connection with current method
-  - Add tests for key authentication operations (read, write)
-  - Tests should initially pass with current auth, fail with new auth
+## Phase 4: Create New Flow Manager
 
-**IMPLEMENTATION:**
+- [ ] Create app/survey_flow_manager.py
+  - Replace FlowEngine completely with LangGraph-based manager
+  - Use compiled graph for all operations
+  - New API interface - no compatibility needed
 
-**Test Structure Created:**
-- `tests/` - New test directory with comprehensive test suite
-- `tests/conftest.py` - Shared fixtures for legacy/new auth environment variables
-- `pytest.ini` - Test configuration with custom markers and async support
-- Added `pytest` and `pytest-asyncio` dependencies to `pyproject.toml`
+- [ ] Implement start_session method
+  - Initialize SurveyState
+  - Invoke graph with initial state
+  - Return formatted response
 
-**Test Coverage:**
-- `test_database_legacy_auth.py` - 10 tests for current authentication (ALL PASSING ✅)
-  - Environment variable validation and format checking
-  - Client initialization and singleton behavior
-  - Connection testing with error detection for "Legacy API keys disabled"
-  - CRUD operations (create/read clients, sessions, responses)
-  - Connection state management and error handling
+- [ ] Implement advance_session_step method
+  - Update state with responses
+  - Continue graph execution
+  - Handle completion routing
 
-- `test_database_new_auth.py` - Tests for new authentication (PROPERLY SKIPPED until implementation)
-  - New key format validation (publishable/secret keys)
-  - Client initialization with new environment variables
-  - Connection and CRUD operations with new auth system
-  - Authentication transition and error handling scenarios
+- [ ] Implement finalize_session method
+  - Complete graph execution
+  - Return completion data
 
-- `test_integration_auth.py` - Real database connection tests
-  - Legacy auth integration test (PASSES with real DB connection ✅)
-  - New auth integration tests (skipped until implementation)
-  - Migration compatibility and error recovery tests
+## Phase 5: Update API Integration
 
-**Test Results:**
-- **Legacy Authentication**: 10/10 tests passing, real DB connection working
-- **New Authentication**: Tests properly skipped with clear implementation markers
-- **Key Validation**: Both legacy JWT and new key formats validated correctly
-- **Error Detection**: "Legacy API keys disabled" error properly handled
+- [ ] Completely rewrite app/routes/sessions.py
+  - Use SurveyFlowManager instead of FlowEngine
+  - Update all endpoint logic
+  - Import py_models for Pydantic models
 
-- [x] Update environment variable configuration
-  - Add new authentication environment variables to `.env`
-  - Update environment variable documentation in DEVELOPMENT_PLAN.md
-  - Maintain backward compatibility during transition
+- [ ] Update app/main.py
+  - Remove FlowEngine references
+  - Update health checks if needed
 
-**IMPLEMENTATION:**
+## Phase 6: Complete Cleanup
 
-**Environment Variables Updated:**
-- `.env` - New keys added and organized (PUBLISHABLE_KEY, SECRET_KEY)
-- `.env.sample` - Updated to reflect new key structure
-- Legacy keys retained with deprecation comment for backward compatibility
-- Google Maps API key added (empty) for future enhancements
+- [ ] Delete old agent files
+  - Delete entire app/agents/ directory
+  - Delete app/flow_engine.py completely
+  - Delete app/agent_factory.py
 
-**Documentation Updates:**
-- `DEVELOPMENT_PLAN.md` - Updated Environment Variables Status section
-  - Clear labeling of new vs legacy authentication systems
-  - Migration timeline documented (November 1, 2025 deadline)
-  - Backward compatibility status noted
-  - Authentication migration status section added
+- [ ] Clean up imports throughout codebase
+  - Remove all old agent imports
+  - Update any remaining references
 
-**Key Organization:**
-- **New keys first**: SUPABASE_PUBLISHABLE_KEY, SUPABASE_SECRET_KEY
-- **Legacy keys deprecated**: SUPABASE_ANON_KEY, SUPABASE_SERVICE_KEY
-- Clear deprecation comment: "the below env vars are deprecated"
-- Maintained environment integrity during transition period
+- [ ] Add comprehensive error handling
+  - Graph-level error handling
+  - Node-level fallbacks
+  - Clean error responses for API
 
-- [x] Update Supabase client initialization
-  - Modify `src/database.py` to use new public key authentication
-  - Implement proper error handling and fallback mechanisms
-  - Ensure existing function signatures remain unchanged
+## Phase 7: Testing and Validation
 
-**IMPLEMENTATION:**
+- [ ] Create new test suite for LangGraph implementation
+  - Test complete survey flow
+  - Test state transitions
+  - Test error conditions
 
-**Database Client Migration (COMPLETE MIGRATION - NO LEGACY SUPPORT):**
-- **Updated `src/database.py`** to use only new authentication
-  - Changed environment variables: `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`
-  - Removed all legacy key references (`SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_KEY`)
-  - Updated error handling to remove "Legacy API keys disabled" detection
-  - Use secret key for backend operations (replaces service_role key)
+- [ ] Performance testing
+  - Verify new system performance
+  - Test concurrent sessions
 
-**Test Suite Overhaul:**
-- **Removed all legacy tests**: `test_database_legacy_auth.py` deleted
-- **Created clean new test suite**: `test_database_auth.py` (10 tests, all passing ✅)
-  - Environment variable validation for new key formats
-  - Client initialization with publishable/secret keys
-  - Connection testing and CRUD operations
-  - Session management and response handling
-  - Singleton behavior and key format validation
+- [ ] Documentation updates
+  - Update CLAUDE.md with new architecture
+  - Document graph structure and nodes
 
-**Integration Testing:**
-- **Real database connection verified** ✅ with new authentication
-- **Removed all legacy integration tests**
-- **Updated `test_integration_auth.py`** for new system only
-- **Environment cleanup**: Legacy keys completely removed from `.env`
+## Implementation Notes
 
-**Migration Results:**
-- **10/10 new authentication tests passing** ✅
-- **Real database connection working** ✅ with new keys only
-- **No legacy code remaining** - clean migration complete
-- **Existing function signatures preserved** - no breaking changes to API
-- **Error handling updated** for new authentication patterns
+### File Organization (Final State)
+- `app/models.py` - LangChain model utilities
+- `app/py_models.py` - Pydantic models for API
+- `app/state.py` - SurveyState definition
+- `app/tools.py` - Survey-specific LangGraph tools
+- `app/graphs/survey_graph.py` - Main graph definition
+- `app/graphs/nodes/` - Individual node functions
+- `app/survey_flow_manager.py` - Graph-based flow manager
+- `app/routes/sessions.py` - Updated API routes
 
-- [ ] Update database utility functions
-  - Modify any authentication-specific utility functions
-  - Update connection testing and validation methods
-  - Ensure all database operations work with new auth method
+### Files to Delete
+- `app/flow_engine.py` - Replace with survey_flow_manager.py
+- `app/agent_factory.py` - No longer needed
+- `app/agents/` - Entire directory, replaced with nodes/
+- `app/llm_utils.py` - Move logic to nodes if needed
 
-- [ ] Test database connection and operations
-  - Run connection tests: `uv run python3 -c "from src.database import db; print('✅ DB connected' if db.test_connection() else '❌ DB issue')"`
-  - Test all CRUD operations on existing tables
-  - Verify session management still works correctly
+### State Management
+- SurveyState as single source of truth
+- Immutable state updates
+- All nodes return proper state updates
 
-- [ ] Test integration with LangGraph flow
-  - Run the enhanced_lead_funnel.ipynb notebook
-  - Verify all database saves during form flow work correctly
-  - Test session state persistence and retrieval
-
-- [ ] Test API backend integration
-  - Start API server: `uv run uvicorn src.api.main:app --reload`
-  - Test all API endpoints that use database
-  - Verify session management endpoints work correctly
-
-- [ ] Update security and error handling
-  - Review security implications of new authentication method
-  - Update error messages to not expose authentication details
-  - Implement proper connection retry logic
-
-- [ ] Clean up deprecated authentication code
-  - Remove old authentication method code
-  - Update any configuration files or documentation
-  - Remove unused environment variables
-
-- [ ] Update documentation and development commands
-  - Update DEVELOPMENT_PLAN.md with new authentication status
-  - Update any README or setup instructions
-  - Update development command examples if needed
-
-## Success Criteria
-- [ ] All database operations work with new authentication
-- [ ] Existing notebooks and API continue to function
-- [ ] Security compliance improved
-- [ ] No degradation in functionality or performance
-- [ ] Clean migration with no deprecated code remaining
-
-## Testing Commands
-```bash
-# Test database connection
-uv run python3 -c "from src.database import db; print('✅ DB connected' if db.test_connection() else '❌ DB issue')"
-
-# Test API backend
-uv run uvicorn src.api.main:app --reload
-
-# Test notebook functionality
-uv run jupyter notebook enhanced_lead_funnel.ipynb
-```
+### No Backward Compatibility
+- Clean break from old system
+- New API interface
+- Fresh start with best practices
