@@ -64,6 +64,33 @@ class SupabaseClient:
         result = self.client.table("forms").select("*").eq("id", form_id).execute()
         return result.data[0] if result.data else None
     
+    def get_form_questions(self, form_id: str) -> List[Dict[str, Any]]:
+        """Get all questions for a form"""
+        result = self.client.table("form_questions").select("*").eq("form_id", form_id).order("question_order").execute()
+        return result.data or []
+    
+    def get_client_by_form(self, form_id: str) -> Optional[Dict[str, Any]]:
+        """Get client information associated with a form"""
+        # First get the form to find the client_id
+        form = self.get_form(form_id)
+        if not form or not form.get('client_id'):
+            return None
+        
+        # Then get the client data
+        return self.get_client(form['client_id'])
+    
+    def get_form_with_questions(self, form_id: str) -> Dict[str, Any]:
+        """Get form configuration with all associated questions"""
+        form = self.get_form(form_id)
+        if not form:
+            return {}
+        
+        questions = self.get_form_questions(form_id)
+        return {
+            **form,
+            'questions': questions
+        }
+    
     # === Lead Session Management ===
     
     def create_lead_session(self, session_data: Dict[str, Any]) -> Dict[str, Any]:

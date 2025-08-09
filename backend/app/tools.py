@@ -16,7 +16,7 @@ from .database import db
 
 @tool
 def load_questions(form_id: str = "dogwalk_demo_form") -> str:
-    """Load questions from JSON file based on form_id.
+    """Load questions from database based on form_id.
     
     Args:
         form_id: Form configuration identifier
@@ -25,17 +25,21 @@ def load_questions(form_id: str = "dogwalk_demo_form") -> str:
         JSON string of questions array
     """
     try:
-        # For now, use the dogwalk demo data
-        questions_file = Path("data/input/dogwalk_34397/questions.json")
-        with open(questions_file, 'r') as f:
-            data = json.load(f)
-        return json.dumps(data['questions'])
+        questions = db.get_form_questions(form_id)
+        return json.dumps(questions)
     except Exception as e:
-        return json.dumps([])
+        # Fallback to JSON file if database fails (for development)
+        try:
+            questions_file = Path("data/input/dogwalk_34397/questions.json")
+            with open(questions_file, 'r') as f:
+                data = json.load(f)
+            return json.dumps(data['questions'])
+        except:
+            return json.dumps([])
 
 @tool 
 def load_client_info(form_id: str = "dogwalk_demo_form") -> str:
-    """Load client information based on form_id.
+    """Load client information from database based on form_id.
     
     Args:
         form_id: Form configuration identifier
@@ -44,11 +48,35 @@ def load_client_info(form_id: str = "dogwalk_demo_form") -> str:
         JSON string of client information
     """
     try:
-        # For now, use the dogwalk demo data
-        client_file = Path("data/input/dogwalk_34397/client.json")
-        with open(client_file, 'r') as f:
-            data = json.load(f)
-        return json.dumps(data['client'])
+        client = db.get_client_by_form(form_id)
+        if client:
+            # Wrap in 'client' key for backward compatibility
+            return json.dumps({"client": client})
+        else:
+            return json.dumps({})
+    except Exception as e:
+        # Fallback to JSON file if database fails (for development)
+        try:
+            client_file = Path("data/input/dogwalk_34397/client.json")
+            with open(client_file, 'r') as f:
+                data = json.load(f)
+            return json.dumps(data['client'])
+        except:
+            return json.dumps({})
+
+@tool
+def load_form_config(form_id: str) -> str:
+    """Load form configuration from database.
+    
+    Args:
+        form_id: Form configuration identifier
+        
+    Returns:
+        JSON string of form configuration
+    """
+    try:
+        form = db.get_form(form_id)
+        return json.dumps(form or {})
     except Exception as e:
         return json.dumps({})
 
@@ -235,6 +263,7 @@ def get_tool_belt() -> List:
     survey_tools = [
         load_questions,
         load_client_info,
+        load_form_config,
         save_responses,
         update_session,
         finalize_session,
