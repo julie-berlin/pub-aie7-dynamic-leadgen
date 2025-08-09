@@ -5,7 +5,6 @@ Main application entry point with middleware and route configuration.
 """
 
 from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import uvicorn
 import os
@@ -13,11 +12,14 @@ import os
 # Load environment variables
 load_dotenv()
 
+# Import CORS configuration
+from cors_config import configure_cors
+
 # Import routes
 import sys
 import os
 sys.path.append(os.path.dirname(__file__))
-from routes import sessions
+from routes import sessions, survey_api
 
 # Create FastAPI application
 app = FastAPI(
@@ -25,20 +27,29 @@ app = FastAPI(
     description="AI-powered adaptive forms for lead generation and qualification",
     version="1.0.0",
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
+    openapi_tags=[
+        {
+            "name": "survey",
+            "description": "Survey management endpoints for frontend integration"
+        },
+        {
+            "name": "sessions", 
+            "description": "Legacy session endpoints (deprecated)"
+        },
+        {
+            "name": "health",
+            "description": "Health check and monitoring endpoints"
+        }
+    ]
 )
 
-# Configure CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],  # React dev server
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE"],
-    allow_headers=["*"],
-)
+# Configure CORS middleware with environment-based settings
+configure_cors(app)
 
 # Include routers
 app.include_router(sessions.router, prefix="/api", tags=["sessions"])
+app.include_router(survey_api.router, tags=["survey"])
 
 @app.get("/")
 async def root():
