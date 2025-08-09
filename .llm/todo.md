@@ -38,10 +38,51 @@ Migrate from current authentication method to new public key authentication meth
 - Test connection detects legacy key deprecation automatically
 - No direct Supabase client usage outside of `src/database.py` wrapper
 
-- [ ] Research new public key authentication method
+- [x] Research new public key authentication method
   - Review Supabase documentation for new authentication patterns
   - Understand migration requirements and breaking changes
   - Document security improvements and compliance benefits
+
+**FINDINGS:**
+
+**New Authentication System (Available Now, Required by Q2/Q3 2025):**
+
+**1. New API Key Types:**
+- **Publishable Key** (`sb_publishable_...`) - Replaces `SUPABASE_ANON_KEY`
+- **Secret Key** (`sb_secret_...`) - Replaces `SUPABASE_SERVICE_KEY`
+- Multiple secret keys can be created per project
+- Single publishable key per project (like anon key)
+
+**2. JWT Signing Keys System:**
+- **Legacy**: Single shared JWT secret (symmetric HS256)
+- **New**: Asymmetric keys (RS256, ES256) or improved shared secrets
+- **Benefits**: Local JWT validation, zero-downtime rotation, enhanced security
+- **Timeline**: New projects use asymmetric JWTs by default from October 1, 2025
+
+**3. Migration Timeline:**
+- **Current Status**: Legacy keys still working, new keys available as opt-in
+- **Deadline**: Legacy API keys disabled November 1, 2025
+- **No Action Required Until**: At least November 1, 2025
+- **Python Client**: supabase-py supports both systems during transition
+
+**4. Security Improvements:**
+- Zero-downtime key rotation without forcing user sign-outs
+- Better security compliance framework alignment
+- Improved performance with local JWT validation
+- Enhanced reliability and reduced dependency on central services
+
+**5. Breaking Changes & Compatibility:**
+- Secret keys cannot be used in browser environments (same as service keys)
+- Some third-party integrations may need updates
+- Edge Functions and database type generation may need adjustments
+- Realtime connections may have 24-hour session limitations
+
+**6. Migration Requirements:**
+- Update client libraries to latest versions
+- Replace environment variables: `SUPABASE_ANON_KEY` → `SUPABASE_PUBLISHABLE_KEY`
+- Replace `SUPABASE_SERVICE_KEY` → `SUPABASE_SECRET_KEY`
+- Update JWT verification logic to use new signing keys
+- Test authentication flows with new keys
 
 - [ ] Create test cases for authentication functionality
   - Add tests for database connection with current method
