@@ -12,8 +12,19 @@ import os
 # Load environment variables
 load_dotenv()
 
-# Import CORS configuration
+# Import configuration
 from cors_config import configure_cors
+from utils.fastapi_logging import setup_fastapi_logging, LoggingMiddleware, log_health_check
+from utils.langsmith_tracing import setup_graph_tracing
+
+# Set up logging first
+setup_fastapi_logging(
+    log_level=os.getenv('LOG_LEVEL', 'INFO'),
+    log_file=os.getenv('LOG_FILE')
+)
+
+# Set up tracing
+setup_graph_tracing()
 
 # Import routes
 import sys
@@ -47,6 +58,9 @@ app = FastAPI(
 # Configure CORS middleware with environment-based settings
 configure_cors(app)
 
+# Add logging middleware
+app.add_middleware(LoggingMiddleware)
+
 # Include routers
 app.include_router(sessions.router, prefix="/api", tags=["sessions"])
 app.include_router(survey_api.router, tags=["survey"])
@@ -70,8 +84,6 @@ async def health_check():
         db_healthy = db.test_connection()
         
         # Test OpenAI connection
-        import openai
-        openai_client = openai.OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
         openai_healthy = bool(os.getenv('OPENAI_API_KEY'))
         
         return {
