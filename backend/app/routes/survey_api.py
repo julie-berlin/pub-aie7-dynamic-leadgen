@@ -1,77 +1,35 @@
 """Survey API endpoints for frontend interaction."""
 
 from fastapi import APIRouter, HTTPException, Request, Header
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from typing import Dict, Any, List, Optional
 import logging
 from datetime import datetime
 
+# Import consolidated Pydantic models
+from ...pydantic_models import (
+    StartSessionRequest,
+    StartSessionResponse,
+    SubmitResponsesRequest,
+    StepResponse,
+    CompletionResponse,
+    SessionStatusResponse,
+    AbandonSessionRequest,
+    ErrorResponse,
+    QuestionData,
+    SurveyGraphState,
+    create_initial_state,
+    LeadStatus,
+    CompletionType
+)
 from ..graphs.survey_graph_v2 import survey_graph_v2
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/survey", tags=["survey"])
 
 
-class StartSessionRequest(BaseModel):
-    """Request model for starting a new survey session."""
-    form_id: str
-    client_id: Optional[str] = None
-    utm_source: Optional[str] = None
-    utm_medium: Optional[str] = None
-    utm_campaign: Optional[str] = None
-    utm_content: Optional[str] = None
-    utm_term: Optional[str] = None
-    landing_page: Optional[str] = None
-
-
-class StartSessionResponse(BaseModel):
-    """Response model for session initialization."""
-    session_id: str
-    questions: List[Dict[str, Any]]
-    headline: str
-    motivation: str
-    step: int = 1
-
-
-class SubmitResponsesRequest(BaseModel):
-    """Request model for submitting survey responses."""
-    session_id: str
-    responses: List[Dict[str, Any]] = Field(
-        ..., 
-        description="List of {question_id, question_text, answer}"
-    )
-
-
-class StepResponse(BaseModel):
-    """Response model for next step data."""
-    session_id: str
-    step: int
-    questions: List[Dict[str, Any]]
-    headline: str
-    motivation: str
-    progress: Dict[str, Any]
-    completed: bool = False
-    completion_message: Optional[str] = None
-
-
-class SessionStatusResponse(BaseModel):
-    """Response model for session status."""
-    session_id: str
-    status: str
-    step: int
-    completed: bool
-    lead_status: str
-    abandonment_risk: float
-    abandonment_status: str
-    form_id: str
-    started_at: Optional[str]
-    completed_at: Optional[str]
-    response_count: int
-    completion_type: Optional[str]
-
-
 class AbandonResponse(BaseModel):
-    """Response model for abandonment endpoint."""
+    """Simple response model for abandonment endpoint."""
     status: str
     message: str
 

@@ -1,15 +1,41 @@
-"""Shared agent state definitions for LangGraph graphs."""
+"""
+Legacy state definitions - DEPRECATED
+
+Use pydantic_models.py for all new state definitions.
+This file is kept for backward compatibility during migration.
+"""
 from __future__ import annotations
 from typing import Annotated, TypedDict, List, Dict, Any, Optional, Literal
 from langgraph.graph.message import add_messages
+
+# Import the new Pydantic models
+from ..pydantic_models import (
+    SurveyGraphState,
+    CoreSurveyState,
+    MasterFlowState,
+    QuestionStrategyState,
+    LeadIntelligenceState,
+    EngagementState,
+    ResponseData,
+    QuestionDataInternal,
+    OperationLogEntry,
+    create_initial_state,
+    LeadStatus,
+    AbandonmentStatus,
+    CompletionType,
+    FlowPhase,
+    FlowStrategy
+)
 
 class AgentState(TypedDict):
     """State schema for agent graphs, storing a message list with add_messages."""
     messages: Annotated[List, add_messages]
 
-# Core shared state for basic survey information
-class CoreSurveyState(TypedDict):
-    """Core survey state shared across all supervisors."""
+# Legacy TypedDict versions - DEPRECATED
+# Use Pydantic models from pydantic_models.py instead
+
+class CoreSurveyStateLegacy(TypedDict):
+    """DEPRECATED: Use pydantic_models.CoreSurveyState instead."""
     session_id: str
     form_id: str
     client_id: Optional[str]

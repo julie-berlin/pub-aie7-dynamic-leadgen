@@ -6,25 +6,70 @@ import json
 import logging
 from datetime import datetime
 
-from ...state import SurveyGraphState, CoreSurveyState
+# Import Pydantic models for type safety
+from ....pydantic_models import (
+    SurveyGraphState,
+    CoreSurveyState,
+    ResponseData,
+    OperationLogEntry,
+    LeadStatus,
+    AbandonmentStatus,
+    create_initial_state
+)
 from ..toolbelts.persistence_toolbelt import persistence_toolbelt
 
 logger = logging.getLogger(__name__)
 
 
-def initialize_session_with_tracking_node(state: SurveyGraphState) -> Dict[str, Any]:
+def initialize_session_with_tracking_node(state: Dict[str, Any]) -> Dict[str, Any]:
     """
     Initialize session with UTM parameters and tracking data.
     
-    Expected input in state:
-    - utm_source, utm_medium, utm_campaign, utm_content, utm_term
-    - referrer (from HTTP headers)
-    - user_agent
-    - ip_address (for geographic data)
-    - form_id/client_id
+    Args:
+        state: Raw state dictionary (will be validated)
+        
+    Returns:
+        Updated state dictionary with validated Pydantic models
     """
     try:
-        # Extract tracking data from initial request
+        # Create proper Pydantic state if we have minimal data
+        if 'core' not in state and 'metadata' in state:
+            # This is likely an initial API call, create proper state
+            metadata = state.get('metadata', {})
+            
+            # Create validated initial state
+            survey_state = create_initial_state(
+                session_id=f"session_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                form_id=metadata.get('form_id', ''),
+                client_id=metadata.get('client_id'),
+                utm_data={
+                    'utm_source': metadata.get('utm_source'),
+                    'utm_medium': metadata.get('utm_medium'),
+                    'utm_campaign': metadata.get('utm_campaign'),
+                    'utm_content': metadata.get('utm_content'),
+                    'utm_term': metadata.get('utm_term'),
+                    'referrer': metadata.get('referrer'),
+                    'user_agent': metadata.get('user_agent'),
+                    'ip_address': metadata.get('ip_address'),
+                    'landing_page': metadata.get('landing_page')
+                }
+            )
+            
+            # Convert to dict for LangGraph compatibility
+            state = survey_state.model_dump()
+        
+        # Validate existing state with Pydantic
+        try:
+            validated_state = SurveyGraphState(**state)
+        except Exception as e:
+            logger.warning(f"State validation failed, using raw state: {e}")
+            validated_state = None
+        
+        # Extract core data (use validated if available)
+        core_data = validated_state.core if validated_state else state.get('core', {})
+        session_id = core_data.session_id if hasattr(core_data, 'session_id') else core_data.get('session_id')
+        
+        # Extract tracking data from metadata or core
         metadata = state.get('metadata', {})
         tracking_data = {
             'utm_source': metadata.get('utm_source'),
