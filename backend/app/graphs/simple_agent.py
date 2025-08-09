@@ -12,9 +12,9 @@ from typing import Dict, Any
 from langgraph.graph import StateGraph, END
 from langgraph.prebuilt import ToolNode
 
-from app.state import AgentState
-from backend.py_models import get_chat_model
-from app.tools import get_tool_belt
+from ..state import AgentState
+from ..models import get_chat_model
+from ..tools import get_tool_belt
 
 
 def _build_model_with_tools():

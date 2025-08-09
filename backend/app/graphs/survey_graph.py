@@ -91,13 +91,13 @@ def build_survey_graph() -> StateGraph:
     graph.add_edge("lead_intelligence", "supervisor_coordination")
     graph.add_edge("engagement_supervision", "supervisor_coordination")
     
-    # After coordination, update state
+    # After coordination, update state and persist in parallel
     graph.add_edge("supervisor_coordination", "update_step")
-    graph.add_edge("update_step", "update_session")
+    graph.add_edge("supervisor_coordination", "update_session")  # Fire-and-forget DB write
     
-    # Conditional routing based on master flow decision
+    # Conditional routing based only on step update (don't wait for DB)
     graph.add_conditional_edges(
-        "update_session",
+        "update_step",
         should_continue_survey_with_supervisors,
         {
             "continue": "master_coordination",  # Loop back to supervisors
