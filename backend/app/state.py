@@ -17,6 +17,17 @@ class CoreSurveyState(TypedDict):
     last_updated: str
     step: int
     completed: bool
+    
+    # UTM and tracking parameters
+    utm_source: Optional[str]
+    utm_medium: Optional[str]
+    utm_campaign: Optional[str]
+    utm_content: Optional[str]
+    utm_term: Optional[str]
+    referrer: Optional[str]
+    user_agent: Optional[str]
+    ip_address: Optional[str]
+    landing_page: Optional[str]
 
 # Master flow supervisor state
 class MasterFlowState(TypedDict):
@@ -58,6 +69,12 @@ class EngagementState(TypedDict):
     step_motivation: str
     engagement_history: List[Dict[str, Any]]
     retention_strategies: List[str]
+    
+    # Activity tracking
+    last_activity_timestamp: Optional[str]
+    abandonment_status: Literal["active", "at_risk", "high_risk", "abandoned"]
+    time_on_step: Optional[float]  # seconds
+    hesitation_indicators: int
 
 # Main graph state that coordinates all supervisor states
 class SurveyGraphState(TypedDict):
@@ -75,8 +92,20 @@ class SurveyGraphState(TypedDict):
     supervisor_messages: List[Dict[str, Any]]
     shared_context: Dict[str, Any]  # Minimal shared context
     
-    # Error handling
+    # API interaction fields
+    pending_responses: List[Dict[str, Any]]  # Responses waiting to be processed
+    frontend_response: Optional[Dict[str, Any]]  # Data prepared for frontend
+    
+    # Session management
+    session_recovery_data: Optional[Dict[str, Any]]  # For resuming sessions
+    completion_message: Optional[str]  # Generated completion message
+    
+    # Error handling and logging
     error_log: List[Dict[str, Any]]
+    operation_log: List[Dict[str, Any]]  # Track all operations
+    
+    # Metadata and tracking
+    metadata: Dict[str, Any]  # Additional tracking data
 
 # Legacy state for backward compatibility during transition
 SurveyState = SurveyGraphState  # Alias for existing code
