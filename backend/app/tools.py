@@ -186,6 +186,46 @@ def validate_responses(responses_data: str, questions_data: str) -> str:
             "error": str(e)
         })
 
+@tool
+def save_tracking_data(session_id: str, tracking_data: str) -> str:
+    """Save UTM and tracking data to database immediately.
+    
+    Args:
+        session_id: Session identifier
+        tracking_data: JSON string of tracking parameters
+        
+    Returns:
+        JSON string with success status
+    """
+    try:
+        tracking = json.loads(tracking_data)
+        # Fire-and-forget operation for tracking data
+        result = db.save_tracking_data(session_id, tracking)
+        return json.dumps({"success": True, "tracking_saved": True})
+    except Exception as e:
+        # Log error but don't fail the flow
+        return json.dumps({"success": False, "error": str(e), "tracking_saved": False})
+
+@tool
+def save_response(session_id: str, response_data: str) -> str:
+    """Save individual response to database immediately.
+    
+    Args:
+        session_id: Session identifier
+        response_data: JSON string of single response data
+        
+    Returns:
+        JSON string with success status
+    """
+    try:
+        response = json.loads(response_data)
+        # Fire-and-forget operation for individual response
+        result = db.save_individual_response(session_id, response)
+        return json.dumps({"success": True, "response_saved": True})
+    except Exception as e:
+        # Log error but don't fail the flow
+        return json.dumps({"success": False, "error": str(e), "response_saved": False})
+
 
 def get_tool_belt() -> List:
     """Return the list of tools available to agents and LangGraph nodes."""
@@ -199,7 +239,9 @@ def get_tool_belt() -> List:
         update_session,
         finalize_session,
         create_session,
-        validate_responses
+        validate_responses,
+        save_tracking_data,
+        save_response
     ]
     tools.extend(survey_tools)
     

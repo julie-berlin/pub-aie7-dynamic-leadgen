@@ -93,6 +93,29 @@ class SupabaseClient:
         result = self.client.table("responses").select("*").eq("session_id", session_id).order("timestamp").execute()
         return result.data or []
     
+    def save_individual_response(self, session_id: str, response_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Save individual response immediately (fire-and-forget)"""
+        # Add session_id and timestamp if not present
+        response_with_metadata = {
+            **response_data,
+            "session_id": session_id,
+            "timestamp": datetime.now().isoformat()
+        }
+        result = self.client.table("responses").insert(response_with_metadata).execute()
+        return result.data[0] if result.data else {}
+    
+    # === Tracking Data Management ===
+    
+    def save_tracking_data(self, session_id: str, tracking_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Save UTM and tracking parameters immediately (fire-and-forget)"""
+        tracking_with_metadata = {
+            **tracking_data,
+            "session_id": session_id,
+            "created_at": datetime.now().isoformat()
+        }
+        result = self.client.table("tracking_data").insert(tracking_with_metadata).execute()
+        return result.data[0] if result.data else {}
+    
     # === Lead Outcome Management ===
     
     def create_lead_outcome(self, outcome_data: Dict[str, Any]) -> Dict[str, Any]:

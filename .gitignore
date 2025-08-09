@@ -211,4 +211,5 @@ __marimo__/
 # Mac
 .DS_Store
 .llm/
+.langgraph_api/
 DEVELOPMENT_PLAN.md

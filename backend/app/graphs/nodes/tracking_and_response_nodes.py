@@ -43,7 +43,7 @@ def initialize_session_with_tracking_node(state: SurveyGraphState) -> Dict[str, 
         import uuid
         session_id = str(uuid.uuid4())
         
-        # Initialize core state
+        # Initialize core state with all tracking fields
         core_state = {
             'session_id': session_id,
             'form_id': metadata.get('form_id', 'default'),
@@ -51,7 +51,17 @@ def initialize_session_with_tracking_node(state: SurveyGraphState) -> Dict[str, 
             'started_at': datetime.now().isoformat(),
             'last_updated': datetime.now().isoformat(),
             'step': 0,
-            'completed': False
+            'completed': False,
+            # Add all UTM and tracking fields
+            'utm_source': metadata.get('utm_source'),
+            'utm_medium': metadata.get('utm_medium'),
+            'utm_campaign': metadata.get('utm_campaign'),
+            'utm_content': metadata.get('utm_content'),
+            'utm_term': metadata.get('utm_term'),
+            'referrer': metadata.get('referrer'),
+            'user_agent': metadata.get('user_agent'),
+            'ip_address': metadata.get('ip_address'),
+            'landing_page': metadata.get('landing_page')
         }
         
         # Save tracking data immediately to database
@@ -76,17 +86,43 @@ def initialize_session_with_tracking_node(state: SurveyGraphState) -> Dict[str, 
                 'all_questions': [],  # Will be loaded
                 'asked_questions': [],
                 'current_questions': [],
-                'phrased_questions': []
+                'phrased_questions': [],
+                'question_strategy': {},
+                'selection_history': []
             },
             'lead_intelligence': {
                 'responses': [],
                 'current_score': 0,
-                'lead_status': 'unknown'
+                'score_history': [],
+                'lead_status': 'unknown',
+                'qualification_reasoning': [],
+                'risk_factors': [],
+                'positive_indicators': []
             },
             'engagement': {
                 'abandonment_risk': 0.3,
-                'last_activity_timestamp': datetime.now().isoformat()
+                'engagement_metrics': {},
+                'step_headline': '',
+                'step_motivation': '',
+                'engagement_history': [],
+                'retention_strategies': [],
+                'last_activity_timestamp': datetime.now().isoformat(),
+                'abandonment_status': 'active',
+                'time_on_step': None,
+                'hesitation_indicators': 0
             },
+            # Communication and API fields
+            'supervisor_messages': [],
+            'shared_context': {},
+            'pending_responses': [],
+            'frontend_response': None,
+            # Session management
+            'session_recovery_data': None,
+            'completion_message': None,
+            # Logging
+            'error_log': [],
+            'operation_log': [],
+            # Metadata
             'metadata': {**metadata, **tracking_data}
         }
         
