@@ -18,7 +18,7 @@ from .nodes.question_selection_node import question_selection_node
 from .nodes.question_phrasing_node import question_phrasing_node
 from .nodes.engagement_node import engagement_node
 from .nodes.lead_scoring_node import lead_scoring_node
-from ..tools import load_questions, load_client_info
+from ..tools import load_questions, load_client_info, save_responses, update_session, finalize_session, create_session
 
 
 def initialize_session_node(state: SurveyState) -> Dict[str, Any]:
@@ -206,6 +206,114 @@ def should_continue_survey(state: SurveyState) -> str:
         return "complete"
 
 
+def save_responses_node(state: SurveyState) -> Dict[str, Any]:
+    """
+    Save user responses to database.
+    
+    Args:
+        state: Current SurveyState with responses to save
+        
+    Returns:
+        Dict with success status (doesn't modify state)
+    """
+    try:
+        responses = state.get('responses', [])
+        if not responses:
+            return {}  # No responses to save
+            
+        # Get only the latest responses that need to be saved
+        # In a real implementation, you'd track which responses are already saved
+        session_id = state.get('session_id', '')
+        
+        # Save responses using our tool
+        responses_json = json.dumps(responses)
+        result = save_responses.invoke({
+            "session_id": session_id,
+            "responses_data": responses_json
+        })
+        
+        print(f"Saved responses: {result}")
+        return {}  # Don't modify state, just persist to DB
+        
+    except Exception as e:
+        print(f"Error saving responses: {e}")
+        return {}
+
+
+def update_session_node(state: SurveyState) -> Dict[str, Any]:
+    """
+    Update session data in database.
+    
+    Args:
+        state: Current SurveyState
+        
+    Returns:
+        Dict with success status (doesn't modify state)
+    """
+    try:
+        session_id = state.get('session_id', '')
+        
+        # Prepare session update data
+        update_data = {
+            'step_count': state.get('step', 0),
+            'final_score': state.get('score', 0),
+            'lead_status': state.get('lead_status', 'unknown'),
+            'completed': state.get('completed', False),
+            'updated_at': state.get('last_updated', datetime.now().isoformat())
+        }
+        
+        # Update session using our tool
+        updates_json = json.dumps(update_data)
+        result = update_session.invoke({
+            "session_id": session_id,
+            "updates_data": updates_json
+        })
+        
+        print(f"Updated session: {result}")
+        return {}  # Don't modify state, just persist to DB
+        
+    except Exception as e:
+        print(f"Error updating session: {e}")
+        return {}
+
+
+def save_completion_node(state: SurveyState) -> Dict[str, Any]:
+    """
+    Finalize session with completion data in database.
+    
+    Args:
+        state: Current SurveyState with final data
+        
+    Returns:
+        Dict with success status (doesn't modify state)
+    """
+    try:
+        session_id = state.get('session_id', '')
+        
+        # Prepare final completion data
+        final_data = {
+            'final_score': state.get('score', 0),
+            'lead_status': state.get('lead_status', 'unknown'),
+            'completed_at': datetime.now().isoformat(),
+            'step_count': state.get('step', 0),
+            'response_count': len(state.get('responses', []))
+        }
+        
+        # Finalize session using our tool
+        final_json = json.dumps(final_data)
+        result = finalize_session.invoke({
+            "session_id": session_id,
+            "final_data": final_json
+        })
+        
+        print(f"Finalized session: {result}")
+        return {}  # Don't modify state, just persist to DB
+        
+    except Exception as e:
+        print(f"Error finalizing session: {e}")
+        return {}
+
+
 def completion_node(state: SurveyState) -> Dict[str, Any]:
     """
     Mark survey as completed and prepare final state.
@@ -242,6 +350,13 @@ def build_survey_graph() -> StateGraph:
     graph.add_node("create_engagement", create_engagement_node)
     graph.add_node("update_step", update_step_node)
     graph.add_node("score_lead", score_lead_node)
+    
+    # Add database persistence nodes
+    graph.add_node("save_responses", save_responses_node)
+    graph.add_node("update_session", update_session_node)
+    graph.add_node("save_completion", save_completion_node)
+    
+    # Add completion node
     graph.add_node("completion", completion_node)
     
     # Set entry point
@@ -252,7 +367,8 @@ def build_survey_graph() -> StateGraph:
     graph.add_edge("select_questions", "phrase_questions")
     graph.add_edge("phrase_questions", "create_engagement")
     graph.add_edge("create_engagement", "update_step")
-    graph.add_edge("update_step", "score_lead")
+    graph.add_edge("update_step", "update_session")  # Save session state after each step
+    graph.add_edge("update_session", "score_lead")
     
     # Add conditional routing after scoring
     graph.add_conditional_edges(
@@ -260,12 +376,13 @@ def build_survey_graph() -> StateGraph:
         should_continue_survey,
         {
             "continue": "select_questions",  # Loop back to select more questions
-            "complete": "completion",  # Move to completion
+            "complete": "save_completion",  # Save final data before completion
             END: END  # End graph (wait for user responses)
         }
     )
     
-    # Completion leads to END
+    # Completion flow with database persistence
+    graph.add_edge("save_completion", "completion")
     graph.add_edge("completion", END)
     
     return graph
