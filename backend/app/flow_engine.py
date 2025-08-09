@@ -12,7 +12,7 @@ from pathlib import Path
 import sys
 import os
 
-# Add src to path for imports
+# Add app to path for imports
 sys.path.append(os.path.dirname(__file__))
 
 # Import our existing flow components
@@ -31,13 +31,13 @@ from agents.lead_scoring_agent import invoke_lead_scoring_agent
 class FormFlowEngine:
     """
     Engine that orchestrates the form flow for API consumption
-    
+
     Converts the notebook-based LangGraph flow into API-callable methods.
     """
-    
+
     def __init__(self):
         self.active_sessions: Dict[str, Dict[str, Any]] = {}
-        
+
     def load_questions(self, form_id: str = "dogwalk_demo_form") -> List[Dict[str, Any]]:
         """Load questions from JSON file based on form_id"""
         # For now, use the dogwalk demo data
@@ -45,7 +45,7 @@ class FormFlowEngine:
         with open(questions_file, 'r') as f:
             data = json.load(f)
         return data['questions']
-    
+
     def load_client_info(self, form_id: str = "dogwalk_demo_form") -> Dict[str, Any]:
         """Load client information based on form_id"""
         # For now, use the dogwalk demo data
@@ -53,7 +53,7 @@ class FormFlowEngine:
         with open(client_file, 'r') as f:
             data = json.load(f)
         return data['client']
-    
+
     def _create_initial_state(self, session_id: str, form_id: str, client_id: Optional[str], metadata: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         """Create initial session state with alphabetically ordered keys"""
         return {
@@ -77,40 +77,40 @@ class FormFlowEngine:
             'step_headline': "",
             'step_motivation': ""
         }
-    
+
     async def start_session(self, form_id: str, client_id: Optional[str] = None, metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         Start a new form session
-        
+
         Args:
             form_id: Form configuration identifier
             client_id: Optional client identifier
             metadata: Additional session metadata
-            
+
         Returns:
             Dict with session_id, first step questions, and content
         """
         # Generate session ID
         session_id = str(uuid.uuid4())
-        
+
         # Initialize session state with alphabetically ordered keys
         state = self._create_initial_state(session_id, form_id, client_id, metadata)
-        
+
         # Store session in memory and database
         self.active_sessions[session_id] = state
-        
+
         # Get first step questions using our agent
         try:
             selected_question_ids = invoke_question_selection(state)
-            selected_questions = [q for q in state['all_questions'] 
+            selected_questions = [q for q in state['all_questions']
                                 if q['id'] in selected_question_ids]
         except Exception as e:
             print(f"Question selection failed: {e}, using fallback")
             # Fallback to first 2 questions
             selected_questions = state['all_questions'][:2]
-        
+
         state['current_step_questions'] = selected_questions
-        
+
         # Phrase questions using LLM
         try:
             client_info = self.load_client_info(form_id)
@@ -119,7 +119,7 @@ class FormFlowEngine:
         except Exception as e:
             print(f"Question phrasing failed: {e}, using original questions")
             state['phrased_questions'] = [q['question'] for q in selected_questions]
-        
+
         # Generate engagement content
         try:
             client_info = self.load_client_info(form_id)
@@ -130,7 +130,7 @@ class FormFlowEngine:
             print(f"Engagement generation failed: {e}, using fallback")
             state['step_headline'] = "Let's get started! 🚀"
             state['step_motivation'] = "Help us understand your needs better."
-        
+
         # Save initial state to database
         try:
             session_data = {
@@ -146,7 +146,7 @@ class FormFlowEngine:
             db.create_lead_session(session_data)
         except Exception as e:
             print(f"Database save failed: {e}")
-        
+
         # Prepare questions for API response
         questions_with_phrasing = []
         for i, (question, phrased) in enumerate(zip(selected_questions, state['phrased_questions'])):
@@ -154,7 +154,7 @@ class FormFlowEngine:
                 **question,
                 'phrased_question': phrased
             })
-        
+
         return {
             'session_id': session_id,
             'step': 1,
@@ -162,7 +162,7 @@ class FormFlowEngine:
             'motivation': state['step_motivation'],
             'questions': questions_with_phrasing
         }
-    
+
     async def get_session_status(self, session_id: str) -> Optional[Dict[str, Any]]:
         """Get current session status"""
         if session_id not in self.active_sessions:
@@ -171,9 +171,9 @@ class FormFlowEngine:
                 session_data = db.get_lead_session(session_id)
                 if not session_data:
                     return None
-                
+
                 responses = db.get_session_responses(session_id)
-                
+
                 return {
                     'completed': session_data.get('completed', False),
                     'form_id': session_data.get('form_id', ''),
@@ -188,7 +188,7 @@ class FormFlowEngine:
             except Exception as e:
                 print(f"Failed to load session from database: {e}")
                 return None
-        
+
         state = self.active_sessions[session_id]
         return {
             'completed': state['completed'],
@@ -201,13 +201,13 @@ class FormFlowEngine:
             'started_at': state['started_at'],
             'step': state['step']
         }
-    
+
     def _collect_user_responses(self, state: Dict[str, Any], responses: List[Dict[str, Any]]) -> None:
         """Collect and store user responses in session state"""
         for response in responses:
-            question_data = next((q for q in state['current_step_questions'] 
+            question_data = next((q for q in state['current_step_questions']
                                 if q['id'] == response['question_id']), None)
-            
+
             if question_data:
                 response_record = {
                     'answer': response['answer'],
@@ -222,7 +222,7 @@ class FormFlowEngine:
                 }
                 state['responses'].append(response_record)
                 state['asked_questions'].append(response['question_id'])
-        
+
         state['last_updated'] = datetime.now().isoformat()
         state['step'] += 1
 
@@ -252,7 +252,7 @@ class FormFlowEngine:
             scoring_result = invoke_lead_scoring_agent(state, state['all_questions'])
             state['min_questions_met'] = len(state['responses']) >= 4
             state['score'] = scoring_result['score']
-            
+
             # Determine lead status
             if any("CRITICAL" in flag for flag in scoring_result.get('red_flags', [])):
                 state['failed_required'] = True
@@ -265,7 +265,7 @@ class FormFlowEngine:
                 state['lead_status'] = "no"
             else:
                 state['lead_status'] = "maybe"
-                
+
         except Exception as e:
             print(f"Lead scoring calculation failed: {e}, using fallback")
             state['min_questions_met'] = len(state['responses']) >= 4
@@ -281,7 +281,7 @@ class FormFlowEngine:
         """Check if session meets completion criteria"""
         available_questions = [q for q in state['all_questions']
                              if q['id'] not in state['asked_questions']]
-        
+
         return (
             not available_questions or
             state['failed_required'] or
@@ -293,7 +293,7 @@ class FormFlowEngine:
         """Select questions for next step using AI agent"""
         try:
             selected_question_ids = invoke_question_selection(state)
-            return [q for q in state['all_questions'] 
+            return [q for q in state['all_questions']
                    if q['id'] in selected_question_ids]
         except Exception as e:
             print(f"Question selection failed: {e}, using fallback")
@@ -336,49 +336,49 @@ class FormFlowEngine:
     async def advance_session_step(self, session_id: str, responses: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
         Advance session to next step with user responses
-        
+
         Args:
             session_id: Session identifier
             responses: List of user responses for current step
-            
+
         Returns:
             Dict with next step questions and content, or completion flag
         """
         if session_id not in self.active_sessions:
             raise ValueError(f"Session {session_id} not found")
-        
+
         state = self.active_sessions[session_id]
-        
+
         # Collect and store user responses
         self._collect_user_responses(state, responses)
-        
+
         # Persist responses to database
         new_responses = state['responses'][-len(responses):] if responses else []
         self._persist_responses_to_database(session_id, new_responses)
-        
+
         # Calculate lead score and status
         self._calculate_lead_score(state)
-        
+
         # Check if session should be completed
         if self._check_completion_criteria(state):
             state['completed'] = True
             return {'completed': True, 'session_id': session_id}
-        
+
         # Select questions for next step
         selected_questions = self._select_next_questions(state)
         state['current_step_questions'] = selected_questions
-        
+
         # Adapt question phrasing
         self._adapt_question_phrasing(state, selected_questions)
-        
+
         # Create engagement content
         self._create_engagement_content(state)
-        
+
         # Format response
         questions_with_phrasing = self._format_questions_for_api(
             selected_questions, state['phrased_questions']
         )
-        
+
         return {
             'headline': state['step_headline'],
             'motivation': state['step_motivation'],
@@ -387,7 +387,7 @@ class FormFlowEngine:
             'step': state['step'],
             'total_responses': len(state['responses'])
         }
-    
+
     def _extract_personalization_data(self, responses: List[Dict[str, Any]]) -> Dict[str, str]:
         """Extract user name and dog info for personalization"""
         # TODO: Refactor hardcoded question IDs for real app
@@ -396,25 +396,25 @@ class FormFlowEngine:
         # - Support different question types (name, contact, subject, etc.)
         dog_info = "your pup"
         user_name = ""
-        
+
         for response in responses:
             if response['question_id'] == 7:  # HARDCODED: Name question
                 user_name = response['answer'].split()[0]
             elif response['question_id'] == 2:  # HARDCODED: Breed question
                 dog_info = f"your {response['answer']}"
-        
+
         greeting = f"Hi {user_name}!" if user_name else "Hello!"
         return {'dog_info': dog_info, 'greeting': greeting, 'user_name': user_name}
-    
+
     def _generate_completion_message(self, state: Dict[str, Any], personalization: Dict[str, str]) -> Dict[str, Any]:
         """Generate personalized completion message based on lead status"""
         client_info = self.load_client_info(state['form_id'])
         business_name = client_info['information']['name']
         owner_name = client_info['information']['owner']
-        
+
         greeting = personalization['greeting']
         dog_info = personalization['dog_info']
-        
+
         if state['lead_status'] == "yes":
             completion_message = f"""🎉 {greeting} Wonderful news!
 
@@ -428,7 +428,7 @@ We're excited to meet you both and provide the best care for your furry family m
                 "Prepare any additional questions about our services",
                 "Get ready to meet your dedicated dog walker!"
             ]
-            
+
         elif state['lead_status'] == "maybe":
             completion_message = f"""🤔 {greeting} Thank you for your interest!
 
@@ -442,7 +442,7 @@ We appreciate you considering {business_name} for your dog walking needs! 🐕""
                 "Consider additional services you might need",
                 "Review our service areas and scheduling"
             ]
-            
+
         else:  # "no" status
             completion_message = f"""🙏 {greeting} Thank you for your time!
 
@@ -456,12 +456,12 @@ Best wishes to you and your furry friend! 🐾"""
                 "Check our referral network for alternatives",
                 "Feel free to contact us if your needs change"
             ]
-        
+
         return {
             'completion_message': completion_message,
             'next_steps': next_steps
         }
-    
+
     def _finalize_session_in_database(self, session_id: str, state: Dict[str, Any]) -> None:
         """Update database with final session completion data"""
         try:
@@ -473,47 +473,47 @@ Best wishes to you and your furry friend! 🐾"""
             })
         except Exception as e:
             print(f"Database finalization failed: {e}")
-    
+
     async def finalize_session(self, session_id: str, final_responses: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
         """
         Finalize session and generate completion results
-        
+
         Args:
             session_id: Session identifier
             final_responses: Optional final responses to process
-            
+
         Returns:
             Dict with completion message and final status
         """
         if session_id not in self.active_sessions:
             raise ValueError(f"Session {session_id} not found")
-        
+
         state = self.active_sessions[session_id]
-        
+
         # Collect any final responses
         if final_responses:
             self._collect_user_responses(state, final_responses)
             new_responses = state['responses'][-len(final_responses):] if final_responses else []
             self._persist_responses_to_database(session_id, new_responses)
             self._calculate_lead_score(state)
-        
+
         # Mark session as completed
         state['completed'] = True
         state['last_updated'] = datetime.now().isoformat()
-        
+
         # Extract personalization data
         personalization = self._extract_personalization_data(state['responses'])
-        
+
         # Generate completion message
         completion_data = self._generate_completion_message(state, personalization)
-        
+
         # Update database
         self._finalize_session_in_database(session_id, state)
-        
+
         # Clean up active session
         if session_id in self.active_sessions:
             del self.active_sessions[session_id]
-        
+
         return {
             'completed_at': state['last_updated'],
             'completion_message': completion_data['completion_message'],
@@ -522,7 +522,7 @@ Best wishes to you and your furry friend! 🐾"""
             'next_steps': completion_data['next_steps'],
             'session_id': session_id
         }
-    
+
     def _record_abandonment_in_database(self, session_id: str, abandoned_at: str) -> None:
         """Record session abandonment in database"""
         try:
@@ -533,33 +533,33 @@ Best wishes to you and your furry friend! 🐾"""
             })
         except Exception as e:
             print(f"Database abandonment recording failed: {e}")
-    
+
     async def mark_session_abandoned(self, session_id: str) -> Dict[str, Any]:
         """
         Mark session as abandoned for analytics
-        
+
         Args:
             session_id: Session identifier
-            
+
         Returns:
             Dict with abandonment details
         """
         if session_id in self.active_sessions:
             state = self.active_sessions[session_id]
             abandoned_at = datetime.now().isoformat()
-            
+
             # Record abandonment in database
             self._record_abandonment_in_database(session_id, abandoned_at)
-            
+
             result = {
                 'abandoned_at': abandoned_at,
                 'responses_collected': len(state['responses']),
                 'step_abandoned': state['step']
             }
-            
+
             # Clean up active session
             del self.active_sessions[session_id]
-            
+
             return result
         else:
             raise ValueError(f"Session {session_id} not found")

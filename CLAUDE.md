@@ -27,7 +27,7 @@ The system uses AI agents to create intelligent, engaging forms that maximize co
 - **Notebooks**: Development and experimentation in `/notebooks/`
   - `poc_chain.ipynb` - Main proof of concept using LangGraph
   - `PoC_Survey_Agents.ipynb` - Survey agents implementation
-- **Source code**: `/src/` - Core application modules
+- **Source code**: `/app/` - Core application modules
   - `handlers/` - Request/response handlers
   - `llm/` - Language model integrations
   - `ml/` - Machine learning components
@@ -56,7 +56,7 @@ uv run python3 main.py
 Current focus is on capabilities #2 and #3 (Adaptive Forms and Lead Scoring):
 
 ```
-Start → Question Selection Agent → Question Phrasing Node → Engagement Agent → Present Step 
+Start → Question Selection Agent → Question Phrasing Node → Engagement Agent → Present Step
    ↑                                                                              ↓
    ←── Continue Flow ←── Engagement Check ←── More Questions? ←── Save State ← Score Lead
                               ↓
@@ -67,7 +67,7 @@ Start → Question Selection Agent → Question Phrasing Node → Engagement Age
 
 **Question Selection Agent**:
 - Selects 1-3 logically related questions per step (max 3)
-- Avoids repeating previously asked questions  
+- Avoids repeating previously asked questions
 - Ensures required questions are asked for lead qualification
 - Can add follow-up questions based on previous responses
 
@@ -90,7 +90,7 @@ Start → Question Selection Agent → Question Phrasing Node → Engagement Age
 
 ### Lead Classification & Actions
 - **"Yes" leads**: Real-time notification + personalized completion message + email
-- **"Maybe" leads**: Daily batch email to client + personalized completion message  
+- **"Maybe" leads**: Daily batch email to client + personalized completion message
 - **"No" leads**: Database storage only + generic completion message
 - **Failed required questions**: Immediate routing to "no" completion flow
 
@@ -132,7 +132,7 @@ Start → Question Selection Agent → Question Phrasing Node → Engagement Age
 
 ## Testing Strategy
 - Test flow with different lead quality scenarios
-- Validate scoring logic against business requirements  
+- Validate scoring logic against business requirements
 - Test abandonment prevention and re-engagement
 - Verify database state consistency
 - Test real-time vs batch notification systems

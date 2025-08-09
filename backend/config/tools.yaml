@@ -1,0 +1,20 @@
+# this is the planning agent
+engagement_agent:
+  model: gpt-4o-mini
+  temperature: 0.1
+  max_tokens: 1000
+  timeout_seconds: 30
+
+#
+lead_scoring_agent:
+  model: gpt-4o-mini
+  temperature: 0.1
+  max_tokens: 1000
+  timeout_seconds: 30
+
+# can be fast
+question_selection_agent:
+  model: gpt-4o-mini
+  temperature: 0.1
+  max_tokens: 1000
+  timeout_seconds: 30

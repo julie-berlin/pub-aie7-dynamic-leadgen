@@ -14,12 +14,12 @@ import uuid
 # Add parent directories to path for imports
 current_dir = os.path.dirname(__file__)
 api_dir = os.path.dirname(current_dir)
-src_dir = os.path.dirname(api_dir)
-root_dir = os.path.dirname(src_dir)
+app_dir = os.path.dirname(api_dir)
+root_dir = os.path.dirname(app_dir)
 
-sys.path.extend([api_dir, src_dir, root_dir])
+sys.path.extend([api_dir, app_dir, root_dir])
 
-from models import (
+from backend.py_models import (
     SessionStartRequest, SessionStepRequest, SessionCompleteRequest,
     SessionStepResponse, SessionStatusResponse, SessionCompletionResponse,
     QuestionResponse, ErrorResponse
@@ -37,7 +37,7 @@ flow_engine = FormFlowEngine()
 async def start_session(request: SessionStartRequest):
     """
     Start a new lead generation session
-    
+
     Creates a new session, initializes state, and returns the first form step.
     """
     try:
@@ -47,7 +47,7 @@ async def start_session(request: SessionStartRequest):
             client_id=request.client_id,
             metadata=request.metadata
         )
-        
+
         # Convert questions to response format
         questions = [
             QuestionResponse(
@@ -59,7 +59,7 @@ async def start_session(request: SessionStartRequest):
             )
             for q in session_result['questions']
         ]
-        
+
         return SessionStepResponse(
             session_id=session_result['session_id'],
             step=session_result['step'],
@@ -72,7 +72,7 @@ async def start_session(request: SessionStartRequest):
                 'completion_percentage': 0
             }
         )
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -83,7 +83,7 @@ async def start_session(request: SessionStartRequest):
 async def process_step(request: SessionStepRequest):
     """
     Process a form step with user responses
-    
+
     Processes user responses, advances the form flow, and returns the next step.
     """
     try:
@@ -92,16 +92,16 @@ async def process_step(request: SessionStepRequest):
             session_id=request.session_id,
             responses=request.responses
         )
-        
+
         # Check if session is complete
         if step_result.get('completed', False):
             # Return completion redirect
             raise HTTPException(
                 status_code=302,
                 detail="Session completed",
-                headers={"Location": f"/api/sessions/{request.session_id}/complete"}
+                headers={"Location": f"/sessions/{request.session_id}/complete"}
             )
-        
+
         # Convert questions to response format
         questions = [
             QuestionResponse(
@@ -113,7 +113,7 @@ async def process_step(request: SessionStepRequest):
             )
             for q in step_result['questions']
         ]
-        
+
         return SessionStepResponse(
             session_id=step_result['session_id'],
             step=step_result['step'],
@@ -126,7 +126,7 @@ async def process_step(request: SessionStepRequest):
                 'completion_percentage': min(100, step_result.get('total_responses', 0) * 20)
             }
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -139,18 +139,18 @@ async def process_step(request: SessionStepRequest):
 async def get_session_status(session_id: str):
     """
     Get current session status and state
-    
+
     Returns the current state of a session without advancing the flow.
     """
     try:
         status = await flow_engine.get_session_status(session_id)
-        
+
         if not status:
             raise HTTPException(
                 status_code=404,
                 detail=f"Session {session_id} not found"
             )
-        
+
         return SessionStatusResponse(
             session_id=status['session_id'],
             form_id=status['form_id'],
@@ -162,7 +162,7 @@ async def get_session_status(session_id: str):
             started_at=datetime.fromisoformat(status['started_at']),
             last_updated=datetime.fromisoformat(status['last_updated'])
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -175,7 +175,7 @@ async def get_session_status(session_id: str):
 async def complete_session(session_id: str, request: SessionCompleteRequest = None):
     """
     Complete a session and get final results
-    
+
     Finalizes the session, generates completion message, and returns final status.
     """
     try:
@@ -184,7 +184,7 @@ async def complete_session(session_id: str, request: SessionCompleteRequest = No
             session_id=session_id,
             final_responses=request.final_responses if request else []
         )
-        
+
         return SessionCompletionResponse(
             session_id=completion_result['session_id'],
             lead_status=completion_result['lead_status'],
@@ -193,7 +193,7 @@ async def complete_session(session_id: str, request: SessionCompleteRequest = No
             next_steps=completion_result.get('next_steps', []),
             completed_at=datetime.fromisoformat(completion_result['completed_at'])
         )
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -204,19 +204,19 @@ async def complete_session(session_id: str, request: SessionCompleteRequest = No
 async def abandon_session(session_id: str):
     """
     Mark a session as abandoned
-    
+
     Records session abandonment for analytics and cleanup.
     """
     try:
         result = await flow_engine.mark_session_abandoned(session_id)
-        
+
         return {
             "message": f"Session {session_id} marked as abandoned",
             "abandoned_at": result.get('abandoned_at'),
             "step_abandoned": result.get('step_abandoned'),
             "responses_collected": result.get('responses_collected', 0)
         }
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=500,

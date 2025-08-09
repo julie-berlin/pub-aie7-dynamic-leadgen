@@ -13,7 +13,7 @@ from langgraph.graph import StateGraph, END
 from langgraph.prebuilt import ToolNode
 
 from app.state import AgentState
-from app.models import get_chat_model
+from backend.py_models import get_chat_model
 from app.tools import get_tool_belt
 
 
