@@ -318,3 +318,203 @@ def prepare_step_for_frontend_node(state: SurveyGraphState) -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Failed to prepare frontend data: {e}")
         return {}
+
+
+def qualified_message_generation_node(state: SurveyGraphState) -> Dict[str, Any]:
+    """
+    Generate personalized completion message for qualified/maybe leads.
+    Uses LLM to create engaging, business-specific completion messages.
+    """
+    try:
+        # Extract state components
+        core = state.get('core', {})
+        lead_intelligence = state.get('lead_intelligence', {})
+        
+        form_id = core.get('form_id', 'default')
+        session_id = core.get('session_id')
+        lead_status = lead_intelligence.get('lead_status', 'unknown')
+        responses = lead_intelligence.get('responses', [])
+        
+        # Only generate for qualified/maybe leads
+        if lead_status not in ['yes', 'maybe']:
+            logger.warning(f"Qualified message generation called for {lead_status} lead")
+            return {}
+        
+        # Load client information for personalization
+        from ...tools import load_client_info
+        client_json = load_client_info.invoke({'form_id': form_id})
+        client_info = json.loads(client_json) if client_json else {}
+        
+        # Extract business context
+        business_name = "Our Business"
+        business_type = "service provider" 
+        owner_name = "The Team"
+        
+        if client_info.get('client'):
+            client_data = client_info['client']
+            business_name = client_data.get('business_name', client_data.get('name', business_name))
+            business_type = client_data.get('business_type', client_data.get('industry', business_type))
+            owner_name = client_data.get('owner_name', client_data.get('contact_name', owner_name))
+        
+        # Extract personalization data from responses
+        user_name = ""
+        key_interests = []
+        specific_needs = []
+        
+        for response in responses:
+            answer = str(response.get('answer', '')).lower()
+            question = str(response.get('question_text', '')).lower()
+            
+            # Extract name
+            if 'name' in question and not user_name:
+                user_name = str(response.get('answer', '')).strip()
+            
+            # Extract interests and needs
+            if any(word in question for word in ['service', 'need', 'looking', 'want']):
+                if len(answer) > 3:
+                    specific_needs.append(answer)
+            
+            if any(word in answer for word in ['yes', 'interested', 'definitely', 'absolutely']):
+                key_interests.append(question.split('?')[0])
+        
+        # Generate personalized message using LLM
+        completion_message = _generate_qualified_message_with_llm(
+            business_name=business_name,
+            business_type=business_type, 
+            owner_name=owner_name,
+            lead_status=lead_status,
+            user_name=user_name,
+            key_interests=key_interests[:3],  # Top 3
+            specific_needs=specific_needs[:2]  # Top 2
+        )
+        
+        logger.info(f"Generated qualified completion message for {lead_status} lead {session_id}")
+        
+        return {
+            'completion_message': completion_message,
+            'core': {
+                **core,
+                'completed': True,
+                'completed_at': datetime.now().isoformat(),
+                'completion_type': 'qualified'
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to generate qualified message: {e}")
+        # Fallback message
+        fallback = "Thank you for your interest! We'll be in touch soon with next steps."
+        return {
+            'completion_message': fallback,
+            'core': {
+                **state.get('core', {}),
+                'completed': True,
+                'completed_at': datetime.now().isoformat(),
+                'completion_type': 'qualified_fallback'
+            }
+        }
+
+
+def unqualified_completion_node(state: SurveyGraphState) -> Dict[str, Any]:
+    """
+    Simple completion for unqualified leads without LLM personalization.
+    Efficient and direct completion for leads that don't meet criteria.
+    """
+    try:
+        core = state.get('core', {})
+        lead_intelligence = state.get('lead_intelligence', {})
+        
+        session_id = core.get('session_id')
+        lead_status = lead_intelligence.get('lead_status', 'unknown')
+        
+        # Simple completion message - no LLM needed
+        completion_message = "Thank you for your time and interest."
+        
+        logger.info(f"Completed unqualified lead {session_id} with status {lead_status}")
+        
+        return {
+            'completion_message': completion_message,
+            'core': {
+                **core,
+                'completed': True,
+                'completed_at': datetime.now().isoformat(),
+                'completion_type': 'unqualified'
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to complete unqualified lead: {e}")
+        return {
+            'completion_message': "Thank you for your time.",
+            'core': {
+                **state.get('core', {}),
+                'completed': True,
+                'completed_at': datetime.now().isoformat(),
+                'completion_type': 'unqualified_error'
+            }
+        }
+
+
+def _generate_qualified_message_with_llm(
+    business_name: str,
+    business_type: str,
+    owner_name: str, 
+    lead_status: str,
+    user_name: str = "",
+    key_interests: list = None,
+    specific_needs: list = None
+) -> str:
+    """Generate personalized completion message using LLM for qualified leads."""
+    try:
+        from ...models import get_chat_model
+        
+        key_interests = key_interests or []
+        specific_needs = specific_needs or []
+        
+        # Create personalization context
+        personalization = ""
+        if user_name:
+            personalization += f"The user's name is {user_name}. "
+        if key_interests:
+            personalization += f"They showed interest in: {', '.join(key_interests)}. "
+        if specific_needs:
+            personalization += f"Their specific needs include: {', '.join(specific_needs)}. "
+        
+        lead_quality = "high-quality" if lead_status == "yes" else "potential"
+        
+        prompt = f"""Write a personalized completion message for a {lead_quality} lead for {business_name}, a {business_type}.
+
+Business owner: {owner_name}
+Lead quality: {lead_status}
+{personalization}
+
+Requirements:
+- Thank them for their time and interest
+- Reference specific interests/needs they mentioned if available
+- Create excitement about working together
+- Mention next steps (we'll contact them soon)
+- Keep it warm, professional, and personal
+- 2-3 sentences maximum
+- Use their name if provided
+
+Write the message as if {owner_name} is speaking directly to them."""
+
+        # Get chat model and generate response
+        model = get_chat_model(temperature=0.7)
+        messages = [
+            {"role": "system", "content": "You write personalized, warm completion messages for service businesses that make leads excited to work with the company."},
+            {"role": "user", "content": prompt}
+        ]
+        
+        response = model.invoke(messages)
+        
+        if hasattr(response, 'content'):
+            return response.content.strip()
+        else:
+            return str(response).strip()
+            
+    except Exception as e:
+        logger.error(f"LLM message generation failed: {e}")
+        # Fallback message
+        name_part = f"{user_name}, " if user_name else ""
+        return f"Thank you {name_part}for your interest in {business_name}! We're excited about the possibility of working together and will be in touch soon."
