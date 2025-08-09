@@ -105,11 +105,16 @@ def should_wait_or_continue(state: SurveyGraphState) -> str:
 def should_continue_or_complete(state: SurveyGraphState) -> str:
     """
     Determine if survey should continue or complete after processing responses.
-    Similar to should_continue_survey but specifically for post-response processing.
+    Returns values expected by the graph: "continue" or "complete"
     """
     try:
-        # Use the same logic as should_continue_survey
-        return should_continue_survey(state)
+        decision = should_continue_survey(state)
+        
+        # Map the internal decision to graph-expected values
+        if decision == "continue":
+            return "continue"
+        else:  # "complete" or END
+            return "complete"
             
     except Exception as e:
         print(f"Error in should_continue_or_complete: {e}")
