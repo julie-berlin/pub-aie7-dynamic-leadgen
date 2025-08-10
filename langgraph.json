@@ -5,7 +5,8 @@
   "python_version": "3.13",
   "graphs": {
     "simple_agent": "backend.app.graphs.simple_agent:graph",
-    "survey_graph": "backend.app.graphs.survey_graph:survey_graph"
+    "survey_graph": "backend.app.graphs.survey_graph:survey_graph",
+    "intelligent_survey": "backend.app.graphs.survey_graph_intelligent:intelligent_survey_graph"
   },
   "assistants": {
     "agent": {
@@ -15,8 +16,13 @@
     },
     "survey_assistant": {
       "graph_id": "survey_graph",
+      "name": "Basic Survey Assistant",
+      "description": "Simple survey flow without supervisor intelligence."
+    },
+    "intelligent_survey_assistant": {
+      "graph_id": "intelligent_survey",
       "name": "Intelligent Survey Assistant",
-      "description": "AI-powered adaptive survey with supervisor hierarchy for intelligent question selection, lead scoring, and engagement optimization."
+      "description": "Advanced AI-powered survey with supervisor hierarchy, intelligent question selection, lead scoring with external validation (Tavily search, Google Maps), and adaptive engagement optimization."
     }
   }
 }
