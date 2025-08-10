@@ -53,7 +53,7 @@ from app.middleware.request_limits import create_request_limits_middleware
 from app.cors_config import configure_cors
 
 # Import routes
-from app.routes import survey_api, health
+from app.routes import survey_api, health, theme_api, analytics_api, admin_api
 
 # Create FastAPI application with environment-specific settings
 app = FastAPI(
@@ -68,12 +68,20 @@ app = FastAPI(
             "description": "Survey management endpoints for frontend integration"
         },
         {
-            "name": "health", 
-            "description": "Health check and monitoring endpoints"
+            "name": "themes",
+            "description": "Theme management endpoints for form customization"
+        },
+        {
+            "name": "analytics",
+            "description": "Analytics and performance tracking endpoints"
         },
         {
             "name": "admin",
-            "description": "Administrative endpoints (protected)"
+            "description": "Admin user management and client configuration endpoints"
+        },
+        {
+            "name": "health", 
+            "description": "Health check and monitoring endpoints"
         }
     ]
 )
@@ -105,6 +113,9 @@ app.add_middleware(LoggingMiddleware)
 
 # Include routers
 app.include_router(survey_api.router, tags=["survey"])
+app.include_router(theme_api.router, tags=["themes"])
+app.include_router(analytics_api.router, tags=["analytics"])
+app.include_router(admin_api.router, tags=["admin"])
 app.include_router(health.router, tags=["health"])
 
 @app.get("/")
