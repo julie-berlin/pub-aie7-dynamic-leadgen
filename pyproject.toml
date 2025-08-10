@@ -18,6 +18,7 @@ dependencies = [
     "langgraph>=0.5.4",
     "langgraph-sdk>=0.1.74",
     "openai>=1.97.0",
+    "pydantic[email]>=2.11.7",
     "pytest>=8.4.1",
     "pytest-asyncio>=1.1.0",
     "python-dotenv>=1.1.1",
