@@ -24,18 +24,25 @@ The system uses AI agents to create intelligent, engaging forms that maximize co
 
 ### Project Structure
 - **Main application**: `main.py` - Entry point for the application
-- **Notebooks**: Development and experimentation in `/notebooks/`
-  - `poc_chain.ipynb` - Main proof of concept using LangGraph
-  - `PoC_Survey_Agents.ipynb` - Survey agents implementation
-- **Source code**: `/app/` - Core application modules
+- **Backend**: `/backend/app/` - Core application modules
   - `handlers/` - Request/response handlers
   - `llm/` - Language model integrations
   - `ml/` - Machine learning components
   - `prompt_engineering/` - Prompt templates and engineering
   - `utils/` - Utility functions and configuration loading
+  - `routes/` - API endpoints for survey operations
+  - `graphs/` - LangGraph implementations for survey flow
+- **Database**: `/database/` - Database migrations and population scripts
+  - `001_initial_schema.sql` - Complete database schema with all tables
+  - `002_populate_example_data.sql` - 5 example business scenarios with 52 questions
+  - `business_scenarios.md` - Documentation of all business cases
+  - `test_database_population.py` - Comprehensive test suite
+- **Notebooks**: Development and experimentation in `/notebooks/`
+  - `poc_chain.ipynb` - Main proof of concept using LangGraph
+  - `PoC_Survey_Agents.ipynb` - Survey agents implementation
 - **Configuration**: `/config/` - YAML configuration files
 - **Data**: `/data/` - Input data, outputs, and cached results
-  - Survey questions and client data in JSON format
+  - Survey questions and client data (now primarily database-driven)
   - Embeddings and cached LLM responses
 
 ## Development Setup
@@ -43,11 +50,35 @@ The system uses AI agents to create intelligent, engaging forms that maximize co
 # Install dependencies
 uv sync
 
+# Set up database (run in Supabase SQL Editor)
+# 1. Run: database/001_initial_schema.sql
+# 2. Run: database/002_populate_example_data.sql
+
+# Test database setup
+uv run python3 database/test_database_population.py
+
 # Run notebooks
 uv run jupyter notebook
 
 # Run main application
 uv run python3 main.py
+```
+
+## Database Setup
+The system includes comprehensive database population with 5 example business scenarios:
+
+1. **Pawsome Dog Walking** - Pet services (10 questions)
+2. **Metro Realty Group** - Real estate (12 questions)  
+3. **TechSolve Consulting** - Software consulting (11 questions)
+4. **FitLife Personal Training** - Health & fitness (10 questions)
+5. **Sparkle Clean Solutions** - Home cleaning (9 questions)
+
+**Total: 52 questions** across all forms with proper scoring rubrics and business logic.
+
+### Quick Database Setup
+```bash
+# Run setup script for guided database initialization
+uv run python3 database/setup_and_test.py
 ```
 
 ## LangGraph Flow Architecture
@@ -103,17 +134,33 @@ Start → Question Selection Agent → Question Phrasing Node → Engagement Age
 - Final status update when form completed/abandoned
 
 **Database Schema (Supabase)**:
-- `leads` table: Complete lead records with final status
+- `clients` table: Business profiles and AI context information
+- `forms` table: Form configurations with scoring thresholds
+- `form_questions` table: Individual questions with scoring rubrics
+- `lead_sessions` table: Session tracking with abandonment detection
 - `responses` table: Individual question-answer pairs with timestamps
-- `form_sessions` table: Session state and progression tracking
-- `historical_outcomes` table: Past lead success data for ML learning
+- `tracking_data` table: UTM parameters and marketing attribution
+- `session_snapshots` table: State recovery and resumption
+- `lead_outcomes` table: Conversion tracking for ML learning
 
 ## Current Implementation Status
-- **PoC Complete**: Basic LangGraph flow in `poc_chain.ipynb`
-- **Next Priority**: Question selection agent with JSON integration
-- **Data Integration**: Questions loaded from JSON with rich metadata
-- **Frontend**: React.js + Tailwind v4 (planned)
-- **Admin Interface**: Configuration/notebook-based (current), web-based (planned)
+- **✅ Core System**: Complete LangGraph flow with all phases implemented
+- **✅ Database Integration**: Full database schema with 5 example business scenarios
+- **✅ API Layer**: REST endpoints for survey start, step, abandon, and status
+- **✅ Data Population**: 52 questions across 5 diverse business types
+- **✅ Testing Suite**: Comprehensive validation with 100% pass rate
+- **✅ UTM Tracking**: Marketing attribution and abandonment detection
+- **✅ Lead Scoring**: Automated qualification with personalized messaging
+- **🚧 Frontend**: React.js + Tailwind v4 (in development)
+- **🚧 Admin Interface**: Web-based form management (planned)
+
+### Available Test Forms
+Ready-to-use form IDs for testing:
+- `f1111111-1111-1111-1111-111111111111` - Pawsome Dog Walking
+- `f2222222-2222-2222-2222-222222222222` - Metro Realty Group
+- `f3333333-3333-3333-3333-333333333333` - TechSolve Consulting
+- `f4444444-4444-4444-4444-444444444444` - FitLife Personal Training
+- `f5555555-5555-5555-5555-555555555555` - Sparkle Clean Solutions
 
 ## Business Rules
 - Required questions have `required: true` AND scoring rubrics
@@ -125,10 +172,39 @@ Start → Question Selection Agent → Question Phrasing Node → Engagement Age
 ## Development Notes
 - Use `python3` in all commands
 - Prefer editing existing files over creating new ones
+- Database-first approach: All questions and client data stored in Supabase
 - Configuration is centralized in `/config/` directory
 - All LLM interactions should be mockable for testing
 - Design for future multilingual support
 - Tailwind v4 configuration required for theming
+
+## API Testing Examples
+
+### Start a Survey Session
+```bash
+curl -X POST http://localhost:8000/api/survey/start \
+  -H "Content-Type: application/json" \
+  -d '{
+    "form_id": "f1111111-1111-1111-1111-111111111111",
+    "utm_source": "google",
+    "utm_campaign": "dog_walking_test"
+  }'
+```
+
+### Submit Responses
+```bash
+curl -X POST http://localhost:8000/api/survey/step \
+  -H "Content-Type: application/json" \
+  -d '{
+    "session_id": "your_session_id",
+    "responses": [
+      {
+        "question_id": 1,
+        "answer": "John Smith"
+      }
+    ]
+  }'
+```
 
 ## Testing Strategy
 - Test flow with different lead quality scenarios
