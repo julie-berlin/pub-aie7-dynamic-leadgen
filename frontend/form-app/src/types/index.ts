@@ -14,8 +14,9 @@ export interface Question {
   type: QuestionType;
   text: string;
   description?: string;
+  placeholder?: string;
   required: boolean;
-  options?: QuestionOption[];
+  options?: QuestionOptions;
   validation?: ValidationRule[];
   conditional?: ConditionalRule;
   metadata?: Record<string, any>;
@@ -34,13 +35,42 @@ export type QuestionType =
   | 'rating'
   | 'date'
   | 'time'
+  | 'datetime'
   | 'file';
 
-export interface QuestionOption {
+export interface QuestionChoice {
   id: string;
   text: string;
   value: string;
   description?: string;
+}
+
+export interface QuestionOptions {
+  // Choice options for radio, checkbox, select
+  choices?: QuestionChoice[];
+  
+  // Rating options
+  maxRating?: string;
+  minRating?: string;
+  ratingType?: 'stars' | 'numbers' | 'scale';
+  ratingLabels?: { start?: string; end?: string; };
+  
+  // Date options
+  minDate?: string;
+  maxDate?: string;
+  constraintType?: 'future' | 'past' | 'adult';
+  helpText?: string;
+  
+  // File options
+  allowedTypes?: string[];
+  maxFileSize?: string;
+  maxFiles?: string;
+  
+  // Text options
+  rows?: string;
+  
+  // Other options
+  placeholder?: string;
 }
 
 export interface ValidationRule {
@@ -133,6 +163,7 @@ export interface FormStep {
   questions: Question[];
   canGoBack: boolean;
   isComplete: boolean;
+  isLastStep: boolean;
   metadata?: Record<string, any>;
 }
 
@@ -201,7 +232,9 @@ export interface FormStore {
 
   // Actions
   initializeForm: (clientId: string, formId: string, trackingData?: Partial<TrackingData>) => Promise<void>;
+  submitStep: (stepNumber: number) => Promise<void>;
   submitResponses: (responses: Record<string, any>) => Promise<void>;
+  goBack: () => Promise<void>;
   goToStep: (step: number) => Promise<void>;
   updateTheme: (theme: ThemeConfig) => void;
   saveProgress: () => Promise<void>;

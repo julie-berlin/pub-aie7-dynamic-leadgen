@@ -2,9 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type { 
   FormStore, 
-  FormConfig, 
   FormState, 
-  FormStep, 
   ThemeConfig, 
   TrackingData,
   SubmitResponseRequest,
@@ -160,6 +158,30 @@ export const useFormStore = create<FormStore>()(
             loading: false 
           });
         }
+      },
+
+      submitStep: async (stepNumber: number) => {
+        // This is a convenience method that triggers form validation and submission
+        const { currentStep } = get();
+        
+        if (!currentStep) {
+          set({ error: 'No current step available' });
+          return;
+        }
+
+        // For now, this will trigger React Hook Form validation
+        // The actual submission will be handled by the form component
+        console.log('Submitting step:', stepNumber);
+      },
+
+      goBack: async () => {
+        const { formState, currentStep } = get();
+        
+        if (!formState || !currentStep || currentStep.stepNumber <= 1) {
+          return;
+        }
+
+        await get().goToStep(currentStep.stepNumber - 1);
       },
 
       goToStep: async (step: number) => {
