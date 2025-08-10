@@ -11,6 +11,7 @@ from typing import Dict, Any, List
 import json
 from ...state import SurveyGraphState
 from ...models import get_chat_model
+from ...utils.cached_data_loader import data_loader
 
 
 def question_phrasing_node(state: SurveyGraphState) -> Dict[str, Any]:
@@ -40,7 +41,7 @@ def question_phrasing_node(state: SurveyGraphState) -> Dict[str, Any]:
         
         # Load client information for context
         form_id = core.get('form_id', 'dogwalk_demo_form')
-        client_info = _load_client_info(form_id)
+        client_info = data_loader.get_client_info(form_id)
         
         # Extract business information for context
         business_name = "Our Business"
@@ -209,12 +210,3 @@ def validate_phrased_questions(
         return False
 
 
-def _load_client_info(form_id: str) -> Dict[str, Any]:
-    """Load client information for the given form_id."""
-    try:
-        from ...tools import load_client_info
-        client_json = load_client_info.invoke({'form_id': form_id})
-        return json.loads(client_json)
-    except Exception as e:
-        print(f"Failed to load client info: {e}")
-        return {}

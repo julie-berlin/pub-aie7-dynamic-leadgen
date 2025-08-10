@@ -30,7 +30,7 @@ setup_graph_tracing()
 import sys
 import os
 sys.path.append(os.path.dirname(__file__))
-from routes import sessions, survey_api
+from routes import survey_api
 
 # Create FastAPI application
 app = FastAPI(
@@ -43,10 +43,6 @@ app = FastAPI(
         {
             "name": "survey",
             "description": "Survey management endpoints for frontend integration"
-        },
-        {
-            "name": "sessions", 
-            "description": "Legacy session endpoints (deprecated)"
         },
         {
             "name": "health",
@@ -62,7 +58,6 @@ configure_cors(app)
 app.add_middleware(LoggingMiddleware)
 
 # Include routers
-app.include_router(sessions.router, prefix="/api", tags=["sessions"])
 app.include_router(survey_api.router, tags=["survey"])
 
 @app.get("/")
