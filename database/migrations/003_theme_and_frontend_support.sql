@@ -549,7 +549,7 @@ BEGIN
         (
             SELECT COUNT(*) FROM information_schema.columns
             WHERE table_schema = 'public'
-            AND table_name = rt.table_name
+            AND information_schema.columns.table_name = rt.table_name
         )::INTEGER AS column_count,
         (
             SELECT COUNT(*) FROM pg_indexes 
