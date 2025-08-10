@@ -335,3 +335,7 @@ class SupabaseClient:
 
 # Singleton instance
 db = SupabaseClient()
+
+def get_database_connection():
+    """Compatibility wrapper for Phase 2 API modules"""
+    return db
