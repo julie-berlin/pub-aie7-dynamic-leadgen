@@ -1,0 +1,73 @@
+# Security configuration only
+# Authentication, validation, and security headers
+
+# Input validation
+validation:
+  development:
+    max_input_length: 20000
+    max_file_size: 5242880  # 5MB
+  staging:
+    max_input_length: 10000
+    max_file_size: 3145728  # 3MB
+  production:
+    max_input_length: 5000
+    max_file_size: 2097152  # 2MB
+  sanitize_inputs: true
+  allowed_file_types: [".txt", ".csv", ".json"]
+
+# Authentication settings
+auth:
+  development:
+    enabled: false
+    jwt_expire_minutes: 60
+  staging:
+    enabled: true
+    jwt_expire_minutes: 45
+  production:
+    enabled: true
+    jwt_expire_minutes: 30
+  password_min_length: 8
+  refresh_token_expire_days: 7
+
+# API security
+api_security:
+  development:
+    require_api_key: false
+    admin_key_required: false
+  staging:
+    require_api_key: true
+    admin_key_required: true
+  production:
+    require_api_key: true
+    admin_key_required: true
+
+# Security headers
+headers:
+  development:
+    force_https: false
+    hsts_enabled: false
+    csp_enabled: false
+  staging:
+    force_https: false
+    hsts_enabled: false
+    csp_enabled: true
+  production:
+    force_https: true
+    hsts_enabled: true
+    csp_enabled: true
+  xss_protection: true
+  content_type_nosniff: true
+  frame_options: "DENY"
+
+# Session security
+sessions:
+  development:
+    timeout: 3600  # 1 hour
+    max_per_ip: 20
+  staging:
+    timeout: 2700  # 45 minutes
+    max_per_ip: 10
+  production:
+    timeout: 1800  # 30 minutes
+    max_per_ip: 5
+  cleanup_interval: 300

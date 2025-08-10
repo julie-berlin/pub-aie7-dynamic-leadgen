@@ -1,42 +1,65 @@
 """
 FastAPI Backend for Dynamic Lead Generation
 
-Main application entry point with middleware and route configuration.
+Main application entry point with environment-specific configuration,
+middleware setup, and route configuration.
 """
 
 from fastapi import FastAPI, HTTPException
 from dotenv import load_dotenv
 import uvicorn
 import os
+import sys
+import logging
 
-# Load environment variables
+# Load environment variables first
 load_dotenv()
 
-# Import configuration
-from cors_config import configure_cors
-from utils.fastapi_logging import setup_fastapi_logging, LoggingMiddleware, log_health_check
-from utils.langsmith_tracing import setup_graph_tracing
+# Validate environment before importing other modules
+from app.utils.env_validator import validate_environment
+from app.utils.config_loader import get_api_config, get_security_config
 
-# Set up logging first
+# Validate environment variables
+if not validate_environment():
+    print("❌ Environment validation failed. Please check your .env file.")
+    print("Run 'python -m app.utils.env_validator help' for setup instructions.")
+    sys.exit(1)
+
+# Load configurations
+api_config = get_api_config()
+security_config = get_security_config()
+
+# Set up logging with environment-specific settings
+from app.utils.fastapi_logging import setup_fastapi_logging, LoggingMiddleware, log_health_check
+
 setup_fastapi_logging(
     log_level=os.getenv('LOG_LEVEL', 'INFO'),
     log_file=os.getenv('LOG_FILE')
 )
 
+logger = logging.getLogger(__name__)
+
 # Set up tracing
+from app.utils.langsmith_tracing import setup_graph_tracing
 setup_graph_tracing()
 
-# Import routes
-import sys
-import os
-sys.path.append(os.path.dirname(__file__))
-from routes import survey_api
+# Import middleware and configuration
+from app.middleware.rate_limiting import create_rate_limit_middleware
+from app.middleware.input_validation import create_input_validation_middleware
+from app.middleware.response_sanitization import create_response_sanitization_middleware
+from app.middleware.admin_auth import create_admin_auth_middleware
+from app.middleware.security_headers import create_security_headers_middleware
+from app.middleware.request_limits import create_request_limits_middleware
+from app.cors_config import configure_cors
 
-# Create FastAPI application
+# Import routes
+from app.routes import survey_api, health
+
+# Create FastAPI application with environment-specific settings
 app = FastAPI(
-    title="Dynamic Lead Generation API",
-    description="AI-powered adaptive forms for lead generation and qualification",
-    version="1.0.0",
+    title=api_config.title,
+    description=api_config.description,
+    version=api_config.version,
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_tags=[
@@ -45,8 +68,12 @@ app = FastAPI(
             "description": "Survey management endpoints for frontend integration"
         },
         {
-            "name": "health",
+            "name": "health", 
             "description": "Health check and monitoring endpoints"
+        },
+        {
+            "name": "admin",
+            "description": "Administrative endpoints (protected)"
         }
     ]
 )
@@ -54,11 +81,31 @@ app = FastAPI(
 # Configure CORS middleware with environment-based settings
 configure_cors(app)
 
-# Add logging middleware
+# Add security middleware (order matters!)
+# 1. Security headers first (sets secure response headers)
+app.add_middleware(create_security_headers_middleware())
+
+# 2. Request limits (size and timeout protection)
+app.add_middleware(create_request_limits_middleware())
+
+# 3. Rate limiting (before input validation to prevent excessive processing)
+app.add_middleware(create_rate_limit_middleware())
+
+# 4. Input validation (sanitize and validate all incoming data)
+app.add_middleware(create_input_validation_middleware())
+
+# 5. Admin authentication (protect admin endpoints)
+app.add_middleware(create_admin_auth_middleware())
+
+# 6. Response sanitization (clean outgoing data)
+app.add_middleware(create_response_sanitization_middleware())
+
+# 7. Logging middleware last (log after all security processing)
 app.add_middleware(LoggingMiddleware)
 
 # Include routers
 app.include_router(survey_api.router, tags=["survey"])
+app.include_router(health.router, tags=["health"])
 
 @app.get("/")
 async def root():
@@ -75,7 +122,7 @@ async def health_check():
     """Detailed health check with system status"""
     try:
         # Test database connection
-        from database import db
+        from app.database import db
         db_healthy = db.test_connection()
         
         # Test OpenAI connection

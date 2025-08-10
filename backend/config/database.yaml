@@ -1,0 +1,57 @@
+# Database-only configuration
+# All database connection, pooling, and query settings
+
+# Connection settings (use environment variables)
+connection:
+  url: ${SUPABASE_URL}
+  publishable_key: ${SUPABASE_PUBLISHABLE_KEY}  
+  secret_key: ${SUPABASE_SECRET_KEY}
+
+# Connection pooling
+pool:
+  development:
+    size: 5
+    max_overflow: 10
+    timeout: 30
+    recycle: 3600
+  staging:
+    size: 15
+    max_overflow: 25  
+    timeout: 45
+    recycle: 3600
+  production:
+    size: 20
+    max_overflow: 30
+    timeout: 60
+    recycle: 1800
+
+# Query settings
+query:
+  development:
+    timeout: 30
+    connection_timeout: 10
+    retry_attempts: 3
+    retry_delay: 1
+  staging:
+    timeout: 45
+    connection_timeout: 12
+    retry_attempts: 5
+    retry_delay: 1
+  production:
+    timeout: 60
+    connection_timeout: 15
+    retry_attempts: 5
+    retry_delay: 2
+
+# Health checks
+health_check:
+  enabled: true
+  development:
+    interval: 300  # 5 minutes
+    timeout: 10
+  staging:
+    interval: 240  # 4 minutes
+    timeout: 12
+  production:
+    interval: 180  # 3 minutes
+    timeout: 15

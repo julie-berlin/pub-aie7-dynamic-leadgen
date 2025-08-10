@@ -6,8 +6,8 @@ from typing import Dict, Any, List, Optional
 import logging
 from datetime import datetime
 
-# Import consolidated Pydantic models
-from ...pydantic_models import (
+# Import consolidated Pydantic models  
+from pydantic_models import (
     StartSessionRequest,
     StartSessionResponse,
     SubmitResponsesRequest,
@@ -22,7 +22,7 @@ from ...pydantic_models import (
     LeadStatus,
     CompletionType
 )
-from ..graphs.survey_graph_v2 import survey_graph_v2
+from app.graphs.survey_graph_v2 import survey_graph_v2
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/survey", tags=["survey"])
