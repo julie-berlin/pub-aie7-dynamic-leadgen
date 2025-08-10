@@ -1,0 +1,30 @@
+# Rate limiting configuration only
+# API request limits and throttling
+
+# Rate limiting per environment
+rate_limit:
+  development:
+    enabled: false
+    requests_per_minute: 200
+    burst_size: 50
+  staging:
+    enabled: true
+    requests_per_minute: 80
+    burst_size: 20
+  production:
+    enabled: true
+    requests_per_minute: 60
+    burst_size: 10
+
+# Window and tracking settings
+settings:
+  window_seconds: 60
+  per_ip: true
+  redis_enabled: false  # Set true if using Redis for distributed rate limiting
+  
+# Rate limit headers
+headers:
+  include_headers: true
+  limit_header: "X-RateLimit-Limit"
+  remaining_header: "X-RateLimit-Remaining"
+  reset_header: "X-RateLimit-Reset"

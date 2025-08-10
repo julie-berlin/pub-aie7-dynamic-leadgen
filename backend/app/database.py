@@ -1,44 +1,111 @@
 """
-Database utilities for Supabase integration
+Database utilities for Supabase integration with environment-specific configuration
 """
 import os
+import time
+import logging
 from datetime import datetime
 from typing import Dict, List, Any, Optional
 from supabase import create_client, Client
 from dotenv import load_dotenv
+from app.utils.config_loader import get_database_config, DatabaseConfig
 
 # Load environment variables
 load_dotenv()
+logger = logging.getLogger(__name__)
 
 class SupabaseClient:
-    """Wrapper for Supabase operations"""
+    """Wrapper for Supabase operations with connection pooling and environment-specific settings"""
     
-    def __init__(self):
-        self.url = os.getenv("SUPABASE_URL")
-        self.publishable_key = os.getenv("SUPABASE_PUBLISHABLE_KEY")
-        self.secret_key = os.getenv("SUPABASE_SECRET_KEY")
+    def __init__(self, config: Optional[DatabaseConfig] = None):
+        """Initialize with database configuration"""
+        if config is None:
+            config = get_database_config()
+        
+        self.config = config
+        self.url = config.url
+        self.publishable_key = config.publishable_key
+        self.secret_key = config.secret_key
         
         if not all([self.url, self.publishable_key, self.secret_key]):
             raise ValueError("Missing Supabase environment variables: SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, SUPABASE_SECRET_KEY required")
         
-        # Use secret key for backend operations (replaces service_role key)
-        self.client: Client = create_client(self.url, self.secret_key)
+        # Connection pool settings
+        self.pool_size = config.pool_size
+        self.max_overflow = config.pool_max_overflow
+        self.query_timeout = config.query_timeout
+        
+        # Use secret key for backend operations
+        self.client: Client = create_client(
+            self.url, 
+            self.secret_key
+        )
+        
+        # Connection pool tracking
+        self._active_connections = 0
+        self._total_connections = 0
+        self._failed_connections = 0
+        
+        logger.info(f"Database client initialized - Pool size: {self.pool_size}, Environment: {os.getenv('ENVIRONMENT', 'development')}")
     
+    def _execute_with_retry(self, operation_func, *args, **kwargs):
+        """Execute database operation with retry logic"""
+        for attempt in range(self.config.retry_attempts):
+            try:
+                self._active_connections += 1
+                self._total_connections += 1
+                
+                start_time = time.time()
+                result = operation_func(*args, **kwargs)
+                
+                # Log slow queries
+                execution_time = time.time() - start_time
+                if execution_time > 1.0:  # Log queries taking more than 1 second
+                    logger.warning(f"Slow query detected: {execution_time:.2f}s")
+                
+                return result
+            
+            except Exception as e:
+                self._failed_connections += 1
+                logger.warning(f"Database operation failed (attempt {attempt + 1}/{self.config.retry_attempts}): {e}")
+                
+                if attempt == self.config.retry_attempts - 1:  # Last attempt
+                    raise e
+                
+                time.sleep(self.config.retry_delay)
+            finally:
+                self._active_connections = max(0, self._active_connections - 1)
+
     def test_connection(self) -> bool:
-        """Test database connection"""
+        """Test database connection with retry logic"""
+        def _test():
+            return self.client.table("clients").select("count", count="exact").execute()
+        
         try:
-            # Test with a simple query that should always work
-            result = self.client.table("clients").select("count", count="exact").execute()
+            self._execute_with_retry(_test)
+            logger.info("Database connection test successful")
             return True
         except Exception as e:
             error_str = str(e)
             if "does not exist" in error_str or "relation" in error_str:
+                logger.info("Database connection works, but tables don't exist yet")
                 print("🔧 Database connection works, but tables don't exist yet.")
-                print("   Run the database_schema_fixed.sql file in your Supabase SQL Editor first.")
+                print("   Run the database/001_initial_schema.sql file in your Supabase SQL Editor first.")
                 return False
             else:
+                logger.error(f"Connection test failed: {e}")
                 print(f"Connection test failed: {e}")
             return False
+    
+    def get_connection_stats(self) -> Dict[str, int]:
+        """Get connection pool statistics"""
+        return {
+            'active_connections': self._active_connections,
+            'total_connections': self._total_connections,
+            'failed_connections': self._failed_connections,
+            'pool_size': self.pool_size,
+            'max_overflow': self.max_overflow
+        }
     
     # === Client Management ===
     
