@@ -150,10 +150,20 @@ export interface FormResponse {
   metadata?: Record<string, any>;
 }
 
-// API response types
+// API response types (following consistent format)
+export interface ApiResponse<T = any> {
+  success: boolean;
+  data: T;
+  message: string;
+}
+
 export interface StartSessionResponse {
-  sessionId: string;
-  form: FormConfig;
+  form: {
+    id: string;
+    title: string;
+    description?: string;
+    theme?: ThemeConfig;
+  };
   step: FormStep;
 }
 
@@ -161,25 +171,25 @@ export interface FormStep {
   stepNumber: number;
   totalSteps: number;
   questions: Question[];
-  canGoBack: boolean;
+  headline: string;
+  subheading?: string;
   isComplete: boolean;
-  isLastStep: boolean;
+  canGoBack?: boolean;
+  isLastStep?: boolean;
   metadata?: Record<string, any>;
 }
 
 export interface SubmitResponseRequest {
-  sessionId: string;
-  responses: Record<string, any>;
-  currentStep: number;
-  timestamp: string;
+  responses: {
+    question_id: number;
+    answer: any;
+  }[];
 }
 
 export interface SubmitResponseResponse {
-  success: boolean;
   nextStep?: FormStep;
-  isComplete?: boolean;
+  isComplete: boolean;
   completionData?: CompletionData;
-  errors?: ValidationError[];
 }
 
 export interface CompletionData {
@@ -187,7 +197,7 @@ export interface CompletionData {
   score: number;
   message: string;
   redirectUrl?: string;
-  nextSteps?: string[];
+  nextSteps: string[];
 }
 
 export interface ValidationError {

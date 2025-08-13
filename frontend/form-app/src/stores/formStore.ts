@@ -44,21 +44,22 @@ export const useFormStore = create<FormStore>()(
 
           // Start or resume session
           const response = await apiClient.startSession({
-            clientId,
             formId,
-            sessionId: shouldResume ? sessionId : undefined,
+            clientId,
             trackingData: {
               ...trackingData,
               userAgent: navigator.userAgent,
-              timestamp: new Date(),
-              sessionId
+              timestamp: new Date()
             }
           });
 
+          // Generate a new session ID for frontend state (backend manages real session via cookies)
+          const frontendSessionId = `frontend_${Date.now()}`;
+          
           const newFormState: FormState = {
             formId,
             clientId,
-            sessionId,
+            sessionId: frontendSessionId,
             currentStep: response.step.stepNumber,
             totalSteps: response.step.totalSteps,
             responses: existingState?.responses || {},
@@ -68,7 +69,19 @@ export const useFormStore = create<FormStore>()(
           };
 
           set({
-            currentForm: response.form,
+            currentForm: {
+              id: response.form.id,
+              clientId,
+              title: response.form.title,
+              description: response.form.description,
+              questions: [], // Will be populated from steps
+              theme: response.form.theme,
+              settings: {
+                allowBack: true,
+                showProgress: true,
+                saveProgress: true
+              }
+            },
             formState: newFormState,
             currentStep: response.step,
             theme: response.form.theme || null,
@@ -101,54 +114,49 @@ export const useFormStore = create<FormStore>()(
         set({ loading: true, error: null });
 
         try {
+          // Convert responses to the expected API format
+          const apiResponses = Object.entries(responses).map(([questionId, value]) => ({
+            question_id: parseInt(questionId),
+            answer: value
+          }));
+
           const submitRequest: SubmitResponseRequest = {
-            sessionId: formState.sessionId,
-            responses,
-            currentStep: currentStep.stepNumber,
-            timestamp: new Date().toISOString()
+            responses: apiResponses
           };
 
           const response: SubmitResponseResponse = await apiClient.submitResponses(submitRequest);
 
-          if (response.success) {
-            // Update form state with new responses
-            const updatedResponses = { ...formState.responses };
-            Object.entries(responses).forEach(([questionId, value]) => {
-              updatedResponses[questionId] = {
-                questionId,
-                value,
-                timestamp: new Date()
-              };
-            });
-
-            const updatedFormState: FormState = {
-              ...formState,
-              responses: updatedResponses,
-              currentStep: response.nextStep?.stepNumber || formState.currentStep,
-              isComplete: response.isComplete || false,
-              lastUpdated: new Date()
+          // Update form state with new responses
+          const updatedResponses = { ...formState.responses };
+          Object.entries(responses).forEach(([questionId, value]) => {
+            updatedResponses[questionId] = {
+              questionId,
+              value,
+              timestamp: new Date()
             };
+          });
 
-            set({
-              formState: updatedFormState,
-              currentStep: response.nextStep || null,
-              loading: false
-            });
+          const updatedFormState: FormState = {
+            ...formState,
+            responses: updatedResponses,
+            currentStep: response.nextStep?.stepNumber || formState.currentStep,
+            isComplete: response.isComplete,
+            lastUpdated: new Date()
+          };
 
-            // If form is complete, handle completion
-            if (response.isComplete && response.completionData) {
-              // Store completion data for the completion page
-              localStorage.setItem(
-                `completion_${formState.sessionId}`, 
-                JSON.stringify(response.completionData)
-              );
-            }
+          set({
+            formState: updatedFormState,
+            currentStep: response.nextStep || null,
+            loading: false
+          });
 
-          } else {
-            set({ 
-              error: response.errors?.map(e => e.message).join(', ') || 'Submission failed',
-              loading: false 
-            });
+          // If form is complete, handle completion
+          if (response.isComplete && response.completionData) {
+            // Store completion data for the completion page
+            localStorage.setItem(
+              `completion_${formState.sessionId}`, 
+              JSON.stringify(response.completionData)
+            );
           }
 
         } catch (error) {

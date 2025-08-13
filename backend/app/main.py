@@ -52,6 +52,10 @@ from app.middleware.security_headers import create_security_headers_middleware
 from app.middleware.request_limits import create_request_limits_middleware
 from app.cors_config import configure_cors
 
+# Import session management
+from starlette.middleware.sessions import SessionMiddleware
+from app.session_store import RedisSessionStore
+
 # Import routes
 from app.routes import survey_api, health, theme_api, analytics_api, admin_api
 
@@ -89,26 +93,39 @@ app = FastAPI(
 # Configure CORS middleware with environment-based settings
 configure_cors(app)
 
+# Initialize session store and middleware
+session_store = RedisSessionStore()
+
 # Add security middleware (order matters!)
 # 1. Security headers first (sets secure response headers)
 app.add_middleware(create_security_headers_middleware())
 
-# 2. Request limits (size and timeout protection)
+# 2. Session middleware (must be before other middleware that might use sessions)
+app.add_middleware(
+    SessionMiddleware, 
+    secret_key=os.getenv('SESSION_SECRET_KEY', 'dev-secret-key-change-in-production'),
+    max_age=1800,  # 30 minutes
+    path='/api/survey',
+    same_site='lax',
+    https_only=os.getenv('ENVIRONMENT', 'development').lower() != 'development'
+)
+
+# 3. Request limits (size and timeout protection)
 app.add_middleware(create_request_limits_middleware())
 
-# 3. Rate limiting (before input validation to prevent excessive processing)
+# 4. Rate limiting (before input validation to prevent excessive processing)
 app.add_middleware(create_rate_limit_middleware())
 
-# 4. Input validation (sanitize and validate all incoming data)
+# 5. Input validation (sanitize and validate all incoming data)
 app.add_middleware(create_input_validation_middleware())
 
-# 5. Admin authentication (protect admin endpoints)
+# 6. Admin authentication (protect admin endpoints)
 app.add_middleware(create_admin_auth_middleware())
 
-# 6. Response sanitization (clean outgoing data)
+# 7. Response sanitization (clean outgoing data)
 app.add_middleware(create_response_sanitization_middleware())
 
-# 7. Logging middleware last (log after all security processing)
+# 8. Logging middleware last (log after all security processing)
 app.add_middleware(LoggingMiddleware)
 
 # Include routers

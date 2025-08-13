@@ -1,4 +1,5 @@
 import type { 
+  ApiResponse,
   StartSessionResponse,
   SubmitResponseRequest,
   SubmitResponseResponse,
@@ -18,7 +19,7 @@ class APIClient {
   }
 
   /**
-   * Make HTTP request with error handling
+   * Make HTTP request with error handling and consistent API response format
    */
   private async request<T>(
     endpoint: string, 
@@ -31,22 +32,23 @@ class APIClient {
         'Content-Type': 'application/json',
         ...options.headers,
       },
+      credentials: 'include', // Include HTTP-only cookies for secure session management
       ...options,
     };
 
     try {
       const response = await fetch(url, config);
       
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
+      const result = await response.json().catch(() => ({})) as ApiResponse<T>;
+      
+      if (!response.ok || !result.success) {
         throw new Error(
-          errorData.message || 
-          errorData.detail || 
+          result.message || 
           `HTTP ${response.status}: ${response.statusText}`
         );
       }
 
-      return await response.json();
+      return result.data;
     } catch (error) {
       console.error(`API request failed: ${endpoint}`, error);
       throw error;
@@ -54,36 +56,38 @@ class APIClient {
   }
 
   /**
-   * Start or resume a form session
+   * Start a new survey session with secure HTTP-only cookie
+   * Session ID is automatically managed via secure cookies
    */
   async startSession(params: {
-    clientId: string;
     formId: string;
-    sessionId?: string;
+    clientId?: string;
     trackingData?: Partial<TrackingData>;
   }): Promise<StartSessionResponse> {
     return this.request<StartSessionResponse>('/api/survey/start', {
       method: 'POST',
       body: JSON.stringify({
-        client_id: params.clientId,
         form_id: params.formId,
-        session_id: params.sessionId,
-        tracking_data: params.trackingData
+        client_id: params.clientId,
+        utm_source: params.trackingData?.utmSource,
+        utm_medium: params.trackingData?.utmMedium,
+        utm_campaign: params.trackingData?.utmCampaign,
+        utm_content: params.trackingData?.utmContent,
+        utm_term: params.trackingData?.utmTerm,
+        landing_page: params.trackingData?.landing_page
       }),
     });
   }
 
   /**
-   * Submit form responses
+   * Submit form responses using secure session cookie
+   * Session ID is automatically included via HTTP-only cookie
    */
   async submitResponses(request: SubmitResponseRequest): Promise<SubmitResponseResponse> {
-    return this.request<SubmitResponseResponse>('/api/survey/submit', {
+    return this.request<SubmitResponseResponse>('/api/survey/step', {
       method: 'POST',
       body: JSON.stringify({
-        session_id: request.sessionId,
-        responses: request.responses,
-        current_step: request.currentStep,
-        timestamp: request.timestamp
+        responses: request.responses
       }),
     });
   }
@@ -116,17 +120,12 @@ class APIClient {
 
   /**
    * Get theme configuration for a form
+   * Note: Theme endpoint not implemented yet, always returns null
    */
   async getTheme(formId: string): Promise<ThemeConfig | null> {
-    try {
-      return await this.request<ThemeConfig>(`/api/survey/theme/${formId}`, {
-        method: 'GET',
-      });
-    } catch (error) {
-      // Theme is optional, return null if not found
-      console.warn(`Theme not found for form ${formId}:`, error);
-      return null;
-    }
+    // Theme loading not implemented yet - return null to use default theme
+    console.log(`Theme loading skipped for form ${formId} - using default theme`);
+    return null;
   }
 
   /**
@@ -166,25 +165,42 @@ class APIClient {
     };
     error?: string;
   }> {
-    return this.request(`/api/survey/validate/${clientId}/${formId}`, {
-      method: 'GET',
-    });
+    try {
+      const result = await this.request<{
+        form: {
+          id: string;
+          title: string;
+          description?: string;
+          active: boolean;
+        };
+      }>(`/api/survey/forms/${formId}/validate`, {
+        method: 'GET',
+      });
+      
+      return {
+        valid: true,
+        form: result.form
+      };
+    } catch (error) {
+      return {
+        valid: false,
+        error: error instanceof Error ? error.message : 'Form validation failed'
+      };
+    }
   }
 
   /**
    * Report form abandonment for analytics
+   * Session ID is automatically included via HTTP-only cookie
    */
-  async reportAbandonment(sessionId: string, data: {
-    step: number;
-    timeSpent: number;
+  async reportAbandonment(data?: {
+    step?: number;
+    timeSpent?: number;
     reason?: string;
   }): Promise<void> {
-    await this.request('/api/survey/abandon', {
+    await this.request<void>('/api/survey/abandon', {
       method: 'POST',
-      body: JSON.stringify({
-        session_id: sessionId,
-        ...data
-      }),
+      body: JSON.stringify(data || {}),
     });
   }
 
@@ -192,7 +208,7 @@ class APIClient {
    * Health check endpoint
    */
   async healthCheck(): Promise<{ status: string; timestamp: string }> {
-    return this.request('/health', {
+    return this.request<{ status: string; timestamp: string }>('/health', {
       method: 'GET',
     });
   }
