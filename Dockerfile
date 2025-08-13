@@ -49,6 +49,8 @@ COPY --from=builder /app/.venv /app/.venv
 
 # Copy application code (backend subdirectory)
 COPY backend/ ./
+# Copy pydantic_models to root for imports
+COPY backend/pydantic_models.py ./
 
 # Create directories and set permissions  
 RUN mkdir -p /app/logs /app/data/cache \

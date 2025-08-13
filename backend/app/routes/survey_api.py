@@ -1,10 +1,11 @@
 """Survey API endpoints for frontend interaction."""
 
-from fastapi import APIRouter, HTTPException, Request, Header
+from fastapi import APIRouter, HTTPException, Request, Header, Response, Cookie
 from pydantic import BaseModel
 from typing import Dict, Any, List, Optional
 import logging
 from datetime import datetime
+import os
 
 # Import consolidated Pydantic models  
 from pydantic_models import (
@@ -36,6 +37,7 @@ class AbandonResponse(BaseModel):
 
 @router.post("/start", response_model=StartSessionResponse)
 async def start_session(
+    response: Response,
     request: StartSessionRequest,
     referer: Optional[str] = Header(None),
     user_agent: Optional[str] = Header(None),
@@ -48,6 +50,10 @@ async def start_session(
     1. Captures UTM parameters and tracking data
     2. Initializes the survey flow
     3. Returns the first set of questions
+    4. Sets secure HTTP-only session cookie (OWASP compliant)
+    
+    Security: Session ID is stored in HTTP-only cookie, never exposed in JSON response.
+    This prevents XSS session hijacking while enabling CSRF protection.
     """
     try:
         # Prepare initial state with tracking data
@@ -72,9 +78,25 @@ async def start_session(
         
         # Extract frontend response
         frontend_data = result.get('frontend_response', {})
+        session_id = frontend_data.get('session_id')
         
+        # Set secure HTTP-only session cookie (OWASP compliant)
+        if session_id:
+            is_development = os.getenv('ENVIRONMENT', 'development').lower() == 'development'
+            response.set_cookie(
+                key="survey_session",
+                value=session_id,
+                httponly=True,                    # Prevents XSS access
+                secure=not is_development,        # HTTPS only in production
+                samesite="lax",                   # CSRF protection + iframe embedding
+                max_age=1800,                     # 30 minutes expiry
+                path="/api/survey"                # Scope to survey endpoints only
+            )
+            logger.info(f"Set secure session cookie for survey session: {session_id}")
+        
+        # Return response WITHOUT session_id (security: session is in HTTP-only cookie)
         return StartSessionResponse(
-            session_id=frontend_data.get('session_id'),
+            session_id="",  # Never expose in JSON - use HTTP-only cookie
             questions=frontend_data.get('questions', []),
             headline=frontend_data.get('headline', 'Welcome!'),
             motivation=frontend_data.get('motivation', 'Let\'s get started.'),
@@ -88,20 +110,49 @@ async def start_session(
 
 @router.post("/step", response_model=StepResponse)
 async def submit_and_continue(
-    request: SubmitResponsesRequest
+    request: SubmitResponsesRequest,
+    survey_session: Optional[str] = Cookie(None)
 ):
     """
     Submit responses and get the next step.
     
     This endpoint:
-    1. Saves the submitted responses immediately
-    2. Processes responses through supervisors
-    3. Returns next questions or completion message
+    1. Reads session ID from secure HTTP-only cookie
+    2. Saves the submitted responses immediately
+    3. Processes responses through supervisors
+    4. Returns next questions or completion message
+    
+    Security: Session ID comes from HTTP-only cookie, not request body.
+    This prevents XSS session hijacking attacks.
     """
     try:
-        # Prepare state with responses to process
+        # Get session ID from secure HTTP-only cookie
+        session_id = survey_session
+        if not session_id:
+            raise HTTPException(
+                status_code=401, 
+                detail="No survey session found. Please start a new survey."
+            )
+        
+        logger.info(f"Processing step for session: {session_id}")
+        
+        # Load existing session data from database to get form_id and other state
+        from ..database import db
+        session_data = db.get_lead_session(session_id)
+        if not session_data:
+            raise HTTPException(
+                status_code=404, 
+                detail="Session not found or expired. Please start a new survey."
+            )
+        
+        # Prepare state with full session context plus new responses
         state_update = {
-            'core': {'session_id': request.session_id},
+            'core': {
+                'session_id': session_id,
+                'form_id': session_data.get('form_id'),  # Critical: include form_id
+                'step': session_data.get('step', 0),
+                'client_id': session_data.get('client_id')
+            },
             'pending_responses': request.responses
         }
         
@@ -119,7 +170,7 @@ async def submit_and_continue(
         frontend_data = result.get('frontend_response', {})
         
         response = StepResponse(
-            session_id=request.session_id,
+            session_id="",  # Never expose in JSON - use HTTP-only cookie
             step=frontend_data.get('step', 1),
             questions=frontend_data.get('questions', []),
             headline=frontend_data.get('headline', ''),
@@ -141,14 +192,25 @@ async def submit_and_continue(
         raise HTTPException(status_code=500, detail="Failed to process survey step")
 
 
-@router.post("/abandon/{session_id}", response_model=AbandonResponse)
-async def mark_abandoned(session_id: str):
+@router.post("/abandon", response_model=AbandonResponse)
+async def mark_abandoned(survey_session: Optional[str] = Cookie(None)):
     """
     Mark a session as abandoned.
     
     Called by frontend when user leaves or times out.
+    Security: Session ID comes from HTTP-only cookie, not URL parameter.
     """
     try:
+        # Get session ID from secure HTTP-only cookie
+        session_id = survey_session
+        if not session_id:
+            raise HTTPException(
+                status_code=401, 
+                detail="No survey session found. Session may have already expired."
+            )
+        
+        logger.info(f"Marking session as abandoned: {session_id}")
+        
         # Update session as abandoned
         state_update = {
             'core': {
@@ -174,14 +236,23 @@ async def mark_abandoned(session_id: str):
         raise HTTPException(status_code=500, detail="Failed to update session")
 
 
-@router.get("/status/{session_id}", response_model=SessionStatusResponse)
-async def get_session_status(session_id: str):
+@router.get("/status", response_model=SessionStatusResponse)
+async def get_session_status(survey_session: Optional[str] = Cookie(None)):
     """
     Get the current status of a survey session.
     
     Useful for resuming sessions or checking completion.
+    Security: Session ID comes from HTTP-only cookie.
     """
     try:
+        # Get session ID from secure HTTP-only cookie
+        session_id = survey_session
+        if not session_id:
+            raise HTTPException(
+                status_code=401, 
+                detail="No survey session found. Please start a new survey."
+            )
+        
         # Load session from database
         from ..database import db
         
@@ -193,7 +264,7 @@ async def get_session_status(session_id: str):
         responses = db.get_session_responses(session_id)
         
         return SessionStatusResponse(
-            session_id=session_id,
+            session_id="",  # Never expose in JSON - use HTTP-only cookie
             status="completed" if session_data.get('completed', False) else "active",
             step=session_data.get('step', 0),
             completed=session_data.get('completed', False),

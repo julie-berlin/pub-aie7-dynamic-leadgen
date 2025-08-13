@@ -71,15 +71,12 @@ class StartSessionRequest(BaseModel):
         return v.strip()
 
 class SubmitResponsesRequest(BaseModel):
-    """Request to submit survey responses for a step."""
-    session_id: str = Field(..., description="Session identifier")
-    responses: List[Dict[str, Any]] = Field(..., description="User responses for current step")
+    """Request to submit survey responses for a step.
     
-    @validator('session_id')
-    def validate_session_id(cls, v):
-        if not v or len(v.strip()) == 0:
-            raise ValueError('session_id cannot be empty')
-        return v.strip()
+    Security Note: session_id is now obtained from HTTP-only cookie,
+    not from request body. This prevents XSS session hijacking.
+    """
+    responses: List[Dict[str, Any]] = Field(..., description="User responses for current step")
     
     @validator('responses')
     def validate_responses(cls, v):

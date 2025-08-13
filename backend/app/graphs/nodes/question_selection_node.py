@@ -55,9 +55,9 @@ def question_selection_node(state: SurveyGraphState) -> Dict[str, Any]:
         
         # Business rules for selection
         tough_questions = [q for q in available
-                          if 'dangerous' in q.get('scoring_rubric', '').lower()
-                          or 'must be' in q.get('scoring_rubric', '').lower()
-                          or 'required' in q.get('scoring_rubric', '').lower()]
+                          if 'dangerous' in (q.get('scoring_rubric') or '').lower()
+                          or 'must be' in (q.get('scoring_rubric') or '').lower()
+                          or 'required' in (q.get('scoring_rubric') or '').lower()]
         
         easy_questions = [q for q in available if q not in tough_questions]
         
@@ -71,15 +71,15 @@ def question_selection_node(state: SurveyGraphState) -> Dict[str, Any]:
         
         # Group related questions by category
         contact_questions = [q for q in candidates
-                           if any(word in q['question'].lower()
+                           if any(word in q['question_text'].lower()
                                  for word in ['name', 'phone', 'email', 'contact'])]
         
         dog_questions = [q for q in candidates
-                        if any(word in q['question'].lower()
+                        if any(word in q['question_text'].lower()
                               for word in ['dog', 'breed', 'walk', 'vaccination'])]
         
         service_questions = [q for q in candidates
-                           if any(word in q['question'].lower()
+                           if any(word in q['question_text'].lower()
                                  for word in ['times', 'frequency', 'benefit', 'training'])]
         
         # Select 1-3 questions from same category when possible

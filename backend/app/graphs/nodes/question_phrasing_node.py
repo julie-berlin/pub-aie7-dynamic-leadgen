@@ -60,11 +60,28 @@ def question_phrasing_node(state: SurveyGraphState) -> Dict[str, Any]:
                 business_type = client_info['information'].get('business_type', 'service provider')
         
         # Rephrase questions using LLM
-        phrased_questions = _rephrase_questions_with_llm(
+        phrased_text_list = _rephrase_questions_with_llm(
             current_questions, 
             business_name, 
             business_type
         )
+        
+        # Convert to proper QuestionDataInternal structure
+        phrased_questions = []
+        for i, question in enumerate(current_questions):
+            phrased_text = phrased_text_list[i] if i < len(phrased_text_list) else question.get('question_text', '')
+            
+            phrased_question = {
+                'question_id': question.get('question_id', question.get('id', i+1)),
+                'question_text': question.get('question_text', ''),
+                'phrased_question': phrased_text,
+                'data_type': question.get('question_type', 'text'),
+                'is_required': question.get('is_required', False),
+                'options': question.get('options'),
+                'scoring_rubric': question.get('scoring_rubric'),
+                'category': question.get('category')
+            }
+            phrased_questions.append(phrased_question)
         
         return {
             'question_strategy': {
@@ -78,12 +95,26 @@ def question_phrasing_node(state: SurveyGraphState) -> Dict[str, Any]:
         # Fallback to original questions on error
         question_strategy = state.get('question_strategy', {})
         current_questions = question_strategy.get('current_questions', [])
-        original_questions = [q.get('question', '') for q in current_questions]
+        
+        # Create proper QuestionDataInternal structure with original text
+        fallback_questions = []
+        for i, question in enumerate(current_questions):
+            fallback_question = {
+                'question_id': question.get('question_id', question.get('id', i+1)),
+                'question_text': question.get('question_text', ''),
+                'phrased_question': question.get('question_text', ''),  # Use original text
+                'data_type': question.get('question_type', 'text'),
+                'is_required': question.get('is_required', False),
+                'options': question.get('options'),
+                'scoring_rubric': question.get('scoring_rubric'),
+                'category': question.get('category')
+            }
+            fallback_questions.append(fallback_question)
         
         return {
             'question_strategy': {
                 **question_strategy,
-                'phrased_questions': original_questions
+                'phrased_questions': fallback_questions
             }
         }
 
@@ -110,7 +141,7 @@ def _rephrase_questions_with_llm(
     try:
         # Create question list for prompt
         questions_text = "\n".join([
-            f"{i+1}. {q['question']}" for i, q in enumerate(questions)
+            f"{i+1}. {q['question_text']}" for i, q in enumerate(questions)
         ])
         
         # Create engaging prompt for rephrasing
@@ -151,7 +182,7 @@ Return only the rephrased questions, one per line, no numbers."""
         # Ensure we have the same number of questions
         if len(phrased_questions) != len(questions):
             print(f"⚠️ Question count mismatch ({len(phrased_questions)} vs {len(questions)}). Using original questions.")
-            return [q['question'] for q in questions]
+            return [q['question_text'] for q in questions]
         
         # Clean up the phrased questions
         cleaned_questions = []
@@ -166,14 +197,14 @@ Return only the rephrased questions, one per line, no numbers."""
         # Final validation
         if len(cleaned_questions) != len(questions):
             print(f"⚠️ Final question count mismatch. Using original questions.")
-            return [q['question'] for q in questions]
+            return [q['question_text'] for q in questions]
         
         return cleaned_questions
         
     except Exception as e:
         print(f"❌ Question phrasing failed: {e}")
         # Fallback to original questions
-        return [q['question'] for q in questions]
+        return [q['question_text'] for q in questions]
 
 
 def validate_phrased_questions(
