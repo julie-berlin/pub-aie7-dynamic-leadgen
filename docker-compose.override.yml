@@ -1,0 +1,40 @@
+# Docker Compose Override for local development
+# This file is automatically loaded by docker-compose and overrides the base configuration
+# Use this for local development settings that shouldn't be in the main docker-compose.yml
+
+services:
+  backend:
+    # Additional development settings
+    environment:
+      - DEBUG=true
+      - RELOAD=true
+    
+    # Mount additional development files
+    volumes:
+      - ./notebooks:/app/notebooks
+      - ./data:/app/data
+
+  frontend:
+    # Development build args
+    build:
+      args:
+        - NODE_ENV=development
+    
+    # Additional dev environment
+    environment:
+      - REACT_APP_DEBUG=true
+
+  admin:
+    # Development build args
+    build:
+      args:
+        - NODE_ENV=development
+    
+    # Additional dev environment
+    environment:
+      - VITE_DEBUG=true
+    
+    # Mount additional config files for hot reload
+    volumes:
+      - ./frontend/admin-app/postcss.config.js:/app/postcss.config.js
+      - ./frontend/admin-app/tsconfig.json:/app/tsconfig.json

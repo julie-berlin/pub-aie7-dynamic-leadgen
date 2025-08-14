@@ -57,7 +57,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.session_store import RedisSessionStore
 
 # Import routes
-from app.routes import survey_api, health, theme_api, analytics_api, admin_api
+from app.routes import survey_api, health, theme_api, analytics_api, admin_api, admin_forms_api, admin_analytics_api, admin_themes_api, admin_business_api
 
 # Create FastAPI application with environment-specific settings
 app = FastAPI(
@@ -82,6 +82,22 @@ app = FastAPI(
         {
             "name": "admin",
             "description": "Admin user management and client configuration endpoints"
+        },
+        {
+            "name": "admin-forms",
+            "description": "Admin form management endpoints"
+        },
+        {
+            "name": "admin-analytics",
+            "description": "Admin analytics and reporting endpoints"
+        },
+        {
+            "name": "admin-themes",
+            "description": "Admin theme management endpoints"
+        },
+        {
+            "name": "admin-business",
+            "description": "Admin business information and settings endpoints"
         },
         {
             "name": "health", 
@@ -133,6 +149,10 @@ app.include_router(survey_api.router, tags=["survey"])
 app.include_router(theme_api.router, tags=["themes"])
 app.include_router(analytics_api.router, tags=["analytics"])
 app.include_router(admin_api.router, tags=["admin"])
+app.include_router(admin_forms_api.router, tags=["admin-forms"])
+app.include_router(admin_analytics_api.router, tags=["admin-analytics"])
+app.include_router(admin_themes_api.router, tags=["admin-themes"])
+app.include_router(admin_business_api.router, tags=["admin-business"])
 app.include_router(health.router, tags=["health"])
 
 @app.get("/")

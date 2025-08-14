@@ -20,6 +20,7 @@ The system uses AI agents to create intelligent, engaging forms that maximize co
 - **Session Management**: Starlette SessionMiddleware with Redis backend (OWASP-compliant HTTP-only cookies)
 - **Database**: Supabase for data storage and real-time updates
 - **Frontend**: React.js with Tailwind CSS v4 for theming
+- **Admin Frontend**: React.js admin interface on port 5174 with `/admin` base path
 - **Package Manager**: uv (modern Python package manager)
 - **Configuration**: YAML-based configuration management
 - **Containerization**: Docker & Docker Compose for full-stack development
@@ -53,6 +54,36 @@ The system uses AI agents to create intelligent, engaging forms that maximize co
 ```
 docker-compose up -d
 ```
+
+### Admin Interface Setup
+The admin interface is a separate React application for managing the platform:
+
+```bash
+# Start admin interface (from project root)
+cd frontend/admin-app
+npm install
+npm run dev
+```
+
+**Admin Interface URLs:**
+- **Development**: http://localhost:5174/admin/
+- **Production**: http://your-domain.com/admin/
+
+**Key Features:**
+- Form CRUD operations with question management
+- Real-time analytics dashboard with charts and metrics
+- Theme management with preview capabilities
+- Business information and branding configuration
+- Team member management and role-based access
+- Data export functionality (CSV/JSON)
+
+**API Integration:**
+All admin APIs are available under `/api/admin/*`:
+- `/api/admin/auth/*` - Authentication
+- `/api/admin/forms/*` - Form management
+- `/api/admin/analytics/*` - Analytics and reporting
+- `/api/admin/themes/*` - Theme management
+- `/api/admin/business/*` - Business settings
 
 ## Database Setup
 The system includes comprehensive database population with 5 example business scenarios:
@@ -153,7 +184,7 @@ graph TB
 - **✅ Lead Scoring**: Automated qualification with personalized messaging
 - **✅ Docker Environment**: Full containerization with backend, frontend, and Redis services
 - **🚧 Frontend**: React.js + Tailwind v4 (in development)
-- **🚧 Admin Interface**: Web-based form management (planned)
+- **✅ Admin Interface**: Complete React.js admin app with forms, analytics, themes, and business management
 
 ### Available Test Forms
 Ready-to-use form IDs for testing:
