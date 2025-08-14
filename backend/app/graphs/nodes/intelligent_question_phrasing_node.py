@@ -46,9 +46,8 @@ def intelligent_question_phrasing_node(state: SurveyState) -> Dict[str, Any]:
         
         # Initialize LLM
         llm = get_chat_model(
-            model="gpt-4o-mini",
-            temperature=0.4,  # Higher temperature for creative phrasing
-            max_tokens=1000
+            model_name="gpt-4o-mini",
+            temperature=0.4  # Higher temperature for creative phrasing
         )
         
         # Create context for phrasing

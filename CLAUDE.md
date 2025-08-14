@@ -27,10 +27,6 @@ The system uses AI agents to create intelligent, engaging forms that maximize co
 ### Project Structure
 - **Main application**: `main.py` - Entry point for the application
 - **Backend**: `/backend/app/` - Core application modules
-  - `handlers/` - Request/response handlers
-  - `llm/` - Language model integrations
-  - `ml/` - Machine learning components
-  - `prompt_engineering/` - Prompt templates and engineering
   - `utils/` - Utility functions and configuration loading
   - `routes/` - API endpoints for survey operations
   - `graphs/` - LangGraph implementations for survey flow
@@ -145,12 +141,12 @@ graph TB
 
 ### Key Features
 
-✅ **Intelligent Question Selection**: LLM chooses questions within business rules  
-✅ **Question Flow Strategy**: Supervisor coordinates selection + phrasing + engagement  
-✅ **Score Validation**: LLM reviews mathematical score for business sense  
-✅ **Tool Integration**: External validation when Lead Intelligence Supervisor deems necessary  
-✅ **Maybe Handling**: Marked in database for separate workflow  
-✅ **Non-deterministic Question Flow**: Each survey adapts to user responses  
+✅ **Intelligent Question Selection**: LLM chooses questions within business rules
+✅ **Question Flow Strategy**: Supervisor coordinates selection + phrasing + engagement
+✅ **Score Validation**: LLM reviews mathematical score for business sense
+✅ **Tool Integration**: External validation when Lead Intelligence Supervisor deems necessary
+✅ **Maybe Handling**: Marked in database for separate workflow
+✅ **Non-deterministic Question Flow**: Each survey adapts to user responses
 ✅ **Business Rule Compliance**: AI selection within defined constraints
 
 ### Lead Classification & Actions

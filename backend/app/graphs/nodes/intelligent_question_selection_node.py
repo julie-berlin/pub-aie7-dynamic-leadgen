@@ -49,11 +49,21 @@ def intelligent_question_selection_node(state: SurveyState) -> Dict[str, Any]:
         
         # Initialize LLM
         llm = get_chat_model(
-            model="gpt-4o-mini",
-            temperature=0.3,
-            max_tokens=1500
+            model_name="gpt-4o-mini",
+            temperature=0.3
         )
         
+        # Create numbered question list for LLM to reference
+        numbered_questions = []
+        for i, q in enumerate(available[:15], 1):  # Limit to 15 for context
+            numbered_questions.append({
+                "number": i,
+                "question": q.get("question_text", ""),
+                "type": q.get("question_type", ""),
+                "required": q.get("is_required", False),
+                "category": q.get("category", "")
+            })
+
         # Create LLM prompt
         system_prompt = """You are an intelligent question selection agent for lead generation surveys.
 
@@ -77,7 +87,7 @@ BUSINESS RULES TO FOLLOW:
 OUTPUT FORMAT:
 Respond with valid JSON only:
 {
-  "selected_question_ids": [1, 5, 8],
+  "selected_question_numbers": [1, 3, 5],
   "reasoning": "detailed explanation for selection",
   "confidence": 0.85,
   "flow_logic": "explanation of conversation flow",
@@ -86,7 +96,9 @@ Respond with valid JSON only:
     "difficulty_level": "easy" | "medium" | "hard",
     "expected_response_time": "30-60 seconds"
   }
-}"""
+}
+
+IMPORTANT: Use the question numbers (1, 2, 3...) shown in the available questions list below."""
 
         user_prompt = f"""Select the next questions for this lead generation survey:
 
@@ -98,15 +110,15 @@ SUPERVISOR GUIDANCE:
 CONVERSATION CONTEXT:
 - Questions asked so far: {len(responses_so_far)}
 - Previous responses: {responses_so_far[-3:] if responses_so_far else "None"}
-- Questions already asked: {questions_asked}
+- Questions already asked IDs: {questions_asked}
 
 BUSINESS RULES:
 {json.dumps(business_rules, indent=2)}
 
-AVAILABLE QUESTIONS:
-{json.dumps(available[:15], indent=2)}  # Limit to first 15 for context
+AVAILABLE QUESTIONS (by number):
+{json.dumps(numbered_questions, indent=2)}
 
-Select {recommended_count} questions that create the best conversation flow and maximize lead qualification information."""
+Select {recommended_count} questions by their numbers that create the best conversation flow and maximize lead qualification information."""
 
         # Get LLM response
         messages = [
@@ -124,28 +136,38 @@ Select {recommended_count} questions that create the best conversation flow and 
             
         try:
             selection_data = json.loads(llm_content)
+            logger.info(f"LLM selection data: {selection_data}")
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse LLM response: {e}")
+            logger.error(f"LLM content was: {repr(llm_content[:200])}")
             # Fallback to rule-based selection
+            return _fallback_question_selection(available, recommended_count, responses_so_far)
+        except Exception as llm_error:
+            logger.error(f"LLM call failed: {llm_error}")
+            # Fallback to rule-based selection when LLM is unavailable
             return _fallback_question_selection(available, recommended_count, responses_so_far)
         
         # Validate and get selected questions
-        selected_ids = selection_data.get("selected_question_ids", [])
+        selected_numbers = selection_data.get("selected_question_numbers", [])
         selected_questions = []
         
-        # Create lookup for available questions
-        question_lookup = {q.get("id"): q for q in available}
+        logger.info(f"LLM selected question numbers: {selected_numbers}")
+        logger.info(f"Available questions count: {len(available)}")
         
-        for q_id in selected_ids:
-            if q_id in question_lookup:
-                selected_questions.append(question_lookup[q_id])
+        # Map question numbers back to actual questions
+        for number in selected_numbers:
+            if isinstance(number, int) and 1 <= number <= len(available):
+                question_index = number - 1  # Convert to 0-based index
+                selected_questions.append(available[question_index])
+                logger.info(f"Mapped question number {number} to: {available[question_index].get('question_text', '')}")
             else:
-                logger.warning(f"Selected question ID {q_id} not found in available questions")
+                logger.warning(f"Selected question number {number} is out of range (1-{len(available)})")
         
         # Ensure we don't exceed the limit
         if len(selected_questions) > 3:
+            original_count = len(selected_questions)
             selected_questions = selected_questions[:3]
-            logger.info(f"Trimmed selection to 3 questions (was {len(selected_ids)})")
+            logger.info(f"Trimmed selection to 3 questions (was {original_count})")
         
         # Apply business rule validation
         validated_questions = _apply_business_rule_validation(
@@ -155,6 +177,7 @@ Select {recommended_count} questions that create the best conversation flow and 
         )
         
         return {
+            # Flat structure for backward compatibility
             "selected_questions": validated_questions,
             "selection_reasoning": selection_data.get("reasoning", "Intelligent LLM selection"),
             "selection_confidence": selection_data.get("confidence", 0.7),
@@ -166,6 +189,13 @@ Select {recommended_count} questions that create the best conversation flow and 
                 "questions_selected": len(validated_questions),
                 "timestamp": datetime.now().isoformat(),
                 **selection_data.get("metadata", {})
+            },
+            # Hierarchical structure for graph state
+            "question_strategy": {
+                **state.get("question_strategy", {}),
+                "current_questions": validated_questions,
+                "selection_reasoning": selection_data.get("reasoning", "Intelligent LLM selection"),
+                "selection_confidence": selection_data.get("confidence", 0.7)
             }
         }
         
@@ -201,12 +231,25 @@ def _is_question_valid(question: Dict, business_rules: Dict, responses: List[Dic
     question_type = question.get("question_type", "")
     responses_count = len(responses)
     
-    # Don't ask qualifying questions too early
-    if question_type == "qualifying" and responses_count < 2:
+    # Special case: On first step (0 responses), allow basic engagement questions
+    if responses_count == 0:
+        # Always allow basic contact questions on first step
+        if question_type in ["text", "contact"] or "name" in question.get("question_text", "").lower():
+            return True
+        # Allow non-qualifying questions
+        if question_type != "qualifying":
+            return True
+    
+    # Don't ask qualifying questions too early (but allow after 1 response, not 2)
+    if question_type == "qualifying" and responses_count < 1:
         return False
     
-    # Check required question timing
-    if question.get("is_required") and business_rules.get("defer_required_until", 3) > responses_count:
+    # Check required question timing - but be more lenient for essential questions
+    defer_until = business_rules.get("defer_required_until", 3)
+    if question.get("is_required") and defer_until > responses_count:
+        # Exception: always allow name/contact questions
+        if "name" in question.get("question_text", "").lower() or question_type == "contact":
+            return True
         return False
     
     # Add more business rule checks as needed

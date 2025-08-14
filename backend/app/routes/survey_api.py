@@ -24,7 +24,7 @@ from pydantic_models import (
     LeadStatus,
     CompletionType
 )
-from app.graphs.survey_graph_v2 import survey_graph_v2
+from app.graphs.survey_graph_intelligent import intelligent_survey_graph
 from app.utils.response_helpers import (
     success_response,
     error_response,
@@ -81,7 +81,7 @@ async def start_session(
         }
         
         # Run the graph to initialize and get first questions
-        result = await survey_graph_v2.ainvoke(initial_state)
+        result = await intelligent_survey_graph.ainvoke(initial_state)
         
         # Extract frontend response
         frontend_data = result.get('frontend_response', {})
@@ -184,7 +184,7 @@ async def submit_and_continue(
         }
         
         # Run the graph starting from response processing
-        result = await survey_graph_v2.ainvoke(
+        result = await intelligent_survey_graph.ainvoke(
             state_update,
             {"recursion_limit": 25}
         )
@@ -273,7 +273,7 @@ async def mark_abandoned(request: Request):
         }
         
         # Run abandonment flow
-        await survey_graph_v2.ainvoke(state_update)
+        await intelligent_survey_graph.ainvoke(state_update)
         
         return success_response(
             message="Abandonment recorded"

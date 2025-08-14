@@ -202,13 +202,67 @@ def survey_admin_supervisor_node(state: SurveyState) -> Dict[str, Any]:
     """Node function for Survey Administration Supervisor."""
     supervisor = SurveyAdministrationSupervisor()
     
-    # Make strategic decision
-    decision = supervisor.make_decision(state)
+    # Load and prepare available questions for intelligent nodes
+    try:
+        # Get form_id from hierarchical state structure
+        core = state.get('core', {})
+        question_strategy = state.get('question_strategy', {})
+        lead_intelligence = state.get('lead_intelligence', {})
+        
+        form_id = core.get('form_id', 'dogwalk_demo_form')
+        
+        # Load all questions if not already loaded (using same pattern as v2 graph)
+        from ...utils.cached_data_loader import data_loader
+        all_questions = data_loader.get_questions(form_id)
+        
+        # Get already asked questions
+        asked_ids = question_strategy.get('asked_questions', [])
+        responses = lead_intelligence.get('responses', [])
+        
+        # Filter to available questions (excluding already asked)
+        available_questions = [q for q in all_questions if q.get('id') not in asked_ids]
+        
+        logger.info(f"Supervisor loaded {len(all_questions)} total questions, {len(available_questions)} available for form {form_id}")
+        
+        # Add available questions to state for intelligent nodes
+        # Use hierarchical structure for intelligent graph
+        prepared_state = {
+            **state,
+            # Flat structure for intelligent nodes (backward compatibility)
+            'available_questions': available_questions,
+            'all_responses': responses,
+            'questions_asked': asked_ids,
+            'business_rules': {},
+            'form_config': {'form_id': form_id},
+            # Also update hierarchical structure
+            'question_strategy': {
+                **state.get('question_strategy', {}),
+                'all_questions': all_questions,
+                'available_questions': available_questions,  # For intelligent nodes
+                'asked_questions': asked_ids
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to load questions in supervisor: {e}")
+        # Fallback to empty questions
+        prepared_state = {
+            **state,
+            'available_questions': [],
+            'all_responses': [],
+            'questions_asked': [],
+            'business_rules': {},
+            'form_config': {}
+        }
+    
+    # Make strategic decision with prepared state
+    decision = supervisor.make_decision(prepared_state)
     
     # Analyze engagement risk
-    engagement_analysis = supervisor.analyze_engagement_risk(state)
+    engagement_analysis = supervisor.analyze_engagement_risk(prepared_state)
     
     return {
+        **prepared_state,  # Include prepared state for downstream nodes
         "survey_admin_decision": decision.to_dict(),
         "engagement_analysis": engagement_analysis,
         "supervisor_metadata": {

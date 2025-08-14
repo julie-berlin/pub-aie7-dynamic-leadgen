@@ -34,9 +34,8 @@ def unified_completion_message_node(state: SurveyState) -> Dict[str, Any]:
         
         # Initialize LLM
         llm = get_chat_model(
-            model="gpt-4o-mini",
-            temperature=0.3,  # Creative but consistent messaging
-            max_tokens=1200
+            model_name="gpt-4o-mini",
+            temperature=0.3  # Creative but consistent messaging
         )
         
         # Get business context

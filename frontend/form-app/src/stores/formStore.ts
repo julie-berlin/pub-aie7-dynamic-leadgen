@@ -9,7 +9,6 @@ import type {
   SubmitResponseResponse 
 } from '../types';
 import { apiClient } from '../utils/apiClient';
-import { generateSessionId } from '../utils/sessionUtils';
 
 export const useFormStore = create<FormStore>()(
   persist(
@@ -29,18 +28,9 @@ export const useFormStore = create<FormStore>()(
         try {
           // Check if we have an existing session for this form
           const existingState = get().formState;
-          const shouldResume = existingState && 
-            existingState.formId === formId && 
-            existingState.clientId === clientId && 
-            !existingState.isComplete;
 
-          let sessionId: string;
-          
-          if (shouldResume) {
-            sessionId = existingState.sessionId;
-          } else {
-            sessionId = generateSessionId();
-          }
+          // Note: Real session ID is managed by backend via HTTP-only cookies
+          // Frontend state is separate from backend session management
 
           // Start or resume session
           const response = await apiClient.startSession({

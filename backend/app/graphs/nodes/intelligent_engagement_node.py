@@ -45,9 +45,8 @@ def intelligent_engagement_node(state: SurveyState) -> Dict[str, Any]:
         
         # Initialize LLM
         llm = get_chat_model(
-            model="gpt-4o-mini",
-            temperature=0.3,
-            max_tokens=1000
+            model_name="gpt-4o-mini",
+            temperature=0.3
         )
         
         # Determine engagement urgency

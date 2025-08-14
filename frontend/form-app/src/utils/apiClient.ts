@@ -5,8 +5,43 @@ import type {
   SubmitResponseResponse,
   FormStep,
   ThemeConfig,
-  TrackingData
+  TrackingData,
+  Question,
+  QuestionType
 } from '../types';
+
+// Backend API response types
+interface BackendQuestion {
+  question: string;
+  phrased_question: string;
+  data_type: string;
+  is_required: boolean;
+  options?: string[] | Record<string, any>;
+  scoring_rubric?: string;
+  description?: string;
+  placeholder?: string;
+}
+
+interface BackendFormStep {
+  stepNumber: number;
+  totalSteps: number;
+  questions: BackendQuestion[];
+  headline: string;
+  subheading?: string;
+  isComplete: boolean;
+  canGoBack?: boolean;
+  isLastStep?: boolean;
+}
+
+interface BackendStartSessionResponse {
+  form: {
+    id?: string;
+    title: string;
+    description?: string;
+    theme?: ThemeConfig;
+  };
+  step: BackendFormStep;
+}
 
 // API configuration
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -16,6 +51,101 @@ class APIClient {
   
   constructor(baseUrl: string = API_BASE_URL) {
     this.baseUrl = baseUrl.replace(/\/$/, ''); // Remove trailing slash
+  }
+
+  /**
+   * Transform backend question data to frontend format
+   */
+  private transformQuestion(backendQuestion: BackendQuestion, index: number): Question {
+    return {
+      id: (index + 1).toString(), // Generate ID from index since backend doesn't provide it
+      type: this.mapDataTypeToQuestionType(backendQuestion.data_type),
+      text: backendQuestion.phrased_question || backendQuestion.question,
+      description: backendQuestion.description,
+      placeholder: backendQuestion.placeholder,
+      required: backendQuestion.is_required || false,
+      options: this.transformQuestionOptions(backendQuestion),
+      validation: this.transformValidationRules(backendQuestion),
+      conditional: undefined // Backend doesn't seem to provide conditional logic yet
+    };
+  }
+
+  /**
+   * Map backend data_type to frontend QuestionType
+   */
+  private mapDataTypeToQuestionType(dataType: string): QuestionType {
+    const typeMap: Record<string, QuestionType> = {
+      'text': 'text',
+      'textarea': 'textarea', 
+      'email': 'email',
+      'phone': 'phone',
+      'number': 'number',
+      'select': 'select',
+      'radio': 'radio',
+      'checkbox': 'checkbox',
+      'multiselect': 'multiselect',
+      'rating': 'rating',
+      'date': 'date',
+      'time': 'time',
+      'datetime': 'datetime',
+      'file': 'file'
+    };
+    
+    return typeMap[dataType] || 'text';
+  }
+
+  /**
+   * Transform backend options to frontend format
+   */
+  private transformQuestionOptions(backendQuestion: BackendQuestion) {
+    if (!backendQuestion.options) return undefined;
+
+    // If options is an array of strings (like for select), convert to choices
+    if (Array.isArray(backendQuestion.options)) {
+      return {
+        choices: backendQuestion.options.map((option: string, index: number) => ({
+          id: (index + 1).toString(),
+          text: option,
+          value: option
+        }))
+      };
+    }
+
+    // If options is an object, return as-is (for complex option structures)
+    return backendQuestion.options;
+  }
+
+  /**
+   * Transform backend validation to frontend format
+   */
+  private transformValidationRules(backendQuestion: BackendQuestion) {
+    const rules = [];
+    
+    if (backendQuestion.is_required) {
+      rules.push({
+        type: 'required' as const,
+        message: 'This field is required'
+      });
+    }
+
+    // Add more validation transformations as needed based on backend schema
+    return rules.length > 0 ? rules : undefined;
+  }
+
+  /**
+   * Transform backend step response to frontend format
+   */
+  private transformFormStep(backendStep: BackendFormStep): FormStep {
+    return {
+      stepNumber: backendStep.stepNumber,
+      totalSteps: backendStep.totalSteps,
+      questions: backendStep.questions.map((q, index) => this.transformQuestion(q, index)),
+      headline: backendStep.headline || '',
+      subheading: backendStep.subheading,
+      isComplete: backendStep.isComplete,
+      canGoBack: backendStep.canGoBack,
+      isLastStep: backendStep.isLastStep
+    };
   }
 
   /**
@@ -64,7 +194,7 @@ class APIClient {
     clientId?: string;
     trackingData?: Partial<TrackingData>;
   }): Promise<StartSessionResponse> {
-    return this.request<StartSessionResponse>('/api/survey/start', {
+    const response = await this.request<BackendStartSessionResponse>('/api/survey/start', {
       method: 'POST',
       body: JSON.stringify({
         form_id: params.formId,
@@ -73,10 +203,20 @@ class APIClient {
         utm_medium: params.trackingData?.utmMedium,
         utm_campaign: params.trackingData?.utmCampaign,
         utm_content: params.trackingData?.utmContent,
-        utm_term: params.trackingData?.utmTerm,
-        landing_page: params.trackingData?.landing_page
+        utm_term: params.trackingData?.utmTerm
       }),
     });
+
+    // Transform the response to match frontend types
+    return {
+      form: {
+        id: response.form.id || 'unknown',
+        title: response.form.title,
+        description: response.form.description,
+        theme: response.form.theme
+      },
+      step: this.transformFormStep(response.step)
+    };
   }
 
   /**
@@ -155,7 +295,7 @@ class APIClient {
   /**
    * Validate form access
    */
-  async validateFormAccess(clientId: string, formId: string): Promise<{
+  async validateFormAccess(formId: string): Promise<{
     valid: boolean;
     form?: {
       id: string;

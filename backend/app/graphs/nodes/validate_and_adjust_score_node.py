@@ -36,9 +36,8 @@ def validate_and_adjust_score_node(state: SurveyState) -> Dict[str, Any]:
         
         # Initialize LLM
         llm = get_chat_model(
-            model="gpt-4o-mini",
-            temperature=0.1,  # Low temperature for consistent scoring
-            max_tokens=1500
+            model_name="gpt-4o-mini",
+            temperature=0.1  # Low temperature for consistent scoring
         )
         
         # Analyze tool results impact
