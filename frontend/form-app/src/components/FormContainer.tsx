@@ -30,18 +30,28 @@ export default function FormContainer({ form, currentStep, formState }: FormCont
     <div className="form-container w-full p-6 md:p-8">
       {/* Form Header */}
       <div className="mb-8">
-        <h1 className="text-2xl md:text-3xl font-bold text-text mb-2">
-          {currentStep.headline || form.title}
+        {/* Company Name as H1 */}
+        <h1 className="text-3xl md:text-4xl font-bold text-text mb-4">
+          {form.title}
         </h1>
         
+        {/* Step Headline as H2 */}
+        {currentStep.headline && (
+          <h2 className="text-xl md:text-2xl font-semibold text-text mb-3">
+            {currentStep.headline}
+          </h2>
+        )}
+        
+        {/* Engagement Content as P */}
         {currentStep.subheading && (
-          <p className="text-text-light mb-4">
+          <p className="text-text-light text-lg leading-relaxed">
             {currentStep.subheading}
           </p>
         )}
         
+        {/* Fallback to form description if no engagement content */}
         {!currentStep.subheading && form.description && (
-          <p className="text-text-light">
+          <p className="text-text-light text-lg leading-relaxed">
             {form.description}
           </p>
         )}

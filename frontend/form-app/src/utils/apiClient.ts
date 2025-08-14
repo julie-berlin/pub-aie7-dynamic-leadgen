@@ -17,9 +17,9 @@ interface BackendQuestion {
   data_type: string;
   is_required: boolean;
   options?: string[] | Record<string, any>;
-  scoring_rubric?: string;
   description?: string;
   placeholder?: string;
+  // Note: scoring_rubric deliberately excluded - sensitive backend data
 }
 
 interface BackendFormStep {
@@ -224,12 +224,23 @@ class APIClient {
    * Session ID is automatically included via HTTP-only cookie
    */
   async submitResponses(request: SubmitResponseRequest): Promise<SubmitResponseResponse> {
-    return this.request<SubmitResponseResponse>('/api/survey/step', {
+    const response = await this.request<{
+      isComplete: boolean;
+      nextStep?: BackendFormStep;
+      completionData?: any;
+    }>('/api/survey/step', {
       method: 'POST',
       body: JSON.stringify({
         responses: request.responses
       }),
     });
+
+    // Transform the response to match frontend types
+    return {
+      isComplete: response.isComplete,
+      nextStep: response.nextStep ? this.transformFormStep(response.nextStep) : undefined,
+      completionData: response.completionData
+    };
   }
 
   /**

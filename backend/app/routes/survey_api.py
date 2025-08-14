@@ -118,17 +118,26 @@ async def start_session(
             session_uuid = await create_survey_session(http_request, session_data)
             logger.info(f"Created secure session: {session_uuid}")
             
+        # Extract form details from graph response
+        form_details = result.get('form_details', {})
+        
+        # If not at top level, check inside frontend_response
+        if not form_details:
+            form_details = frontend_data.get('form_details', {})
+            
+        logger.debug(f"Extracted form_details: {form_details}")
+        
         # Create response with consistent format
         json_response = success_response(
             data={
                 "form": {
-                    "id": request.form_id,
-                    "title": frontend_data.get('form_title', 'Survey'),
-                    "description": frontend_data.get('form_description'),
+                    "id": form_details.get('id', request.form_id),
+                    "title": form_details.get('title', 'Survey'),
+                    "description": form_details.get('description'),
                     "theme": frontend_data.get('theme')
                 },
                 "step": {
-                    "stepNumber": 1,
+                    "stepNumber": frontend_data.get('step', 1),
                     "totalSteps": frontend_data.get('total_steps', 1),
                     "questions": frontend_data.get('questions', []),
                     "headline": frontend_data.get('headline', 'Welcome!'),
