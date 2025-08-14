@@ -3,7 +3,7 @@
   "env": ".env",
   "python_version": "3.12",
   "graphs": {
-    "intelligent_survey_graph": "./backend/app/graphs/simplified_survey_graph.py:graph"
+    "intelligent_survey_graph": "./langgraph_studio_graph.py:graph"
   },
   "assistants": {
     "intelligent_survey_agent": {
