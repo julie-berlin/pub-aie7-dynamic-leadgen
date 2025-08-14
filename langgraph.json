@@ -1,28 +1,8 @@
 {
-  "version": 1,
   "dependencies": ["."],
-  "env": ".env",
-  "python_version": "3.13",
   "graphs": {
-    "simple_agent": "backend.app.graphs.simple_agent:graph",
-    "survey_graph": "backend.app.graphs.survey_graph:survey_graph",
-    "intelligent_survey": "backend.app.graphs.survey_graph_intelligent:intelligent_survey_graph"
+    "intelligent_survey_graph": "./backend/app/graphs/survey_graph_intelligent.py:intelligent_survey_graph",
+    "survey_graph_v2": "./backend/app/graphs/survey_graph_v2.py:survey_graph"
   },
-  "assistants": {
-    "agent": {
-      "graph_id": "simple_agent",
-      "name": "Simple Agent",
-      "description": "Agent with tools using conditional tool-calling."
-    },
-    "survey_assistant": {
-      "graph_id": "survey_graph",
-      "name": "Basic Survey Assistant",
-      "description": "Simple survey flow without supervisor intelligence."
-    },
-    "intelligent_survey_assistant": {
-      "graph_id": "intelligent_survey",
-      "name": "Intelligent Survey Assistant",
-      "description": "Advanced AI-powered survey with supervisor hierarchy, intelligent question selection, lead scoring with external validation (Tavily search, Google Maps), and adaptive engagement optimization."
-    }
-  }
+  "env": ".env"
 }
