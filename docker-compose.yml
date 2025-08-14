@@ -10,6 +10,10 @@ services:
     image: dynamic-survey-api:dev
     container_name: survey-backend-dev
 
+    # Load environment variables from .env file
+    env_file:
+      - .env
+
     environment:
       - ENVIRONMENT=development
       - LOG_LEVEL=DEBUG
@@ -24,6 +28,9 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       # Optional for development
       - LANGCHAIN_API_KEY=${LANGCHAIN_API_KEY}
+      - LANGSMITH_API_KEY=${LANGSMITH_API_KEY}
+      - TAVILY_API_KEY=${TAVILY_API_KEY}
+      - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
 
     ports:
       - "${BACKEND_PORT:-8000}:8000"

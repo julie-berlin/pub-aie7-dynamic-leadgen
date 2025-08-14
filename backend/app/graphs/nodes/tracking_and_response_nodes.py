@@ -91,8 +91,8 @@ def initialize_session_with_tracking_node(state: Dict[str, Any]) -> Dict[str, An
             'referrer': metadata.get('referrer'),
             'user_agent': metadata.get('user_agent'),
             'ip_address': metadata.get('ip_address'),
-            'landing_page': metadata.get('landing_page'),
-            'session_started': datetime.now().isoformat()
+            'landing_page': metadata.get('landing_page')
+            # Note: session_started removed - not in tracking_data schema, use created_at instead
         }
         
         # Create session ID

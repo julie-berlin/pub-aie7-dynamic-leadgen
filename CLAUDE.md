@@ -71,83 +71,51 @@ The system includes comprehensive database population with 5 example business sc
 uv run python3 database/setup_and_test.py
 ```
 
-## LangGraph Flow Architecture
+## LangGraph Flow Architecture (Simplified)
 
-### Core Flow Design
-Current focus is on capabilities #2 and #3 (Adaptive Forms and Lead Scoring):
+### Simplified Flow Design
+**RECENTLY SIMPLIFIED**: All child nodes have been consolidated into their parent supervisors for better performance and maintainability.
 
-See `/.llm/final-supervisor-architecture.md` for information.
 ```mermaid
 graph TB
     Start([Start: User Arrives with UTM]) --> InitTrack[initialize_session_with_tracking<br/>📊 LOGIC - Database ops + UTM]
 
-    InitTrack --> SA[Survey Administration Supervisor<br/>🤖 LLM AGENT - Intelligent question strategy]
+    InitTrack --> SA[Consolidated Survey Admin Supervisor<br/>🤖 LLM AGENT - ALL survey functions integrated]
 
-    SA --> QS[question_selection_node<br/>🤖 LLM AGENT - AI-driven selection within rules]
-    SA --> QP[question_phrasing_node<br/>🤖 LLM AGENT - Rewrites questions]
-    SA --> EN[engagement_node<br/>🤖 LLM AGENT - Generates messages]
+    SA --> Wait{Wait for User Response}
+    Wait --> CheckAndMark[check_abandonment<br/>📊 LOGIC - Abandonment detection]
+    CheckAndMark -->|Abandoned| End([End])
 
-    QS --> QP
-    QP --> EN
-    EN --> PrepStep[prepare_step_for_frontend<br/>📊 LOGIC - Data formatting]
+    Wait --> LI[Consolidated Lead Intelligence Agent<br/>🤖 LLM AGENT - ALL lead processing integrated]
 
-    PrepStep --> Wait{Wait for User Response}
-    Wait --> CheckAndMark[check_and_handle_abandonment<br/>📊 LOGIC - Combined: detect + mark abandoned]
-    CheckAndMark -->|Abandoned| FinalSave
-
-    Wait --> SaveResponses[save_and_validate_responses<br/>📊 LOGIC - Save to DB + update state]
-
-    SaveResponses --> Score[calculate_lead_score<br/>📊 LOGIC - Mathematical scoring]
-
-    Score --> LI[Lead Intelligence Supervisor<br/>🤖 LLM AGENT - Validate score + Tools]
-
-    LI --> Tools{Need External Data?}
-    Tools -->|Yes| Tavily[🔧 Tavily Web Search]
-    Tools -->|Yes| Maps[🔧 Google Maps API]
-    Tools --> Validate[validate_and_adjust_score<br/>🤖 LLM AGENT - Final score validation]
-
-    Tavily --> Validate
-    Maps --> Validate
-
-    Validate --> Route{Lead Status?}
+    LI --> Route{Lead Status?}
 
     Route -->|Need More| SA
-    Route -->|Qualified/Maybe/No| Message[generate_completion_message<br/>🤖 LLM AGENT - Custom message by status]
-
-    Message --> FinalSave[📊 LOGIC - Final database update]
-
-    FinalSave --> End([End])
+    Route -->|Complete| End([End])
 ```
 
-### Supervisor & Node Classification
+### Consolidated Architecture Overview
 
-| Node/Component | Type | Uses LLM? | Purpose |
-|----------------|------|-----------|---------|
-| **initialize_session_with_tracking** | 📊 LOGIC | No | Database operations, UTM tracking |
-| **Survey Administration Supervisor** | 🤖 LLM AGENT | Yes | Overall question strategy coordination |
-| **question_selection_node** | 🤖 LLM AGENT | Yes | **AI-driven selection within rules** |
-| **question_phrasing_node** | 🤖 LLM AGENT | Yes | Rewrites questions for better engagement |
-| **engagement_node** | 🤖 LLM AGENT | Yes | Generates motivational messages |
-| **prepare_step_for_frontend** | 📊 LOGIC | No | Formats data for API response |
-| **check_and_handle_abandonment** | 📊 LOGIC | No | Time-based detection + DB update |
-| **save_and_validate_responses** | 📊 LOGIC | No | Database persistence + state update |
-| **calculate_lead_score** | 📊 LOGIC | No | Mathematical scoring algorithm |
-| **Lead Intelligence Supervisor** | 🤖 LLM AGENT | Yes | **Validates scores + decides on tools** |
-| **Tavily Search** | 🔧 TOOL | No | External web search API |
-| **Google Maps API** | 🔧 TOOL | No | Distance/location calculations |
-| **validate_and_adjust_score** | 🤖 LLM AGENT | Yes | **Final score validation and adjustment** |
-| **generate_completion_message** | 🤖 LLM AGENT | Yes | Custom messages by status |
-| **Final database update** | 📊 LOGIC | No | Session completion |
+| Component | Type | Integrated Functions |
+|-----------|------|---------------------|
+| **initialize_session_with_tracking** | 📊 LOGIC | Database operations, UTM tracking |
+| **Consolidated Survey Admin Supervisor** | 🤖 LLM AGENT | • Question selection (AI-driven)<br/>• Question phrasing & engagement<br/>• Frontend preparation<br/>• Progress tracking |
+| **Consolidated Lead Intelligence Agent** | 🤖 LLM AGENT | • Response saving<br/>• Score calculation<br/>• Tool usage decisions (Tavily/Maps)<br/>• Score validation & adjustment<br/>• Message generation<br/>• Status determination |
+| **check_abandonment** | 📊 LOGIC | Time-based detection + database update |
+| **Lead Intelligence Toolbelt** | 🔧 UTILITY | Database ops, scoring, tools, messaging |
+| **Abandonment Toolbelt** | 🔧 UTILITY | Detection logic, database updates |
 
-### Key Features
+### Key Features (Maintained in Simplified Architecture)
 
-✅ **Intelligent Question Selection**: LLM chooses questions within business rules
-✅ **Question Flow Strategy**: Supervisor coordinates selection + phrasing + engagement
-✅ **Score Validation**: LLM reviews mathematical score for business sense
-✅ **Tool Integration**: External validation when Lead Intelligence Supervisor deems necessary
-✅ **Maybe Handling**: Marked in database for separate workflow
-✅ **Non-deterministic Question Flow**: Each survey adapts to user responses
-✅ **Business Rule Compliance**: AI selection within defined constraints
+✅ **Intelligent Question Selection**: Consolidated in Survey Admin Supervisor  
+✅ **Question Flow Strategy**: All survey logic consolidated in single supervisor  
+✅ **Score Validation**: Integrated in Lead Intelligence Agent with toolbelt support  
+✅ **Tool Integration**: External validation (Tavily/Maps) managed by consolidated agent  
+✅ **Maybe Handling**: Preserved in database workflow  
+✅ **Non-deterministic Question Flow**: Each survey adapts to user responses  
+✅ **Business Rule Compliance**: AI selection within defined constraints  
+✅ **Simplified Architecture**: Reduced complexity with maintained functionality  
+✅ **Better Performance**: Fewer LLM calls, consolidated processing
 
 ### Lead Classification & Actions
 - **"Yes" leads**: Real-time notification + personalized completion message + email

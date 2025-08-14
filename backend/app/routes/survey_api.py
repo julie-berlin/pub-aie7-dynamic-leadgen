@@ -24,7 +24,12 @@ from pydantic_models import (
     LeadStatus,
     CompletionType
 )
-from app.graphs.survey_graph_intelligent import intelligent_survey_graph
+from app.graphs.simplified_survey_graph import (
+    simplified_survey_graph as intelligent_survey_graph,
+    start_simplified_survey as start_intelligent_survey,
+    process_survey_step as process_survey_responses,
+    check_abandonment as check_survey_abandonment
+)
 from app.utils.response_helpers import (
     success_response,
     error_response,
@@ -83,9 +88,14 @@ async def start_session(
         # Run the graph to initialize and get first questions
         result = await intelligent_survey_graph.ainvoke(initial_state)
         
+        logger.debug(f"Graph result type: {type(result)}")
+        logger.debug(f"Graph result keys: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}")
+        
         # Extract frontend response
         frontend_data = result.get('frontend_response', {})
+        logger.debug(f"Frontend data: {frontend_data}")
         session_id = frontend_data.get('session_id')
+        logger.debug(f"Extracted session_id: {session_id}")
         
         # Create session data for fastapi-sessions
         if session_id:
