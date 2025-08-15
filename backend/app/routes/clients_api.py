@@ -32,6 +32,16 @@ router = APIRouter(prefix="/api/clients", tags=["clients"])
 
 # === RESTful ENDPOINTS ===
 
+@router.get("/me", response_model=ClientResponse)
+async def get_current_client(
+    current_user: AdminUserResponse = Depends(get_current_admin_user)
+):
+    """
+    Get the current authenticated client's information.
+    Convenience endpoint that doesn't require passing client_id.
+    """
+    return await get_client(current_user.client_id, current_user)
+
 @router.get("/{client_id}", response_model=ClientResponse)
 async def get_client(
     client_id: str,
@@ -78,7 +88,7 @@ async def get_client(
         )
         
         return success_response(
-            data=client_response.model_dump(),
+            data=client_response.model_dump(mode='json'),
             message="Client retrieved successfully"
         )
             
@@ -87,16 +97,6 @@ async def get_client(
     except Exception as e:
         logger.error(f"Failed to get client: {e}")
         raise HTTPException(status_code=500, detail="Failed to retrieve client")
-
-@router.get("/me", response_model=ClientResponse)
-async def get_current_client(
-    current_user: AdminUserResponse = Depends(get_current_admin_user)
-):
-    """
-    Get the current authenticated client's information.
-    Convenience endpoint that doesn't require passing client_id.
-    """
-    return await get_client(current_user.client_id, current_user)
 
 @router.put("/{client_id}", response_model=ClientResponse)
 async def update_client(

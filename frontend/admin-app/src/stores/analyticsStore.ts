@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { API_CONFIG, buildApiUrl } from '../config/api';
 
 // Analytics data interfaces
 export interface DashboardMetrics {
@@ -177,23 +178,37 @@ export const useAnalyticsStore = create<AnalyticsStore>()(
         
         try {
           const dateRange = customDateRange || get().dateRange;
-          const token = localStorage.getItem('admin_token');
           
           const params = new URLSearchParams({
             startDate: dateRange.start,
             endDate: dateRange.end,
           });
           
-          // TODO: Replace with actual API endpoint
-          const response = await fetch(`/api/admin/analytics/dashboard?${params}`, {
-            headers: { Authorization: `Bearer ${token}` },
+          const response = await fetch(buildApiUrl(`/api/analytics/dashboard?${params}`), {
+            headers: API_CONFIG.DEFAULT_HEADERS,
           });
           
           if (!response.ok) {
             throw new Error('Failed to fetch dashboard metrics');
           }
           
-          const dashboardMetrics = await response.json();
+          const { data: rawMetrics } = await response.json();
+          
+          // Transform backend response (snake_case) to frontend format (camelCase)
+          const dashboardMetrics: DashboardMetrics = {
+            totalForms: rawMetrics.total_forms || 0,
+            activeForms: rawMetrics.active_forms || 0,
+            totalResponses: rawMetrics.total_responses || 0,
+            averageConversionRate: rawMetrics.average_conversion_rate || 0,
+            totalViews: rawMetrics.total_views || 0,
+            responseRate: rawMetrics.response_rate || 0,
+            averageCompletionTime: rawMetrics.average_completion_time || 0,
+            topPerformingForm: rawMetrics.top_performing_form ? {
+              id: rawMetrics.top_performing_form.id,
+              title: rawMetrics.top_performing_form.title,
+              conversionRate: rawMetrics.top_performing_form.conversion_rate || 0
+            } : null
+          };
           
           set({ 
             dashboardMetrics,
@@ -214,23 +229,48 @@ export const useAnalyticsStore = create<AnalyticsStore>()(
         
         try {
           const dateRange = customDateRange || get().dateRange;
-          const token = localStorage.getItem('admin_token');
           
           const params = new URLSearchParams({
             startDate: dateRange.start,
             endDate: dateRange.end,
           });
           
-          // TODO: Replace with actual API endpoint
-          const response = await fetch(`/api/admin/analytics/forms/${formId}?${params}`, {
-            headers: { Authorization: `Bearer ${token}` },
+          const response = await fetch(buildApiUrl(`/api/analytics/forms/${formId}?${params}`), {
+            headers: API_CONFIG.DEFAULT_HEADERS,
           });
           
           if (!response.ok) {
             throw new Error('Failed to fetch form analytics');
           }
           
-          const formAnalytics = await response.json();
+          const { data: rawAnalytics } = await response.json();
+          
+          // Transform backend response (snake_case) to frontend format (camelCase)
+          const formAnalytics: FormAnalytics = {
+            formId: rawAnalytics.form_id || formId,
+            formTitle: rawAnalytics.form_title || '',
+            totalViews: rawAnalytics.total_views || 0,
+            totalResponses: rawAnalytics.total_responses || 0,
+            conversionRate: rawAnalytics.conversion_rate || 0,
+            averageCompletionTime: rawAnalytics.average_completion_time || 0,
+            completionsByDay: rawAnalytics.completions_by_day || [],
+            questionAnalytics: rawAnalytics.question_analytics?.map((q: any) => ({
+              questionId: q.question_id,
+              questionText: q.question_text,
+              responseRate: q.response_rate || 0,
+              averageTimeSpent: q.average_time_spent || 0,
+              abandonmentRate: q.abandonment_rate || 0,
+              commonResponses: q.common_responses || []
+            })) || [],
+            userJourney: rawAnalytics.user_journey?.map((step: any) => ({
+              step: step.step,
+              questionId: step.question_id,
+              questionText: step.question_text,
+              completionRate: step.completion_rate || 0,
+              averageTimeSpent: step.average_time_spent || 0,
+              dropOffRate: step.drop_off_rate || 0
+            })) || []
+          };
           
           set(state => ({
             formAnalytics: {
@@ -252,18 +292,42 @@ export const useAnalyticsStore = create<AnalyticsStore>()(
 
       fetchRealTimeMetrics: async () => {
         try {
-          const token = localStorage.getItem('admin_token');
           
-          // TODO: Replace with actual API endpoint
-          const response = await fetch('/api/admin/analytics/realtime', {
-            headers: { Authorization: `Bearer ${token}` },
+          const response = await fetch(buildApiUrl('/api/analytics/realtime'), {
+            headers: API_CONFIG.DEFAULT_HEADERS,
           });
           
           if (!response.ok) {
             throw new Error('Failed to fetch real-time metrics');
           }
           
-          const realTimeMetrics = await response.json();
+          const { data: rawMetrics } = await response.json();
+          
+          // Transform backend response (snake_case) to frontend format (camelCase)
+          const realTimeMetrics: RealTimeMetrics = {
+            activeUsers: rawMetrics.active_users || 0,
+            activeForms: rawMetrics.active_forms?.map((form: any) => ({
+              formId: form.form_id,
+              formTitle: form.form_title,
+              activeUsers: form.active_users || 0,
+              responsesInLastHour: form.responses_in_last_hour || 0
+            })) || [],
+            recentResponses: rawMetrics.recent_responses?.map((response: any) => ({
+              id: response.id,
+              formId: response.form_id,
+              formTitle: response.form_title,
+              timestamp: response.timestamp,
+              location: response.location,
+              device: response.device,
+              status: response.status
+            })) || [],
+            systemHealth: {
+              status: rawMetrics.system_health?.status || 'unknown',
+              apiResponseTime: rawMetrics.system_health?.api_response_time || 0,
+              dbResponseTime: rawMetrics.system_health?.db_response_time || 0,
+              errorRate: rawMetrics.system_health?.error_rate || 0
+            }
+          };
           
           set({ 
             realTimeMetrics,
@@ -362,7 +426,6 @@ export const useAnalyticsStore = create<AnalyticsStore>()(
         
         try {
           const { dateRange } = get();
-          const token = localStorage.getItem('admin_token');
           
           const params = new URLSearchParams({
             startDate: dateRange.start,
@@ -371,9 +434,8 @@ export const useAnalyticsStore = create<AnalyticsStore>()(
             ...(formId && { formId }),
           });
           
-          // TODO: Replace with actual API endpoint
-          const response = await fetch(`/api/admin/analytics/export?${params}`, {
-            headers: { Authorization: `Bearer ${token}` },
+          const response = await fetch(buildApiUrl(`/api/analytics/export?${params}`), {
+            headers: API_CONFIG.DEFAULT_HEADERS,
           });
           
           if (!response.ok) {

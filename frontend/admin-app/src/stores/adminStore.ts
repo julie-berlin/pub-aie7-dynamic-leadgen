@@ -37,9 +37,16 @@ export interface AdminStore extends AuthState, AuthActions {}
 export const useAdminStore = create<AdminStore>()(
   persist(
     (set, get) => ({
-      // Initial auth state
-      user: null,
-      isAuthenticated: false,
+      // Initial auth state - TEMPORARILY BYPASSING AUTH FOR DEVELOPMENT
+      user: {
+        id: "mock-admin-user-id",
+        email: "admin@example.com",
+        name: "Admin User",
+        role: "admin",
+        clientId: "a1111111-1111-1111-1111-111111111111",
+        permissions: ["forms.view", "forms.edit", "settings.edit", "analytics.view"]
+      },
+      isAuthenticated: true,
       isLoading: false,
       error: null,
 

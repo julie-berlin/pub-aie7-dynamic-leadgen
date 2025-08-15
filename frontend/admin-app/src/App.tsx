@@ -10,6 +10,8 @@ import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import FormsPage from './pages/FormsPage';
 import AnalyticsPage from './pages/AnalyticsPage';
+import SettingsPage from './pages/SettingsPage';
+import FormDetailPage from './pages/FormDetailPage';
 
 // Create Query Client for data fetching
 const queryClient = new QueryClient({
@@ -56,7 +58,9 @@ function App() {
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/forms" element={<FormsPage />} />
+                <Route path="/forms/:id" element={<FormDetailPage />} />
                 <Route path="/analytics" element={<AnalyticsPage />} />
+                <Route path="/settings" element={<SettingsPage />} />
                 <Route path="/login" element={<Navigate to="/dashboard" replace />} />
                 <Route path="*" element={<Navigate to="/dashboard" replace />} />
               </Routes>

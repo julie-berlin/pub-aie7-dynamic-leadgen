@@ -9,7 +9,7 @@ from datetime import datetime
 from app.routes.admin_api import AdminUserResponse
 
 # Test client ID that matches existing test data
-TEST_CLIENT_ID = "c1111111-1111-1111-1111-111111111111"  # Pawsome Dog Walking
+TEST_CLIENT_ID = "a1111111-1111-1111-1111-111111111111"  # Pawsome Dog Walking
 
 async def get_mock_admin_user() -> AdminUserResponse:
     """

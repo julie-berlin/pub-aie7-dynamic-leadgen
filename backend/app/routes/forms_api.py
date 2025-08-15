@@ -123,7 +123,7 @@ def get_form_questions(form_id: str, client_id: str) -> List[FormQuestionConfig]
         
         # Get questions for the form
         questions_result = db.client.table("form_questions")\
-            .select("question_id, question_order, question_text, question_type, options, validation_rules, scoring_rubric, is_required, description, placeholder")\
+            .select("question_id, question_order, question_text, question_type, options, scoring_rubric, is_required, category, metadata")\
             .eq("form_id", form_id)\
             .order("question_order")\
             .execute()
@@ -136,7 +136,7 @@ def get_form_questions(form_id: str, client_id: str) -> List[FormQuestionConfig]
                 question_text=q.get("question_text"),
                 question_type=q.get("question_type") or "text",
                 options=q.get("options"),
-                validation_rules=q.get("validation_rules"),
+                validation_rules=q.get("metadata", {}).get("validation_rules"),
                 scoring_rubric=q.get("scoring_rubric"),
                 is_required=q.get("is_required") or False,
                 description=q.get("description"),
@@ -289,7 +289,7 @@ async def list_forms(
         
         return success_response(
             data={
-                "forms": forms,
+                "forms": [form.model_dump(mode='json') for form in forms],
                 "total_count": total_count,
                 "page": page,
                 "page_size": page_size,
@@ -354,7 +354,7 @@ async def get_form(
         )
         
         return success_response(
-            data=form_response.model_dump(),
+            data=form_response.model_dump(mode='json'),
             message="Form retrieved successfully"
         )
             
@@ -432,7 +432,7 @@ async def create_form(
         )
         
         return success_response(
-            data=form_response.model_dump(),
+            data=form_response.model_dump(mode='json'),
             message="Form created successfully",
             status_code=201
         )

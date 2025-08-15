@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { 
   PlusIcon, 
   FunnelIcon, 
@@ -11,6 +12,7 @@ import {
 import { useFormsStore } from '../stores/formsStore';
 
 export default function FormsPage() {
+  const navigate = useNavigate();
   const {
     forms,
     filters,
@@ -73,7 +75,11 @@ export default function FormsPage() {
             Manage your lead generation forms and campaigns
           </p>
         </div>
-        <button className="admin-btn-primary">
+        <button 
+          className="admin-btn-primary disabled:opacity-50"
+          disabled
+          title="Form creation coming in future update"
+        >
           <PlusIcon className="w-4 h-4 mr-2" />
           Create Form
         </button>
@@ -138,7 +144,11 @@ export default function FormsPage() {
                 ? 'No forms match your current filters.'
                 : 'Get started by creating your first form.'}
             </p>
-            <button className="admin-btn-primary">
+            <button 
+              className="admin-btn-primary disabled:opacity-50"
+              disabled
+              title="Form creation coming in future update"
+            >
               <PlusIcon className="w-4 h-4 mr-2" />
               Create Your First Form
             </button>
@@ -149,9 +159,12 @@ export default function FormsPage() {
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center space-x-3">
-                    <h3 className="text-lg font-semibold text-slate-900">
+                    <Link 
+                      to={`/forms/${form.id}`}
+                      className="text-lg font-semibold text-slate-900 hover:text-admin-600 transition-colors"
+                    >
                       {form.title}
-                    </h3>
+                    </Link>
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusColors[form.status]}`}>
                       {form.status}
                     </span>
@@ -189,10 +202,17 @@ export default function FormsPage() {
                   )}
                 </div>
                 <div className="ml-4 flex-shrink-0 flex items-center space-x-2">
-                  <button className="admin-btn-secondary admin-btn-sm">
-                    Edit
-                  </button>
-                  <button className="admin-btn-secondary admin-btn-sm">
+                  <Link 
+                    to={`/forms/${form.id}`}
+                    className="admin-btn-secondary admin-btn-sm"
+                  >
+                    View Details
+                  </Link>
+                  <button 
+                    className="admin-btn-secondary admin-btn-sm disabled:opacity-50"
+                    disabled
+                    title="Analytics view coming soon"
+                  >
                     Analytics
                   </button>
                   <div className="relative">

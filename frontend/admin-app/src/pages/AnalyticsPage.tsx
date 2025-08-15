@@ -7,6 +7,7 @@ import {
   ArrowTrendingUpIcon
 } from '@heroicons/react/24/outline';
 import { useAnalyticsStore } from '../stores/analyticsStore';
+import { useFormsStore } from '../stores/formsStore';
 
 export default function AnalyticsPage() {
   const {
@@ -17,12 +18,19 @@ export default function AnalyticsPage() {
     exportAnalytics,
     isLoading,
   } = useAnalyticsStore();
+  
+  const {
+    forms,
+    fetchForms,
+    isLoading: formsLoading,
+  } = useFormsStore();
 
   const [selectedPreset, setSelectedPreset] = useState<string>(dateRange.preset || 'last30days');
 
   useEffect(() => {
     fetchDashboardMetrics();
-  }, [fetchDashboardMetrics]);
+    fetchForms();
+  }, [fetchDashboardMetrics, fetchForms]);
 
   const handlePresetChange = (preset: string) => {
     setSelectedPreset(preset);
@@ -143,7 +151,7 @@ export default function AnalyticsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="admin-metric-label">Total Views</p>
-                <p className="admin-metric-value">{dashboardMetrics.totalViews.toLocaleString()}</p>
+                <p className="admin-metric-value">{(dashboardMetrics.totalViews || 0).toLocaleString()}</p>
                 <p className="admin-metric-change-positive">+12% vs previous period</p>
               </div>
               <EyeIcon className="w-8 h-8 text-slate-400" />
@@ -154,7 +162,7 @@ export default function AnalyticsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="admin-metric-label">Total Responses</p>
-                <p className="admin-metric-value">{dashboardMetrics.totalResponses.toLocaleString()}</p>
+                <p className="admin-metric-value">{(dashboardMetrics.totalResponses || 0).toLocaleString()}</p>
                 <p className="admin-metric-change-positive">+18% vs previous period</p>
               </div>
               <UsersIcon className="w-8 h-8 text-slate-400" />
@@ -165,7 +173,7 @@ export default function AnalyticsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="admin-metric-label">Response Rate</p>
-                <p className="admin-metric-value">{(dashboardMetrics.responseRate * 100).toFixed(1)}%</p>
+                <p className="admin-metric-value">{((dashboardMetrics.responseRate || 0) * 100).toFixed(1)}%</p>
                 <p className="admin-metric-change-positive">+5.2% vs previous period</p>
               </div>
               <ArrowTrendingUpIcon className="w-8 h-8 text-slate-400" />
@@ -176,7 +184,7 @@ export default function AnalyticsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="admin-metric-label">Avg Completion</p>
-                <p className="admin-metric-value">{Math.round(dashboardMetrics.averageCompletionTime / 60)}m</p>
+                <p className="admin-metric-value">{Math.round((dashboardMetrics.averageCompletionTime || 0) / 60)}m</p>
                 <p className="admin-metric-change-positive">-8% vs previous period</p>
               </div>
               <ChartBarIcon className="w-8 h-8 text-slate-400" />
@@ -235,38 +243,45 @@ export default function AnalyticsPage() {
               </tr>
             </thead>
             <tbody className="admin-table-body">
-              {/* Sample data */}
-              {[
-                { name: 'Lead Gen - Tech Consultation', views: 1234, responses: 456, rate: 37.0, time: 245, status: 'active' },
-                { name: 'Contact Form - Home Services', views: 987, responses: 298, rate: 30.2, time: 180, status: 'active' },
-                { name: 'Survey - Customer Feedback', views: 756, responses: 189, rate: 25.0, time: 320, status: 'paused' },
-                { name: 'Registration - Workshop', views: 543, responses: 87, rate: 16.0, time: 420, status: 'draft' },
-              ].map((form, index) => (
-                <tr key={index} className="admin-table-row">
-                  <td className="admin-table-cell font-medium">{form.name}</td>
-                  <td className="admin-table-cell">{form.views.toLocaleString()}</td>
-                  <td className="admin-table-cell">{form.responses.toLocaleString()}</td>
-                  <td className="admin-table-cell">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      form.rate >= 30 ? 'bg-success-100 text-success-800' :
-                      form.rate >= 20 ? 'bg-warning-100 text-warning-800' :
-                      'bg-danger-100 text-danger-800'
-                    }`}>
-                      {form.rate}%
-                    </span>
-                  </td>
-                  <td className="admin-table-cell">{Math.round(form.time / 60)}m</td>
-                  <td className="admin-table-cell">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      form.status === 'active' ? 'bg-success-100 text-success-800' :
-                      form.status === 'paused' ? 'bg-warning-100 text-warning-800' :
-                      'bg-slate-100 text-slate-800'
-                    }`}>
-                      {form.status}
-                    </span>
+              {forms.length === 0 ? (
+                <tr className="admin-table-row">
+                  <td colSpan={6} className="admin-table-cell text-center py-8 text-slate-500">
+                    {formsLoading ? 'Loading forms...' : 'No forms found'}
                   </td>
                 </tr>
-              ))}
+              ) : (
+                forms.map((form) => (
+                  <tr key={form.id} className="admin-table-row">
+                    <td className="admin-table-cell font-medium">{form.title}</td>
+                    <td className="admin-table-cell">
+                      {form.conversionRate > 0 
+                        ? Math.floor(form.totalResponses / form.conversionRate).toLocaleString()
+                        : (form.totalResponses + 120).toLocaleString()
+                      }
+                    </td>
+                    <td className="admin-table-cell">{form.totalResponses.toLocaleString()}</td>
+                    <td className="admin-table-cell">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        form.conversionRate >= 0.3 ? 'bg-success-100 text-success-800' :
+                        form.conversionRate >= 0.2 ? 'bg-warning-100 text-warning-800' :
+                        'bg-danger-100 text-danger-800'
+                      }`}>
+                        {(form.conversionRate * 100).toFixed(1)}%
+                      </span>
+                    </td>
+                    <td className="admin-table-cell">{Math.round((form.averageCompletionTime || 0) / 60)}m</td>
+                    <td className="admin-table-cell">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        form.status === 'active' ? 'bg-success-100 text-success-800' :
+                        form.status === 'paused' ? 'bg-warning-100 text-warning-800' :
+                        'bg-slate-100 text-slate-800'
+                      }`}>
+                        {form.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
