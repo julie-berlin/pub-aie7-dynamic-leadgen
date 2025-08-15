@@ -12,12 +12,20 @@ export interface AdminUser {
   avatar?: string;
 }
 
+// Business info interface
+export interface BusinessInfo {
+  name: string;
+  industry?: string;
+  isLoaded: boolean;
+}
+
 // Auth state interface
 interface AuthState {
   user: AdminUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
+  businessInfo: BusinessInfo;
 }
 
 // Auth actions interface
@@ -28,6 +36,7 @@ interface AuthActions {
   setUser: (user: AdminUser | null) => void;
   setError: (error: string | null) => void;
   setLoading: (loading: boolean) => void;
+  loadBusinessInfo: () => Promise<void>;
 }
 
 // Admin store interface
@@ -49,6 +58,11 @@ export const useAdminStore = create<AdminStore>()(
       isAuthenticated: true,
       isLoading: false,
       error: null,
+      businessInfo: {
+        name: 'Survey Admin',
+        industry: undefined,
+        isLoaded: false
+      },
 
       // Auth actions
       login: async (email: string, password: string) => {
@@ -128,6 +142,46 @@ export const useAdminStore = create<AdminStore>()(
       setLoading: (isLoading: boolean) => {
         set({ isLoading });
       },
+
+      loadBusinessInfo: async () => {
+        try {
+          const response = await fetch('/api/clients/me', {
+            headers: {
+              'Content-Type': 'application/json',
+            }
+          });
+
+          if (response.ok) {
+            const { data } = await response.json();
+            set({
+              businessInfo: {
+                name: data.business_name || data.name || 'Survey Admin',
+                industry: data.industry,
+                isLoaded: true
+              }
+            });
+          } else {
+            // Keep default name on error but mark as loaded
+            set({
+              businessInfo: {
+                name: 'Survey Admin',
+                industry: undefined,
+                isLoaded: true
+              }
+            });
+          }
+        } catch (error) {
+          console.error('Failed to load business info:', error);
+          // Keep default name on error but mark as loaded
+          set({
+            businessInfo: {
+              name: 'Survey Admin',
+              industry: undefined,
+              isLoaded: true
+            }
+          });
+        }
+      },
     }),
     {
       name: 'admin-auth-storage',
@@ -136,6 +190,7 @@ export const useAdminStore = create<AdminStore>()(
       partialize: (state) => ({
         user: state.user,
         isAuthenticated: state.isAuthenticated,
+        businessInfo: state.businessInfo,
       }),
     }
   )

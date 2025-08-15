@@ -1,4 +1,4 @@
-import { type ReactNode } from 'react';
+import { type ReactNode, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
   HomeIcon, 
@@ -10,7 +10,6 @@ import {
 import { useAdminStore } from '../../stores/adminStore';
 import Breadcrumb, { useBreadcrumbs } from '../common/Breadcrumb';
 import { useBreadcrumbContext } from '../common/BreadcrumbContext';
-import { useBusinessInfo } from '../../hooks/useBusinessInfo';
 
 interface AdminLayoutProps {
   children: ReactNode;
@@ -25,10 +24,15 @@ const navigation = [
 
 export default function AdminLayout({ children }: AdminLayoutProps) {
   const location = useLocation();
-  const { user, logout } = useAdminStore();
+  const { user, logout, businessInfo, loadBusinessInfo } = useAdminStore();
   const { customBreadcrumbs } = useBreadcrumbContext();
   const breadcrumbs = useBreadcrumbs(customBreadcrumbs);
-  const { businessInfo, loading: businessLoading } = useBusinessInfo();
+
+  useEffect(() => {
+    if (!businessInfo.isLoaded) {
+      loadBusinessInfo();
+    }
+  }, [businessInfo.isLoaded, loadBusinessInfo]);
 
   return (
     <div className="flex h-screen bg-slate-50">
@@ -37,7 +41,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         {/* Logo */}
         <div className="px-6 py-8">
           <h1 className="text-xl font-bold text-slate-900">
-            {businessLoading ? 'Loading...' : businessInfo.name}
+            {!businessInfo.isLoaded ? 'Loading...' : businessInfo.name}
           </h1>
           <p className="text-sm text-slate-500 mt-1">
             Varyq - Intelligent Leads
