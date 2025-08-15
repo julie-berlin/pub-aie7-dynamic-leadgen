@@ -20,13 +20,13 @@ class ConsolidatedLeadIntelligenceAgent(SupervisorAgent):
     def __init__(self, **kwargs):
         super().__init__(
             name="ConsolidatedLeadIntelligenceAgent",
-            model_name="gpt-4o-mini",
+            model_name="gpt-3.5-turbo",
             temperature=0.1,
-            max_tokens=4000,
-            timeout_seconds=60,
+            max_tokens=1500,  # Reduced for faster responses
+            timeout_seconds=10,  # Reduced timeout for faster responses
             **kwargs
         )
-        self.llm = get_chat_model(model_name="gpt-4o-mini", temperature=0.2)
+        self.llm = get_chat_model(model_name="gpt-3.5-turbo", temperature=0.2)
         self.toolbelt = lead_intelligence_toolbelt
     
     def make_decision(self, state: SurveyState, context: Dict[str, Any] = None) -> SupervisorDecision:

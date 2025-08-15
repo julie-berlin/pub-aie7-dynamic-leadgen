@@ -132,7 +132,11 @@ def check_abandonment_node(state: SurveyState) -> Dict[str, Any]:
 def route_after_survey_admin(state: SurveyState) -> str:
     """Determine routing after survey administration."""
     
-    # Check if we have pending responses to process
+    # Check if survey admin indicated to route to lead intelligence
+    if state.get("route_to_lead_intelligence"):
+        return "lead_intelligence"
+    
+    # Check if we have pending responses to process (legacy check)
     if state.get("pending_responses"):
         return "lead_intelligence"
     
@@ -188,14 +192,9 @@ async def process_survey_step(state_with_responses: dict) -> dict:
     Process user responses in simplified flow.
     Used by POST /api/survey/step
     """
-    # Mark that we have responses to process
-    state_with_responses["pending_responses"] = state_with_responses.get("responses", [])
-    
-    # Continue from survey_administration which will route to lead_intelligence
-    return await simplified_survey_graph.ainvoke(
-        state_with_responses,
-        config={"configurable": {"entry_point": "survey_administration"}}
-    )
+    # When we have pending responses, start from survey_administration 
+    # which will route to lead_intelligence via the routing logic
+    return await simplified_survey_graph.ainvoke(state_with_responses)
 
 
 async def check_abandonment(session_state: dict) -> dict:

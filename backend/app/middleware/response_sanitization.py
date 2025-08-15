@@ -45,6 +45,12 @@ class ResponseSanitizer:
             'error_detail', 'exception_detail'
         }
         
+        # Public fields that are safe to display (exempt from sensitivity checks)
+        self.public_fields = {
+            'businessname', 'business_name', 'company_name', 'companyname',
+            'organization_name', 'organizationname', 'brand_name', 'brandname'
+        }
+        
         # Fields to mask instead of remove (show partial data)
         self.mask_fields = {
             'email': lambda x: self._mask_email(x),
@@ -91,6 +97,10 @@ class ResponseSanitizer:
     def _should_remove_field(self, key: str, is_admin: bool = False) -> bool:
         """Determine if a field should be removed"""
         key_lower = key.lower()
+        
+        # Always allow public fields (business names, etc.)
+        if key_lower in self.public_fields:
+            return False
         
         # Always remove highly sensitive fields
         critical_fields = {'password', 'secret', 'token', 'api_key', 'private_key'}

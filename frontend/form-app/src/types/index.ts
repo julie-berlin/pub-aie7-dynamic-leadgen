@@ -4,6 +4,7 @@ export interface FormConfig {
   clientId: string;
   title: string;
   description?: string;
+  businessName?: string;
   questions: Question[];
   theme?: ThemeConfig;
   settings: FormSettings;
@@ -162,6 +163,7 @@ export interface StartSessionResponse {
     id: string;
     title: string;
     description?: string;
+    businessName?: string;
     theme?: ThemeConfig;
   };
   step: FormStep;

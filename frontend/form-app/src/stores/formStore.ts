@@ -64,6 +64,7 @@ export const useFormStore = create<FormStore>()(
               clientId,
               title: response.form.title,
               description: response.form.description,
+              businessName: response.form.businessName,
               questions: [], // Will be populated from steps
               theme: response.form.theme,
               settings: {

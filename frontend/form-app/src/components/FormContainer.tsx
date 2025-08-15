@@ -3,6 +3,8 @@ import QuestionRenderer from './QuestionRenderer';
 import FormNavigation from './FormNavigation';
 import { useFormStore } from '../stores/formStore';
 import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 
 interface FormContainerProps {
   form: FormConfig;
@@ -10,11 +12,109 @@ interface FormContainerProps {
   formState: FormState | null;
 }
 
+// Create dynamic validation schema based on questions
+function createValidationSchema(questions: any[]) {
+  const shape: Record<string, z.ZodType> = {};
+
+  questions.forEach(question => {
+    let schema: z.ZodType;
+
+    switch (question.type) {
+      case 'email':
+        schema = z.string().email({ message: 'Please enter a valid email address' });
+        break;
+      case 'number':
+        schema = z.coerce.number();
+        break;
+      case 'phone':
+        schema = z.string().min(10, 'Please enter a valid phone number');
+        break;
+      case 'checkbox':
+        schema = z.array(z.string()).min(1, 'Please select at least one option');
+        break;
+      case 'rating':
+        schema = z.number().min(1).max(10);
+        break;
+      case 'date':
+        schema = z.string().min(1, 'Please select a date');
+        break;
+      default:
+        schema = z.string();
+    }
+
+    // Apply custom validation rules
+    if (question.validation) {
+      question.validation.forEach((rule: any) => {
+        switch (rule.type) {
+          case 'required':
+            if (question.type === 'checkbox') {
+              schema = (schema as z.ZodArray<z.ZodString>).min(1, rule.message);
+            } else {
+              schema = (schema as z.ZodString).min(1, rule.message);
+            }
+            break;
+          case 'minLength':
+            schema = (schema as z.ZodString).min(rule.value, rule.message);
+            break;
+          case 'maxLength':
+            schema = (schema as z.ZodString).max(rule.value, rule.message);
+            break;
+          case 'pattern':
+            schema = (schema as z.ZodString).regex(new RegExp(rule.value), rule.message);
+            break;
+        }
+      });
+    } else if (question.required) {
+      if (question.type === 'checkbox') {
+        schema = (schema as z.ZodArray<z.ZodString>).min(1, 'This field is required');
+      } else {
+        schema = (schema as z.ZodString).min(1, 'This field is required');
+      }
+    } else {
+      schema = schema.optional();
+    }
+
+    shape[question.id] = schema;
+  });
+
+  return z.object(shape);
+}
+
 export default function FormContainer({ form, currentStep, formState }: FormContainerProps) {
   const { loading, error, submitResponses } = useFormStore();
 
+  // Create validation schema
+  const validationSchema = createValidationSchema(currentStep.questions || []);
+
+  // Initialize form with existing responses
+  const defaultValues = (currentStep.questions || []).reduce((acc: any, question: any) => {
+    const response = formState?.responses[question.id];
+    if (response) {
+      acc[question.id] = response.value;
+    } else {
+      // Set default values based on question type
+      switch (question.type) {
+        case 'checkbox':
+          acc[question.id] = [];
+          break;
+        case 'rating':
+          acc[question.id] = 0;
+          break;
+        default:
+          acc[question.id] = '';
+      }
+    }
+    return acc;
+  }, {} as Record<string, any>);
+
   // Initialize React Hook Form for this step
-  const { handleSubmit } = useForm();
+  const formMethods = useForm({
+    resolver: zodResolver(validationSchema),
+    defaultValues,
+    mode: 'onBlur'
+  });
+
+  const { handleSubmit, register, control, formState: { errors }, watch } = formMethods;
 
   if (!formState) {
     return <div>No form state available</div>;
@@ -27,31 +127,43 @@ export default function FormContainer({ form, currentStep, formState }: FormCont
   };
 
   return (
-    <div className="form-container w-full p-6 md:p-8">
+    <div className="form-container">
       {/* Form Header */}
-      <div className="mb-8">
+      <div className="mb-16">
         {/* Company Name as H1 */}
-        <h1 className="text-3xl md:text-4xl font-bold text-text mb-4">
+        <h1 
+          className="text-3xl md:text-4xl font-bold mb-8 text-center"
+          style={{ color: 'var(--color-text)' }}
+        >
           {form.title}
         </h1>
-        
+
         {/* Step Headline as H2 */}
         {currentStep.headline && (
-          <h2 className="text-xl md:text-2xl font-semibold text-text mb-3">
+          <h2 
+            className="text-2xl md:text-3xl font-semibold mb-6 text-center"
+            style={{ color: 'var(--color-primary)' }}
+          >
             {currentStep.headline}
           </h2>
         )}
-        
+
         {/* Engagement Content as P */}
         {currentStep.subheading && (
-          <p className="text-text-light text-lg leading-relaxed">
+          <p 
+            className="text-lg md:text-xl leading-relaxed max-w-3xl mx-auto text-center"
+            style={{ color: 'var(--color-text-light)' }}
+          >
             {currentStep.subheading}
           </p>
         )}
-        
+
         {/* Fallback to form description if no engagement content */}
         {!currentStep.subheading && form.description && (
-          <p className="text-text-light text-lg leading-relaxed">
+          <p 
+            className="text-lg md:text-xl leading-relaxed max-w-3xl mx-auto text-center"
+            style={{ color: 'var(--color-text-light)' }}
+          >
             {form.description}
           </p>
         )}
@@ -67,12 +179,16 @@ export default function FormContainer({ form, currentStep, formState }: FormCont
       )}
 
       {/* Form with Questions */}
-      <form onSubmit={handleSubmit(onSubmit)}>
-        <div className="mb-8">
+      <form onSubmit={handleSubmit(onSubmit)} className="max-w-3xl mx-auto">
+        <div className="mb-16">
           <QuestionRenderer
             questions={currentStep.questions}
             responses={formState.responses}
             disabled={loading}
+            register={register}
+            control={control}
+            errors={errors}
+            watch={watch}
           />
         </div>
 

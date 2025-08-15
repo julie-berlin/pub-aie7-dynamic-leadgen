@@ -11,16 +11,18 @@ export default function FormPage() {
   const { clientId, formId } = useParams<{ clientId: string; formId: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  
-  const { 
-    currentForm, 
-    formState, 
-    currentStep, 
-    loading, 
-    error, 
-    initializeForm 
+
+  const {
+    currentForm,
+    formState,
+    currentStep,
+    loading,
+    error,
+    initializeForm
   } = useFormStore();
-  
+
+  // Business name from form data
+  const businessName = currentForm?.businessName;
   const { loadTheme } = useThemeStore();
 
   useEffect(() => {
@@ -31,28 +33,40 @@ export default function FormPage() {
 
     // Extract tracking data from URL
     const trackingData = extractUTMParams();
-    
+
     // Add session ID if resuming
     const sessionId = searchParams.get('session');
-    
+
     if (sessionId) {
       trackingData.sessionId = sessionId;
     }
 
-    // Initialize form and load theme concurrently
-    Promise.all([
-      initializeForm(clientId, formId, trackingData),
-      loadTheme(formId)
-    ]).catch(err => {
-      console.error('Failed to initialize form or load theme:', err);
+    // Initialize form
+    initializeForm(clientId, formId, trackingData).catch(err => {
+      console.error('Failed to initialize form:', err);
+    });
+
+    // Load theme separately with fallback (theme API is slow)
+    loadTheme(formId).catch(err => {
+      console.warn('Theme loading failed, using default:', err);
+      // Theme store will automatically fall back to default theme
     });
   }, [clientId, formId, searchParams, initializeForm, loadTheme, navigate]);
+
+  // Update page title with business name
+  useEffect(() => {
+    if (businessName) {
+      document.title = `${businessName} - Survey`;
+    } else {
+      document.title = 'Survey';
+    }
+  }, [businessName]);
 
   // Redirect to completion page if form is complete
   useEffect(() => {
     if (formState?.isComplete) {
-      navigate(`/form/${clientId}/${formId}/complete`, { 
-        state: { sessionId: formState.sessionId } 
+      navigate(`/form/${clientId}/${formId}/complete`, {
+        state: { sessionId: formState.sessionId }
       });
     }
   }, [formState?.isComplete, clientId, formId, formState?.sessionId, navigate]);
@@ -60,7 +74,7 @@ export default function FormPage() {
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
-        <ErrorMessage 
+        <ErrorMessage
           title="Form Not Available"
           message={error}
           showRetry
@@ -72,21 +86,48 @@ export default function FormPage() {
 
   if (loading || !currentForm || !currentStep) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <LoadingSpinner message="Loading form..." />
+      <div className="grid h-screen place-items-center max-w-2xl">
+        <LoadingSpinner message="Loading..." />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-8 max-w-2xl">
-        <FormContainer 
-          form={currentForm}
-          currentStep={currentStep}
-          formState={formState}
-        />
-      </div>
+    <div className="bg-gray-200">
+      {/* Header with Logo */}
+      <header className="w-full">
+        <div className="container mx-auto px-6 py-4 max-w-6xl">
+          <div className="flex items-center justify-center">
+            {/* Modern Logo */}
+            <div className="flex items-center space-x-3">
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+                <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-xl font-bold text-gray-900">
+                  {businessName || 'Varyq'}
+                </span>
+                <span className="text-xs text-gray-500">Varyq Intelligent Leads</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content with proper padding */}
+      <main className="min-h-screen py-8">
+        <div className="container mx-auto px-6 md:px-8 lg:px-12 max-w-4xl">
+          <div className="bg-white rounded-2xl shadow-sm p-8 md:p-12 lg:p-16">
+            <FormContainer
+              form={currentForm}
+              currentStep={currentStep}
+              formState={formState}
+            />
+          </div>
+        </div>
+      </main>
     </div>
   );
 }

@@ -127,6 +127,25 @@ async def start_session(
             
         logger.debug(f"Extracted form_details: {form_details}")
         
+        # Load business name from client_id (server-side only)
+        business_name = None
+        client_id = form_details.get('client_id')
+        logger.info(f"🏢 Loading business name for client_id: {client_id}")
+        if client_id:
+            try:
+                from ..database import db
+                client_data = db.client.table('clients').select('business_name').eq('id', client_id).execute()
+                logger.info(f"🏢 Client query result: {client_data.data}")
+                if client_data.data and len(client_data.data) > 0:
+                    business_name = client_data.data[0].get('business_name')
+                    logger.info(f"🏢 Successfully loaded business name: {business_name}")
+                else:
+                    logger.warning(f"🏢 No client data found for client_id: {client_id}")
+            except Exception as e:
+                logger.error(f"🏢 Failed to load business name for client {client_id}: {e}")
+        else:
+            logger.warning(f"🏢 No client_id found in form_details: {form_details}")
+        
         # Create response with consistent format
         json_response = success_response(
             data={
@@ -134,6 +153,7 @@ async def start_session(
                     "id": form_details.get('id', request.form_id),
                     "title": form_details.get('title', 'Survey'),
                     "description": form_details.get('description'),
+                    "businessName": business_name,
                     "theme": frontend_data.get('theme')
                 },
                 "step": {

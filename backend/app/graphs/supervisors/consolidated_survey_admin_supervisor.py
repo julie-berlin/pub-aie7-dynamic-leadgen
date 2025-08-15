@@ -19,13 +19,13 @@ class ConsolidatedSurveyAdminSupervisor(SupervisorAgent):
     def __init__(self, **kwargs):
         super().__init__(
             name="ConsolidatedSurveyAdminSupervisor",
-            model_name="gpt-4o-mini",
+            model_name="gpt-3.5-turbo",
             temperature=0.3,
-            max_tokens=4000,
-            timeout_seconds=60,
+            max_tokens=2000,  # Reduced for faster responses
+            timeout_seconds=15,  # Reduced timeout for faster responses
             **kwargs
         )
-        self.llm = get_chat_model(model_name="gpt-4o-mini", temperature=0.3)
+        self.llm = get_chat_model(model_name="gpt-3.5-turbo", temperature=0.3)
     
     def make_decision(self, state: SurveyState, context: Dict[str, Any] = None) -> SupervisorDecision:
         """Make strategic survey administration decision - delegates to process_survey_step."""
@@ -116,6 +116,19 @@ Confidence: [0.0-1.0]
         try:
             logger.info(f"Starting survey administration processing for state: {type(state)}")
             logger.debug(f"State keys: {list(state.keys()) if isinstance(state, dict) else 'Not a dict'}")
+            
+            # Check if we have pending responses - if so, signal to route to lead intelligence
+            if state.get("pending_responses"):
+                logger.info("Found pending responses - survey admin will route to lead intelligence")
+                return {
+                    "route_to_lead_intelligence": True,
+                    "pending_responses": state.get("pending_responses"),
+                    "supervisor_metadata": {
+                        "supervisor_name": self.name,
+                        "action": "route_to_lead_intelligence",
+                        "decision_timestamp": datetime.now().isoformat()
+                    }
+                }
             
             # Load available questions
             available_questions = self._load_available_questions(state)

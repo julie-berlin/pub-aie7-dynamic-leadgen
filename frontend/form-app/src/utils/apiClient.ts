@@ -38,6 +38,7 @@ interface BackendStartSessionResponse {
     id?: string;
     title: string;
     description?: string;
+    businessName?: string;
     theme?: ThemeConfig;
   };
   step: BackendFormStep;
@@ -198,7 +199,7 @@ class APIClient {
       method: 'POST',
       body: JSON.stringify({
         form_id: params.formId,
-        client_id: params.clientId,
+        // Don't send client_id - backend will extract it from form details
         utm_source: params.trackingData?.utmSource,
         utm_medium: params.trackingData?.utmMedium,
         utm_campaign: params.trackingData?.utmCampaign,
@@ -213,6 +214,7 @@ class APIClient {
         id: response.form.id || 'unknown',
         title: response.form.title,
         description: response.form.description,
+        businessName: response.form.businessName,
         theme: response.form.theme
       },
       step: this.transformFormStep(response.step)
@@ -280,6 +282,36 @@ class APIClient {
       });
     } catch (error) {
       console.warn(`Failed to load theme for form ${formId}, using default:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Get client information by ID
+   */
+  async getClient(clientId: string): Promise<{
+    id: string;
+    business_name: string;
+    name: string;
+    industry: string;
+    website?: string;
+  } | null> {
+    try {
+      const response = await this.request<{ 
+        data: {
+          id: string;
+          business_name: string;
+          name: string;
+          industry: string;
+          website?: string;
+        }
+      }>(`/api/clients/${clientId}`, {
+        method: 'GET',
+      });
+      
+      return response.data;
+    } catch (error) {
+      console.warn(`Failed to load client info for ${clientId}:`, error);
       return null;
     }
   }

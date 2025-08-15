@@ -475,32 +475,88 @@ async def update_form_config(form_id: str, config_request: FormConfigRequest):
         logger.error(f"Failed to update form config: {e}")
         raise HTTPException(status_code=500, detail="Failed to update form configuration")
 
-@router.get("/form/{form_id}/theme", response_model=ThemeConfig)
+@router.get("/form/{form_id}/theme")
 async def get_form_theme(form_id: str):
     """Get the effective theme for a form (form-specific or client default)."""
     try:
-        conn = get_database_connection()
-        with conn.cursor() as cursor:
-            # Get form theme config and client_id
-            cursor.execute("""
-                SELECT client_id, theme_config FROM forms WHERE id = %s
-            """, (form_id,))
-            
-            result = cursor.fetchone()
-            if not result:
-                raise HTTPException(status_code=404, detail="Form not found")
-            
-            client_id, theme_config = result
-            
-            # If form has custom theme, use it
-            if theme_config:
-                return ThemeConfig(**theme_config)
-            
-            # Otherwise, get client default theme using our helper function
-            cursor.execute("SELECT get_client_default_theme(%s)", (client_id,))
-            default_theme = cursor.fetchone()[0]
-            
-            return ThemeConfig(**default_theme)
+        from ..database import db
+        from ..utils.response_helpers import success_response
+        
+        # Get form data including theme_config
+        form_data = db.get_form(form_id)
+        if not form_data:
+            raise HTTPException(status_code=404, detail="Form not found")
+        
+        # Check if form has a specific theme_config
+        theme_config = form_data.get('theme_config')
+        
+        if theme_config:
+            logger.info(f"Found theme_config for form {form_id}: {type(theme_config)}")
+            # Form has a specific theme configuration
+            return success_response(
+                data=theme_config,
+                message="Form-specific theme loaded successfully"
+            )
+        
+        # If no form-specific theme, try to get client's default theme
+        client_id = form_data.get('client_id')
+        if client_id:
+            logger.info(f"Looking for default theme for client {client_id}")
+            try:
+                # Get client's default theme from client_themes table using Supabase client
+                client_theme_data = db.client.table('client_themes').select('theme_config').eq('client_id', client_id).eq('is_default', True).limit(1).execute()
+                
+                if client_theme_data.data and len(client_theme_data.data) > 0:
+                    theme_config = client_theme_data.data[0].get('theme_config')
+                    if theme_config:
+                        logger.info(f"Found client default theme for {client_id}")
+                        return success_response(
+                            data=theme_config,
+                            message="Client default theme loaded successfully"
+                        )
+            except Exception as e:
+                logger.warning(f"Error loading client theme: {e}")
+        
+        # Fallback to default theme if no specific theme is found
+        logger.info(f"Using fallback default theme for form {form_id}")
+        default_theme = {
+            "name": "Default Theme",
+            "colors": {
+                "primary": "#3b82f6",
+                "primaryHover": "#2563eb",
+                "primaryLight": "#dbeafe",
+                "secondary": "#6b7280",
+                "secondaryHover": "#4b5563",
+                "secondaryLight": "#f3f4f6",
+                "accent": "#10b981",
+                "text": "#111827",
+                "textLight": "#6b7280",
+                "textMuted": "#9ca3af",
+                "background": "#ffffff",
+                "backgroundLight": "#f9fafb",
+                "border": "#e5e7eb",
+                "error": "#ef4444",
+                "success": "#10b981",
+                "warning": "#f59e0b"
+            },
+            "typography": {
+                "primary": "Inter, sans-serif",
+                "secondary": "Inter, sans-serif"
+            },
+            "spacing": {
+                "section": "2rem",
+                "element": "1rem"
+            },
+            "borderRadius": "0.5rem",
+            "borderRadiusLg": "0.75rem",
+            "shadow": "0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)",
+            "shadowLg": "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)"
+        }
+        
+        return success_response(
+            data=default_theme,
+            message="Default theme loaded successfully"
+        )
             
     except HTTPException:
         raise
