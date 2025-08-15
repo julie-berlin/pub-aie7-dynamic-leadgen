@@ -261,6 +261,7 @@ export interface ThemeStore {
   // Actions
   loadTheme: (formId: string) => Promise<void>;
   applyTheme: (theme: ThemeConfig) => void;
+  validateTheme: (theme: ThemeConfig) => ThemeConfig;
   resetTheme: () => void;
 }
 

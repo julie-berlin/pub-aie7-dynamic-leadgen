@@ -79,10 +79,7 @@ export const useFormStore = create<FormStore>()(
             error: null
           });
 
-          // Apply theme if provided
-          if (response.form.theme) {
-            get().updateTheme(response.form.theme);
-          }
+          // Note: Theme loading is handled by the dedicated theme store
 
         } catch (error) {
           console.error('Failed to initialize form:', error);

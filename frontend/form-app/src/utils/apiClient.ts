@@ -271,12 +271,17 @@ class APIClient {
 
   /**
    * Get theme configuration for a form
-   * Note: Theme endpoint not implemented yet, always returns null
+   * Returns the effective theme (form-specific or client default)
    */
   async getTheme(formId: string): Promise<ThemeConfig | null> {
-    // Theme loading not implemented yet - return null to use default theme
-    console.log(`Theme loading skipped for form ${formId} - using default theme`);
-    return null;
+    try {
+      return await this.request<ThemeConfig>(`/api/themes/form/${formId}/theme`, {
+        method: 'GET',
+      });
+    } catch (error) {
+      console.warn(`Failed to load theme for form ${formId}, using default:`, error);
+      return null;
+    }
   }
 
   /**

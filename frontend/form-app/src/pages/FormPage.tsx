@@ -39,9 +39,13 @@ export default function FormPage() {
       trackingData.sessionId = sessionId;
     }
 
-    // Initialize form and load theme
-    initializeForm(clientId, formId, trackingData);
-    loadTheme(formId);
+    // Initialize form and load theme concurrently
+    Promise.all([
+      initializeForm(clientId, formId, trackingData),
+      loadTheme(formId)
+    ]).catch(err => {
+      console.error('Failed to initialize form or load theme:', err);
+    });
   }, [clientId, formId, searchParams, initializeForm, loadTheme, navigate]);
 
   // Redirect to completion page if form is complete
