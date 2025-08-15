@@ -327,6 +327,254 @@ class FormConfigModel(BaseModel):
     created_at: Optional[datetime] = Field(None, description="Creation timestamp")
     updated_at: Optional[datetime] = Field(None, description="Update timestamp")
 
+# === FORMS API MODELS ===
+
+class FormQuestionConfig(BaseModel):
+    """Configuration for a form question."""
+    question_id: int
+    question_order: int
+    question_text: str
+    question_type: str = Field(default="text")
+    options: Optional[Dict[str, Any]] = None
+    validation_rules: Optional[Dict[str, Any]] = None
+    scoring_rubric: Optional[Dict[str, Any]] = None
+    is_required: bool = Field(default=False)
+    description: Optional[str] = None
+    placeholder: Optional[str] = None
+
+class FormCreateRequest(BaseModel):
+    """Request to create a new form."""
+    title: str = Field(..., min_length=1, max_length=200)
+    description: Optional[str] = Field(None, max_length=1000)
+    status: Literal["draft", "active", "paused", "archived"] = Field(default="draft")
+    tags: Optional[List[str]] = Field(default_factory=list)
+    theme_config: Optional[Dict[str, Any]] = Field(default_factory=dict)
+    
+    # Scoring configuration
+    lead_scoring_threshold_yes: int = Field(default=80, ge=0, le=100)
+    lead_scoring_threshold_maybe: int = Field(default=50, ge=0, le=100)
+    
+    # Business rules
+    max_questions: int = Field(default=8, ge=1, le=20)
+    min_questions_before_fail: int = Field(default=4, ge=1, le=10)
+    
+    # Templates
+    completion_message_template: Optional[str] = None
+    unqualified_message: str = Field(default="Thank you for your time.")
+    
+    # Additional settings
+    settings: Optional[Dict[str, Any]] = Field(default_factory=dict)
+    
+    # Questions
+    questions: Optional[List[FormQuestionConfig]] = Field(default_factory=list)
+
+    @validator('lead_scoring_threshold_maybe')
+    def validate_thresholds(cls, v, values):
+        if 'lead_scoring_threshold_yes' in values and v >= values['lead_scoring_threshold_yes']:
+            raise ValueError('Maybe threshold must be less than Yes threshold')
+        return v
+
+class FormUpdateRequest(BaseModel):
+    """Request to update an existing form (PUT - full update)."""
+    title: str = Field(..., min_length=1, max_length=200)
+    description: Optional[str] = Field(None, max_length=1000)
+    status: Literal["draft", "active", "paused", "archived"]
+    tags: List[str] = Field(default_factory=list)
+    theme_config: Dict[str, Any] = Field(default_factory=dict)
+    
+    # Scoring configuration
+    lead_scoring_threshold_yes: int = Field(..., ge=0, le=100)
+    lead_scoring_threshold_maybe: int = Field(..., ge=0, le=100)
+    
+    # Business rules
+    max_questions: int = Field(..., ge=1, le=20)
+    min_questions_before_fail: int = Field(..., ge=1, le=10)
+    
+    # Templates
+    completion_message_template: Optional[str] = None
+    unqualified_message: str
+    
+    # Additional settings
+    settings: Dict[str, Any] = Field(default_factory=dict)
+
+    @validator('lead_scoring_threshold_maybe')
+    def validate_thresholds(cls, v, values):
+        if 'lead_scoring_threshold_yes' in values and v >= values['lead_scoring_threshold_yes']:
+            raise ValueError('Maybe threshold must be less than Yes threshold')
+        return v
+
+class FormPatchRequest(BaseModel):
+    """Request to partially update a form (PATCH)."""
+    title: Optional[str] = Field(None, min_length=1, max_length=200)
+    description: Optional[str] = Field(None, max_length=1000)
+    status: Optional[Literal["draft", "active", "paused", "archived"]] = None
+    tags: Optional[List[str]] = None
+    theme_config: Optional[Dict[str, Any]] = None
+    
+    # Scoring configuration
+    lead_scoring_threshold_yes: Optional[int] = Field(None, ge=0, le=100)
+    lead_scoring_threshold_maybe: Optional[int] = Field(None, ge=0, le=100)
+    
+    # Business rules
+    max_questions: Optional[int] = Field(None, ge=1, le=20)
+    min_questions_before_fail: Optional[int] = Field(None, ge=1, le=10)
+    
+    # Templates
+    completion_message_template: Optional[str] = None
+    unqualified_message: Optional[str] = None
+    
+    # Additional settings
+    settings: Optional[Dict[str, Any]] = None
+
+class FormResponse(BaseModel):
+    """Response model for form data."""
+    id: str
+    client_id: str
+    title: str
+    description: Optional[str]
+    status: str
+    tags: List[str]
+    theme_config: Dict[str, Any]
+    
+    # Scoring configuration
+    lead_scoring_threshold_yes: int
+    lead_scoring_threshold_maybe: int
+    
+    # Business rules
+    max_questions: int
+    min_questions_before_fail: int
+    
+    # Templates
+    completion_message_template: Optional[str]
+    unqualified_message: str
+    
+    # Additional settings
+    settings: Dict[str, Any]
+    is_active: bool
+    
+    # Timestamps
+    created_at: datetime
+    updated_at: datetime
+    
+    # Statistics (calculated fields)
+    total_responses: int = 0
+    conversion_rate: float = 0.0
+    average_completion_time: int = 0  # seconds
+    
+    # Questions
+    questions: List[FormQuestionConfig] = []
+
+class FormListResponse(BaseModel):
+    """Response model for form list with pagination."""
+    forms: List[FormResponse]
+    total_count: int
+    page: int
+    page_size: int
+    total_pages: int
+
+# === CLIENTS API MODELS ===
+
+class ClientUpdateRequest(BaseModel):
+    """Request to update client information (PUT - full update)."""
+    business_name: str = Field(..., min_length=1, max_length=200)
+    business_description: str = Field(..., max_length=1000)
+    industry: str = Field(..., max_length=100)
+    website_url: Optional[str] = None
+    contact_email: str = Field(...)
+    contact_phone: Optional[str] = Field(None, max_length=20)
+    business_address: Optional[str] = Field(None, max_length=500)
+    business_type: Optional[str] = Field(None, max_length=100)
+    target_audience: Optional[str] = Field(None, max_length=500)
+    goals: Optional[str] = Field(None, max_length=1000)
+
+class ClientPatchRequest(BaseModel):
+    """Request to partially update client information (PATCH)."""
+    business_name: Optional[str] = Field(None, min_length=1, max_length=200)
+    business_description: Optional[str] = Field(None, max_length=1000)
+    industry: Optional[str] = Field(None, max_length=100)
+    website_url: Optional[str] = None
+    contact_email: Optional[str] = None
+    contact_phone: Optional[str] = Field(None, max_length=20)
+    business_address: Optional[str] = Field(None, max_length=500)
+    business_type: Optional[str] = Field(None, max_length=100)
+    target_audience: Optional[str] = Field(None, max_length=500)
+    goals: Optional[str] = Field(None, max_length=1000)
+
+class ClientResponse(BaseModel):
+    """Response model for client data."""
+    id: str
+    name: str
+    business_name: Optional[str]
+    email: str
+    owner_name: str
+    contact_name: Optional[str]
+    business_type: Optional[str]
+    industry: Optional[str]
+    address: Optional[str]
+    phone: Optional[str]
+    website: Optional[str]
+    background: Optional[str]
+    goals: Optional[str]
+    target_audience: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+
+# === THEMES API MODELS ===
+
+class ThemeCreateRequest(BaseModel):
+    """Request to create a new theme."""
+    name: str = Field(..., min_length=1, max_length=100)
+    description: Optional[str] = Field(None, max_length=500)
+    primary_color: str = Field(..., pattern=r'^#[0-9A-Fa-f]{6}$')
+    secondary_color: str = Field(..., pattern=r'^#[0-9A-Fa-f]{6}$')
+    accent_color: Optional[str] = Field(None, pattern=r'^#[0-9A-Fa-f]{6}$')
+    font_family: Optional[str] = Field(None, max_length=100)
+    custom_css: Optional[str] = Field(None, max_length=10000)
+    settings: Optional[Dict[str, Any]] = Field(default_factory=dict)
+
+class ThemeUpdateRequest(BaseModel):
+    """Request to update a theme (PUT - full update)."""
+    name: str = Field(..., min_length=1, max_length=100)
+    description: Optional[str] = Field(None, max_length=500)
+    primary_color: str = Field(..., pattern=r'^#[0-9A-Fa-f]{6}$')
+    secondary_color: str = Field(..., pattern=r'^#[0-9A-Fa-f]{6}$')
+    accent_color: Optional[str] = Field(None, pattern=r'^#[0-9A-Fa-f]{6}$')
+    font_family: Optional[str] = Field(None, max_length=100)
+    custom_css: Optional[str] = Field(None, max_length=10000)
+    settings: Dict[str, Any] = Field(default_factory=dict)
+
+class ThemePatchRequest(BaseModel):
+    """Request to partially update a theme (PATCH)."""
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    description: Optional[str] = Field(None, max_length=500)
+    primary_color: Optional[str] = Field(None, pattern=r'^#[0-9A-Fa-f]{6}$')
+    secondary_color: Optional[str] = Field(None, pattern=r'^#[0-9A-Fa-f]{6}$')
+    accent_color: Optional[str] = Field(None, pattern=r'^#[0-9A-Fa-f]{6}$')
+    font_family: Optional[str] = Field(None, max_length=100)
+    custom_css: Optional[str] = Field(None, max_length=10000)
+    settings: Optional[Dict[str, Any]] = None
+
+class ThemeResponse(BaseModel):
+    """Response model for theme data."""
+    id: str
+    client_id: str
+    name: str
+    description: Optional[str]
+    primary_color: str
+    secondary_color: str
+    accent_color: Optional[str]
+    font_family: Optional[str]
+    custom_css: Optional[str]
+    settings: Dict[str, Any]
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+class ThemeListResponse(BaseModel):
+    """Response model for theme list."""
+    themes: List[ThemeResponse]
+    total_count: int
+
 # === UTILITY FUNCTIONS ===
 
 def create_initial_state(
