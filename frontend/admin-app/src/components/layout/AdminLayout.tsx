@@ -10,6 +10,7 @@ import {
 import { useAdminStore } from '../../stores/adminStore';
 import Breadcrumb, { useBreadcrumbs } from '../common/Breadcrumb';
 import { useBreadcrumbContext } from '../common/BreadcrumbContext';
+import { useBusinessInfo } from '../../hooks/useBusinessInfo';
 
 interface AdminLayoutProps {
   children: ReactNode;
@@ -27,6 +28,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const { user, logout } = useAdminStore();
   const { customBreadcrumbs } = useBreadcrumbContext();
   const breadcrumbs = useBreadcrumbs(customBreadcrumbs);
+  const { businessInfo, loading: businessLoading } = useBusinessInfo();
 
   return (
     <div className="flex h-screen bg-slate-50">
@@ -35,10 +37,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         {/* Logo */}
         <div className="px-6 py-8">
           <h1 className="text-xl font-bold text-slate-900">
-            Survey Admin
+            {businessLoading ? 'Loading...' : businessInfo.name}
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Lead Generation Platform
+            Varyq - Intelligent Leads
           </p>
         </div>
 

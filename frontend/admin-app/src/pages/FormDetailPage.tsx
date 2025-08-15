@@ -35,6 +35,9 @@ export default function FormDetailPage() {
     fontFamily: 'Inter',
     borderRadius: '0.5rem'
   });
+  const [isEditingQuestions, setIsEditingQuestions] = useState(false);
+  const [editingQuestionId, setEditingQuestionId] = useState<number | null>(null);
+  const [questionEditValues, setQuestionEditValues] = useState<any>({});
 
   useEffect(() => {
     if (id) {
@@ -201,6 +204,75 @@ export default function FormDetailPage() {
       });
     }
     setIsEditingTheme(false);
+  };
+
+  const handleEditQuestion = (question: FormQuestion) => {
+    setEditingQuestionId(question.id);
+    setQuestionEditValues({
+      questionText: question.questionText,
+      questionType: question.questionType,
+      required: question.required
+    });
+  };
+
+  const handleCancelEditQuestion = () => {
+    setEditingQuestionId(null);
+    setQuestionEditValues({});
+  };
+
+  const handleSaveQuestion = async (questionId: number) => {
+    if (!form || !questionEditValues.questionText?.trim()) {
+      handleCancelEditQuestion();
+      return;
+    }
+
+    try {
+      // For now, just update the local state - full API integration can be added later
+      setForm(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          questions: prev.questions.map(q => 
+            q.id === questionId 
+              ? { ...q, questionText: questionEditValues.questionText.trim() }
+              : q
+          )
+        };
+      });
+      
+      handleCancelEditQuestion();
+      alert('Question updated successfully! (Full API integration coming in next phase)');
+    } catch (error) {
+      console.error('Failed to update question:', error);
+      alert('Failed to update question. Please try again.');
+    }
+  };
+
+  const handleDeleteQuestion = async (questionId: number) => {
+    if (!form) return;
+
+    const question = form.questions.find(q => q.id === questionId);
+    const confirmed = confirm(
+      `Are you sure you want to delete the question "${question?.questionText}"? This action cannot be undone.`
+    );
+    
+    if (!confirmed) return;
+
+    try {
+      // For now, just update the local state - full API integration can be added later
+      setForm(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          questions: prev.questions.filter(q => q.id !== questionId)
+        };
+      });
+      
+      alert('Question deleted successfully! (Full API integration coming in next phase)');
+    } catch (error) {
+      console.error('Failed to delete question:', error);
+      alert('Failed to delete question. Please try again.');
+    }
   };
 
   const handleStatusChange = async (newStatus: string) => {
@@ -461,11 +533,11 @@ export default function FormDetailPage() {
               <p className="text-sm text-slate-500">Questions in this form and their configuration</p>
             </div>
             <button 
-              className="admin-btn-primary disabled:opacity-50" 
-              disabled
-              title="Question editing coming in future update"
+              className="admin-btn-primary flex items-center whitespace-nowrap" 
+              onClick={() => alert('Add Question functionality will be implemented in the next phase')}
+              title="Add a new question to this form"
             >
-              <PlusIcon className="w-4 h-4 mr-2" />
+              <PlusIcon className="w-4 h-4 mr-2 flex-shrink-0" />
               Add Question
             </button>
           </div>
@@ -495,9 +567,24 @@ export default function FormDetailPage() {
                       </td>
                       <td className="admin-table-cell">
                         <div className="max-w-md">
-                          <p className="text-sm font-medium text-slate-900 truncate">
-                            {question.questionText}
-                          </p>
+                          {editingQuestionId === question.id ? (
+                            <input
+                              type="text"
+                              value={questionEditValues.questionText || question.questionText}
+                              onChange={(e) => setQuestionEditValues(prev => ({ ...prev, questionText: e.target.value }))}
+                              className="admin-input text-sm w-full"
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleSaveQuestion(question.id);
+                                if (e.key === 'Escape') handleCancelEditQuestion();
+                              }}
+                              onBlur={() => handleSaveQuestion(question.id)}
+                              autoFocus
+                            />
+                          ) : (
+                            <p className="text-sm font-medium text-slate-900 truncate">
+                              {question.questionText}
+                            </p>
+                          )}
                         </div>
                       </td>
                       <td className="admin-table-cell">
@@ -521,20 +608,41 @@ export default function FormDetailPage() {
                       </td>
                       <td className="admin-table-cell">
                         <div className="flex items-center space-x-2">
-                          <button 
-                            className="text-slate-400 hover:text-slate-600 disabled:opacity-50" 
-                            disabled
-                            title="Question editing coming in future update"
-                          >
-                            <PencilIcon className="w-4 h-4" />
-                          </button>
-                          <button 
-                            className="text-slate-400 hover:text-danger-600 disabled:opacity-50" 
-                            disabled
-                            title="Question deletion coming in future update"
-                          >
-                            <TrashIcon className="w-4 h-4" />
-                          </button>
+                          {editingQuestionId === question.id ? (
+                            <>
+                              <button
+                                onClick={() => handleSaveQuestion(question.id)}
+                                className="text-success-600 hover:text-success-700 transition-colors"
+                                title="Save changes (Enter)"
+                              >
+                                ✓
+                              </button>
+                              <button
+                                onClick={handleCancelEditQuestion}
+                                className="text-slate-400 hover:text-slate-600 transition-colors"
+                                title="Cancel editing (Esc)"
+                              >
+                                ✕
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button 
+                                className="text-slate-400 hover:text-slate-600 transition-colors" 
+                                onClick={() => handleEditQuestion(question)}
+                                title="Edit question text"
+                              >
+                                <PencilIcon className="w-4 h-4" />
+                              </button>
+                              <button 
+                                className="text-slate-400 hover:text-danger-600 transition-colors" 
+                                onClick={() => handleDeleteQuestion(question.id)}
+                                title="Delete this question"
+                              >
+                                <TrashIcon className="w-4 h-4" />
+                              </button>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>
