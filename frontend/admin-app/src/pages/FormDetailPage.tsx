@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ChevronLeftIcon, PencilIcon, TrashIcon, PlusIcon } from '@heroicons/react/24/outline';
+import { PencilIcon, TrashIcon, PlusIcon, DocumentDuplicateIcon } from '@heroicons/react/24/outline';
 import { useFormsStore } from '../stores/formsStore';
 import type { AdminForm } from '../stores/formsStore';
 import { API_ENDPOINTS } from '../config/api';
+import { createFormDetailBreadcrumbs } from '../components/common/Breadcrumb';
+import { useBreadcrumbContext } from '../components/common/BreadcrumbContext';
 
 interface FormQuestion {
   id: number;
@@ -22,16 +24,35 @@ export default function FormDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { selectedForm, fetchForm, updateForm } = useFormsStore();
+  const { setCustomBreadcrumbs } = useBreadcrumbContext();
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState<FormDetails | null>(null);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleValue, setTitleValue] = useState('');
+  const [isEditingTheme, setIsEditingTheme] = useState(false);
+  const [themeValues, setThemeValues] = useState({
+    primaryColor: '#3B82F6',
+    fontFamily: 'Inter',
+    borderRadius: '0.5rem'
+  });
 
   useEffect(() => {
     if (id) {
       loadFormDetails(id);
     }
   }, [id]);
+
+  // Update breadcrumbs when form data changes
+  useEffect(() => {
+    if (form) {
+      setCustomBreadcrumbs(createFormDetailBreadcrumbs(form.title));
+    }
+    
+    // Cleanup breadcrumbs when component unmounts
+    return () => {
+      setCustomBreadcrumbs(undefined);
+    };
+  }, [form, setCustomBreadcrumbs]);
 
   const loadFormDetails = async (formId: string) => {
     setLoading(true);
@@ -44,8 +65,61 @@ export default function FormDetailPage() {
 
       if (response.ok) {
         const { data } = await response.json();
-        setForm(data);
-        setTitleValue(data.title || '');
+        
+        // Transform API response to match expected form structure
+        const transformedForm = {
+          id: formId,
+          title: data.title,
+          description: data.description,
+          status: data.status,
+          tags: data.tags || [],
+          createdAt: data.created_at,
+          updatedAt: data.updated_at,
+          totalResponses: data.total_responses || 0,
+          conversionRate: data.conversion_rate || 0,
+          averageCompletionTime: data.average_completion_time || 0,
+          questions: (data.questions || []).map((q: any) => ({
+            id: q.question_id || 0,
+            questionText: q.question_text || '',
+            questionType: q.question_type || 'text',
+            required: q.is_required || false,
+            scoringRubric: q.scoring_rubric,
+            orderIndex: q.question_order || 0,
+            options: q.options,
+            description: q.description,
+            placeholder: q.placeholder
+          })),
+          settings: {
+            maxResponses: data.max_responses,
+            expiresAt: data.expires_at,
+            requireAuth: data.require_auth || false,
+            allowMultipleSubmissions: data.allow_multiple_submissions || false,
+          },
+          theme: data.theme_config ? {
+            primaryColor: data.theme_config.primary_color || '#3B82F6',
+            fontFamily: data.theme_config.font_family || 'Inter',
+            borderRadius: data.theme_config.border_radius || '0.5rem',
+          } : undefined,
+        };
+        
+        setForm(transformedForm);
+        setTitleValue(transformedForm.title || '');
+        
+        // Initialize theme values
+        if (transformedForm.theme) {
+          setThemeValues({
+            primaryColor: transformedForm.theme.primaryColor || '#3B82F6',
+            fontFamily: transformedForm.theme.fontFamily || 'Inter',
+            borderRadius: transformedForm.theme.borderRadius || '0.5rem'
+          });
+        } else {
+          // Set default theme values if no theme exists
+          setThemeValues({
+            primaryColor: '#3B82F6',
+            fontFamily: 'Inter',
+            borderRadius: '0.5rem'
+          });
+        }
       } else if (response.status === 404) {
         navigate('/forms', { replace: true });
       } else {
@@ -78,6 +152,148 @@ export default function FormDetailPage() {
   const handleTitleCancel = () => {
     setTitleValue(form?.title || '');
     setIsEditingTitle(false);
+  };
+
+  const handleThemeSave = async () => {
+    if (!form) return;
+
+    try {
+      const response = await fetch(API_ENDPOINTS.FORMS.UPDATE(form.id), {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          theme_config: {
+            primary_color: themeValues.primaryColor,
+            font_family: themeValues.fontFamily,
+            border_radius: themeValues.borderRadius
+          }
+        })
+      });
+
+      if (response.ok) {
+        const { data } = await response.json();
+        setForm(prev => prev ? {
+          ...prev,
+          theme: {
+            primaryColor: themeValues.primaryColor,
+            fontFamily: themeValues.fontFamily,
+            borderRadius: themeValues.borderRadius
+          }
+        } : null);
+        setIsEditingTheme(false);
+      } else {
+        throw new Error('Failed to update theme');
+      }
+    } catch (error) {
+      console.error('Failed to update theme:', error);
+      alert('Failed to update theme. Please try again.');
+    }
+  };
+
+  const handleThemeCancel = () => {
+    if (form?.theme) {
+      setThemeValues({
+        primaryColor: form.theme.primaryColor || '#3B82F6',
+        fontFamily: form.theme.fontFamily || 'Inter',
+        borderRadius: form.theme.borderRadius || '0.5rem'
+      });
+    }
+    setIsEditingTheme(false);
+  };
+
+  const handleStatusChange = async (newStatus: string) => {
+    if (!form || form.status === newStatus) return;
+
+    // Confirmation for certain status changes
+    if (newStatus === 'archived') {
+      const confirmed = confirm(
+        'Are you sure you want to archive this form? Archived forms stop accepting new responses and are hidden from most views.'
+      );
+      if (!confirmed) return;
+    }
+
+    if (newStatus === 'active' && form.status === 'draft') {
+      const confirmed = confirm(
+        'Are you sure you want to activate this form? Once active, it will be publicly accessible and will start collecting responses.'
+      );
+      if (!confirmed) return;
+    }
+
+    try {
+      const response = await fetch(API_ENDPOINTS.FORMS.UPDATE(form.id), {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          status: newStatus
+        })
+      });
+
+      if (response.ok) {
+        setForm(prev => prev ? { ...prev, status: newStatus } : null);
+        
+        // Update the form in the store as well
+        await updateForm(form.id, { status: newStatus });
+      } else {
+        throw new Error('Failed to update form status');
+      }
+    } catch (error) {
+      console.error('Failed to update form status:', error);
+      alert('Failed to update form status. Please try again.');
+    }
+  };
+
+  const handleDuplicateForm = async () => {
+    if (!form) return;
+
+    const confirmed = confirm(
+      `Create a duplicate of "${form.title}"? The copy will be created as a draft with all questions and settings.`
+    );
+    if (!confirmed) return;
+
+    try {
+      // Create duplicate with modified title
+      const duplicateData = {
+        title: `${form.title} (Copy)`,
+        description: form.description,
+        status: 'draft', // Always create copies as drafts
+        theme_config: form.theme ? {
+          primary_color: form.theme.primaryColor,
+          font_family: form.theme.fontFamily,
+          border_radius: form.theme.borderRadius
+        } : null,
+        settings: {
+          require_auth: form.settings.requireAuth || false,
+          allow_multiple_submissions: form.settings.allowMultipleSubmissions || false,
+          max_responses: form.settings.maxResponses || null,
+          expires_at: null // Clear expiration for copy
+        }
+      };
+
+      const createResponse = await fetch(API_ENDPOINTS.FORMS.CREATE, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(duplicateData)
+      });
+
+      if (createResponse.ok) {
+        const { data: newForm } = await createResponse.json();
+        alert(`Form duplicated successfully! The copy "${newForm.title}" has been created as a draft.`);
+        
+        // Navigate to the new form's detail page
+        navigate(`/forms/${newForm.id}`);
+      } else {
+        throw new Error('Failed to create duplicate form');
+      }
+    } catch (error) {
+      console.error('Failed to duplicate form:', error);
+      alert('Failed to duplicate form. Please try again.');
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -128,16 +344,6 @@ export default function FormDetailPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header with breadcrumb */}
-      <div className="flex items-center space-x-4">
-        <Link 
-          to="/forms" 
-          className="flex items-center text-slate-500 hover:text-slate-700 transition-colors"
-        >
-          <ChevronLeftIcon className="w-5 h-5 mr-1" />
-          Back to Forms
-        </Link>
-      </div>
 
       {/* Form header */}
       <div className="admin-card">
@@ -193,6 +399,33 @@ export default function FormDetailPage() {
               <span className={getStatusBadge(form.status)}>
                 {form.status.charAt(0).toUpperCase() + form.status.slice(1)}
               </span>
+              
+              {/* Action buttons */}
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={handleDuplicateForm}
+                  className="admin-btn-secondary admin-btn-sm"
+                  title="Duplicate this form"
+                >
+                  <DocumentDuplicateIcon className="w-4 h-4 mr-1" />
+                  Duplicate
+                </button>
+                
+                {/* Status management dropdown */}
+                <div className="relative">
+                  <select
+                    value={form.status}
+                    onChange={(e) => handleStatusChange(e.target.value)}
+                    className="admin-input text-sm py-1 px-2 pr-8"
+                    style={{ minWidth: '120px' }}
+                  >
+                    <option value="draft">Draft</option>
+                    <option value="active">Active</option>
+                    <option value="paused">Paused</option>
+                    <option value="archived">Archived</option>
+                  </select>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -318,37 +551,163 @@ export default function FormDetailPage() {
       </div>
 
       {/* Theme section */}
-      {form.theme && (
-        <div className="admin-card">
-          <div className="admin-card-header">
-            <h3 className="text-lg font-medium text-slate-900">Theme Configuration</h3>
-            <p className="text-sm text-slate-500">Visual styling for this form</p>
+      <div className="admin-card">
+        <div className="admin-card-header">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-medium text-slate-900">Theme Configuration</h3>
+              <p className="text-sm text-slate-500">Visual styling for this form</p>
+            </div>
+            <button
+              onClick={() => setIsEditingTheme(true)}
+              disabled={isEditingTheme}
+              className="text-slate-400 hover:text-slate-600 transition-colors disabled:opacity-50"
+              title="Edit theme"
+            >
+              <PencilIcon className="w-4 h-4" />
+            </button>
           </div>
-          
-          <div className="admin-card-body">
+        </div>
+        
+        <div className="admin-card-body">
+          {isEditingTheme ? (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="admin-form-group">
+                  <label htmlFor="primaryColor" className="admin-label">
+                    Primary Color
+                  </label>
+                  <div className="flex items-center space-x-3">
+                    <input
+                      type="color"
+                      id="primaryColor"
+                      value={themeValues.primaryColor}
+                      onChange={(e) => setThemeValues(prev => ({ ...prev, primaryColor: e.target.value }))}
+                      className="w-12 h-10 rounded border border-slate-300 cursor-pointer"
+                    />
+                    <input
+                      type="text"
+                      value={themeValues.primaryColor}
+                      onChange={(e) => setThemeValues(prev => ({ ...prev, primaryColor: e.target.value }))}
+                      className="admin-input font-mono text-sm"
+                      placeholder="#3B82F6"
+                    />
+                  </div>
+                </div>
+
+                <div className="admin-form-group">
+                  <label htmlFor="fontFamily" className="admin-label">
+                    Font Family
+                  </label>
+                  <select
+                    id="fontFamily"
+                    value={themeValues.fontFamily}
+                    onChange={(e) => setThemeValues(prev => ({ ...prev, fontFamily: e.target.value }))}
+                    className="admin-input"
+                  >
+                    <option value="Inter">Inter</option>
+                    <option value="Roboto">Roboto</option>
+                    <option value="Open Sans">Open Sans</option>
+                    <option value="Lato">Lato</option>
+                    <option value="Poppins">Poppins</option>
+                    <option value="Montserrat">Montserrat</option>
+                    <option value="Source Sans Pro">Source Sans Pro</option>
+                    <option value="system-ui">System Default</option>
+                  </select>
+                </div>
+
+                <div className="admin-form-group">
+                  <label htmlFor="borderRadius" className="admin-label">
+                    Border Radius
+                  </label>
+                  <select
+                    id="borderRadius"
+                    value={themeValues.borderRadius}
+                    onChange={(e) => setThemeValues(prev => ({ ...prev, borderRadius: e.target.value }))}
+                    className="admin-input"
+                  >
+                    <option value="0">None (0px)</option>
+                    <option value="0.25rem">Small (4px)</option>
+                    <option value="0.5rem">Medium (8px)</option>
+                    <option value="0.75rem">Large (12px)</option>
+                    <option value="1rem">Extra Large (16px)</option>
+                    <option value="1.5rem">Rounded (24px)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Theme preview */}
+              <div className="border border-slate-200 rounded-lg p-4 bg-slate-50">
+                <h4 className="text-sm font-medium text-slate-700 mb-3">Preview</h4>
+                <div className="space-y-3">
+                  <div
+                    className="p-4 bg-white border-2 shadow-sm"
+                    style={{
+                      borderColor: themeValues.primaryColor,
+                      borderRadius: themeValues.borderRadius,
+                      fontFamily: themeValues.fontFamily
+                    }}
+                  >
+                    <h5 className="font-semibold text-slate-900 mb-2">Sample Question</h5>
+                    <p className="text-slate-600 text-sm mb-3">How would you rate your experience with our service?</p>
+                    <button
+                      className="px-4 py-2 text-white rounded transition-colors"
+                      style={{
+                        backgroundColor: themeValues.primaryColor,
+                        borderRadius: themeValues.borderRadius
+                      }}
+                    >
+                      Submit Response
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end space-x-3 pt-4 border-t border-slate-200">
+                <button
+                  onClick={handleThemeCancel}
+                  className="admin-btn-secondary"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleThemeSave}
+                  className="admin-btn-primary"
+                >
+                  Save Theme
+                </button>
+              </div>
+            </div>
+          ) : (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               <div>
                 <dt className="text-sm font-medium text-slate-500">Primary Color</dt>
                 <dd className="flex items-center space-x-2 mt-1">
                   <div 
                     className="w-6 h-6 rounded border border-slate-200"
-                    style={{ backgroundColor: form.theme.primaryColor }}
+                    style={{ backgroundColor: form?.theme?.primaryColor || themeValues.primaryColor }}
                   />
-                  <span className="text-sm text-slate-900 font-mono">{form.theme.primaryColor}</span>
+                  <span className="text-sm text-slate-900 font-mono">
+                    {form?.theme?.primaryColor || themeValues.primaryColor}
+                  </span>
                 </dd>
               </div>
               <div>
                 <dt className="text-sm font-medium text-slate-500">Font Family</dt>
-                <dd className="text-sm text-slate-900 mt-1">{form.theme.fontFamily}</dd>
+                <dd className="text-sm text-slate-900 mt-1">
+                  {form?.theme?.fontFamily || themeValues.fontFamily}
+                </dd>
               </div>
               <div>
                 <dt className="text-sm font-medium text-slate-500">Border Radius</dt>
-                <dd className="text-sm text-slate-900 mt-1">{form.theme.borderRadius}</dd>
+                <dd className="text-sm text-slate-900 mt-1">
+                  {form?.theme?.borderRadius || themeValues.borderRadius}
+                </dd>
               </div>
             </div>
-          </div>
+          )}
         </div>
-      )}
+      </div>
 
       {/* Form settings */}
       <div className="admin-card">

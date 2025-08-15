@@ -54,9 +54,10 @@ class ResponseSanitizer:
         }
         
         # Allowed fields for different environments
+        # In development (auth disabled) or production (auth enabled), allow admin fields
         self.allowed_admin_fields = {
-            'id', 'created_at', 'updated_at', 'status', 'internal_id'
-        } if config.auth_enabled else set()
+            'id', 'client_id', 'question_id', 'created_at', 'updated_at', 'status', 'internal_id'
+        }
     
     def _mask_email(self, email: str) -> str:
         """Mask email address: user@domain.com -> u***@d***.com"""
@@ -177,7 +178,10 @@ class ResponseSanitizationMiddleware(BaseHTTPMiddleware):
         self.skip_paths = {'/docs', '/redoc', '/openapi.json'}
         
         # Admin endpoints (if authentication is enabled)
-        self.admin_paths = {'/admin/', '/internal/', '/debug/'} if config.auth_enabled else set()
+        self.admin_paths = {
+            '/admin/', '/internal/', '/debug/', 
+            '/api/forms', '/api/clients'  # Admin API endpoints
+        } if config.auth_enabled else set()
         
         logger.info(f"Response sanitization middleware initialized - "
                    f"sanitize_enabled: {config.sanitize_inputs}, "
@@ -192,17 +196,27 @@ class ResponseSanitizationMiddleware(BaseHTTPMiddleware):
         # This would integrate with your authentication system
         # For now, just check path and headers
         
-        if not self.config.auth_enabled:
-            return False
+        # Define admin paths for both auth enabled and disabled scenarios
+        admin_paths = {
+            '/admin/', '/internal/', '/debug/', 
+            '/api/forms', '/api/clients'  # Admin API endpoints
+        }
         
         # Check if admin path
-        is_admin_path = any(admin_path in request.url.path for admin_path in self.admin_paths)
+        is_admin_path = any(admin_path in request.url.path for admin_path in admin_paths)
         
-        # Check for admin API key (simplified)
-        admin_key = request.headers.get('X-Admin-Key')
-        has_admin_key = admin_key and len(admin_key) > 10  # Basic validation
+        if not self.config.auth_enabled:
+            # In development with auth disabled, treat admin paths as admin requests
+            return is_admin_path
         
-        return is_admin_path and has_admin_key
+        # In production with auth enabled, require proper authentication
+        if is_admin_path:
+            # Check for admin API key (simplified)
+            admin_key = request.headers.get('X-Admin-Key')
+            has_admin_key = admin_key and len(admin_key) > 10  # Basic validation
+            return has_admin_key
+        
+        return False
     
     async def dispatch(self, request: Request, call_next):
         """Apply response sanitization"""

@@ -69,7 +69,7 @@ def get_form_statistics(form_id: str, client_id: str) -> Dict[str, Any]:
         
         # Get all sessions for this form
         sessions_result = db.client.table("lead_sessions")\
-            .select("status, started_at, completed_at")\
+            .select("lead_status, started_at, completed_at")\
             .eq("form_id", form_id)\
             .execute()
         
@@ -84,7 +84,7 @@ def get_form_statistics(form_id: str, client_id: str) -> Dict[str, Any]:
             }
         
         # Calculate statistics
-        completed_sessions = [s for s in sessions if s.get('status') == 'completed']
+        completed_sessions = [s for s in sessions if s.get('lead_status') == 'completed']
         completed_responses = len(completed_sessions)
         conversion_rate = completed_responses / total_responses
         
@@ -130,14 +130,30 @@ def get_form_questions(form_id: str, client_id: str) -> List[FormQuestionConfig]
         
         questions = []
         for q in questions_result.data or []:
+            # Handle scoring_rubric - convert string to dict or use None
+            scoring_rubric = q.get("scoring_rubric")
+            if scoring_rubric and isinstance(scoring_rubric, str):
+                # If it's a string, convert to a simple dict format
+                scoring_rubric = {"description": scoring_rubric, "points": 0}
+            elif not isinstance(scoring_rubric, dict):
+                scoring_rubric = None
+                
+            # Handle options - convert list to dict format if needed
+            options = q.get("options")
+            if options and isinstance(options, list):
+                # Convert list of options to dict format
+                options = {"choices": options, "type": "select"}
+            elif not isinstance(options, dict):
+                options = None
+                
             questions.append(FormQuestionConfig(
                 question_id=q.get("question_id"),
                 question_order=q.get("question_order"),
                 question_text=q.get("question_text"),
                 question_type=q.get("question_type") or "text",
-                options=q.get("options"),
+                options=options,
                 validation_rules=q.get("metadata", {}).get("validation_rules"),
-                scoring_rubric=q.get("scoring_rubric"),
+                scoring_rubric=scoring_rubric,
                 is_required=q.get("is_required") or False,
                 description=q.get("description"),
                 placeholder=q.get("placeholder")
@@ -258,12 +274,13 @@ async def list_forms(
         forms = []
         for row in result.data or []:
             form_id = str(row["id"])
+            client_id = str(row["client_id"])
             stats = get_form_statistics(form_id, current_user.client_id)
             questions = get_form_questions(form_id, current_user.client_id)
             
             forms.append(FormResponse(
                 id=form_id,
-                client_id=str(row["client_id"]),
+                client_id=client_id,
                 title=row["title"],
                 description=row.get("description"),
                 status=row["status"],

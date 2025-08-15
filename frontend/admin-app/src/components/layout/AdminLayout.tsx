@@ -8,6 +8,8 @@ import {
   UserIcon
 } from '@heroicons/react/24/outline';
 import { useAdminStore } from '../../stores/adminStore';
+import Breadcrumb, { useBreadcrumbs } from '../common/Breadcrumb';
+import { useBreadcrumbContext } from '../common/BreadcrumbContext';
 
 interface AdminLayoutProps {
   children: ReactNode;
@@ -23,6 +25,8 @@ const navigation = [
 export default function AdminLayout({ children }: AdminLayoutProps) {
   const location = useLocation();
   const { user, logout } = useAdminStore();
+  const { customBreadcrumbs } = useBreadcrumbContext();
+  const breadcrumbs = useBreadcrumbs(customBreadcrumbs);
 
   return (
     <div className="flex h-screen bg-slate-50">
@@ -93,9 +97,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         {/* Header */}
         <header className="bg-white border-b border-slate-200 px-6 py-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-slate-900">
-              {navigation.find(item => item.href === location.pathname)?.name || 'Admin'}
-            </h2>
+            <div className="flex flex-col space-y-2">
+              <h2 className="text-xl font-semibold text-slate-900">
+                {navigation.find(item => item.href === location.pathname)?.name || 'Admin'}
+              </h2>
+              <Breadcrumb items={breadcrumbs} />
+            </div>
             
             {/* Header actions */}
             <div className="flex items-center space-x-4">
