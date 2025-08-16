@@ -137,7 +137,7 @@ export default function FormContainer({ form, currentStep, formState }: FormCont
 
       {/* Form with Questions */}
       <form onSubmit={handleSubmit(onSubmit)} className="max-w-3xl mx-auto">
-        <div className="mb-16">
+        <div className="mb-36">
           <QuestionRenderer
             questions={currentStep.questions}
             responses={formState.responses}

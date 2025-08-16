@@ -7,18 +7,18 @@ interface EngagementHeaderProps {
 
 /**
  * EngagementHeader Component
- * 
+ *
  * Displays the AI-generated engaging headline and motivational content for each form step.
  * This content is designed to encourage user engagement and guide them through the survey.
- * 
+ *
  * Separated from form inputs to maintain clean component boundaries.
  */
 export default function EngagementHeader({ form, currentStep }: EngagementHeaderProps) {
   return (
-    <div className="engagement-header mb-16">
+    <div className="engagement-header">
       {/* Step Headline as H2 - AI-generated engaging content */}
       {currentStep.headline && (
-        <h2 
+        <h2
           className="text-2xl md:text-3xl font-semibold mb-6 text-center"
           style={{ color: 'var(--color-primary)' }}
         >
@@ -28,8 +28,8 @@ export default function EngagementHeader({ form, currentStep }: EngagementHeader
 
       {/* Engagement/Motivation Content as P - AI-generated */}
       {currentStep.subheading && (
-        <p 
-          className="text-lg md:text-xl leading-relaxed max-w-3xl mx-auto text-center"
+        <p
+          className=""
           style={{ color: 'var(--color-text-light)' }}
         >
           {currentStep.subheading}
@@ -38,7 +38,7 @@ export default function EngagementHeader({ form, currentStep }: EngagementHeader
 
       {/* Fallback to form description if no AI-generated engagement content */}
       {!currentStep.subheading && form.description && (
-        <p 
+        <p
           className="text-lg md:text-xl leading-relaxed max-w-3xl mx-auto text-center"
           style={{ color: 'var(--color-text-light)' }}
         >

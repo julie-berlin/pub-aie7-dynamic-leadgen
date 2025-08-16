@@ -5,22 +5,22 @@ interface PageHeaderProps {
 
 /**
  * PageHeader Component
- * 
+ *
  * Displays the page header with logo and business name.
  * Used at the page composition level, replacing the existing header with TODO logo comment.
  */
 export default function PageHeader({ businessName, logoUrl }: PageHeaderProps) {
   return (
-    <header className="w-full">
-      <div className="container mx-auto px-6 py-4 max-w-6xl">
+    <header className="w-full" style={{ backgroundColor: 'var(--color-background-light)' }}>
+      <div className="container mx-auto p-[30px]">
         <div className="flex items-center justify-center">
           <div className="flex items-center space-x-3">
             {/* Logo - either uploaded logo or default icon */}
             {logoUrl ? (
-              <img 
-                src={logoUrl} 
+              <img
+                src={logoUrl}
                 alt={`${businessName} logo`}
-                className="w-12 h-12 rounded-xl object-cover shadow-lg"
+                className="w-12 h-12 rounded-xl object-cover"
               />
             ) : (
               <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
@@ -29,7 +29,7 @@ export default function PageHeader({ businessName, logoUrl }: PageHeaderProps) {
                 </svg>
               </div>
             )}
-            
+
             {/* Business Name */}
             <div className="flex flex-col">
               <span className="text-xl font-bold text-gray-900">

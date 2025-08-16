@@ -113,17 +113,18 @@ body {
 
 /* Question container styles */
 .question-container {
-    margin-bottom: var(--spacing-element);
+    max-width: 80%;
+    margin: 2rem auto;
+
+    label {
+        display: block;
+        font-weight: 500;
+        color: var(--color-text);
+        margin-top: var(--spacing-input);
+        padding: var(--spacing-input);
+    }
 }
 
-.question-label {
-    display: block;
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: var(--color-text);
-    margin-top: 1rem;
-    margin-bottom: 0.75rem;
-}
 
 .question-description {
     font-size: 0.875rem;
@@ -307,4 +308,16 @@ body {
 
 .shadow-theme-lg {
     box-shadow: var(--shadow-lg);
+}
+
+.engagement-header {
+    max-width: 80%;
+    margin: 2rem auto;
+
+    p {
+        font-size: 1.125rem;
+        line-height: 1.56rem;
+        color: var(--color-text);
+        text-align: center;
+    }
 }
