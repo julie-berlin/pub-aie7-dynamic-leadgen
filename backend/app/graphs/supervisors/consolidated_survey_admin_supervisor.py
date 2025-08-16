@@ -79,6 +79,7 @@ ENGAGEMENT TACTICS:
 - Make it feel personal and conversational
 - NEVER suggest this is the "last step" or "final questions"
 - Always encourage completion with positive, forward-looking language
+- KEEP ALL ENGAGEMENT MESSAGES TO MAXIMUM 50 WORDS
 
 OUTPUT FORMAT:
 Return a structured markdown response with sections:
@@ -104,7 +105,7 @@ Confidence: [0.0-1.0]
 [Compelling H2 headline about this step]
 
 ### Message
-[Rich paragraph with company personality, services, and motivation to continue]
+[Rich paragraph with company personality, services, and motivation to continue - MAXIMUM 50 words]
 
 ## METADATA
 - Questions Selected: [count]
@@ -379,6 +380,7 @@ REQUIREMENTS:
    - Encourages completion with positive language
    - References the business background/goals appropriately
    - NEVER suggests this is the "last step" or ending soon
+   - KEEP TO MAXIMUM 50 WORDS
 7. Use {phrasing_tone} tone and {engagement_approach} engagement approach
 
 CRITICAL RULES: 
