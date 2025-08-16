@@ -56,9 +56,9 @@ export default function FormPage() {
   // Update page title with business name
   useEffect(() => {
     if (businessName) {
-      document.title = `${businessName} - Survey`;
+      document.title = `${businessName} - Hello!`;
     } else {
-      document.title = 'Survey';
+      document.title = 'Varyq';
     }
   }, [businessName]);
 

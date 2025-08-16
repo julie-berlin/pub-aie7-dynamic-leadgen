@@ -494,7 +494,10 @@ Provide the complete JSON response with selected, phrased, and engagement-enhanc
             # Extract engagement message
             message_match = re.search(r'### Message\s*\n(.*?)(?=\n##|$)', content, re.DOTALL | re.IGNORECASE)
             if message_match:
-                result["engagement_message"] = message_match.group(1).strip()
+                raw_message = message_match.group(1).strip()
+                # Clean up any accidental metadata that got included in the message
+                cleaned_message = self._clean_engagement_message(raw_message)
+                result["engagement_message"] = cleaned_message
             
             # Extract metadata
             metadata_match = re.search(r'## METADATA\s*\n(.*?)(?=##|$)', content, re.DOTALL | re.IGNORECASE)
@@ -529,6 +532,37 @@ Provide the complete JSON response with selected, phrased, and engagement-enhanc
                 "engagement_message": "Help us understand your needs better.",
                 "metadata": {"fallback": True}
             }
+    
+    def _clean_engagement_message(self, message: str) -> str:
+        """Clean engagement message by removing any accidental metadata."""
+        import re
+        
+        # Remove lines that look like metadata (- Key: value pattern)
+        lines = message.split('\n')
+        cleaned_lines = []
+        
+        for line in lines:
+            line = line.strip()
+            # Skip lines that match metadata patterns
+            if re.match(r'^\s*-\s*(Questions Selected|Risk Level|Approach|Total.*Steps):', line, re.IGNORECASE):
+                continue
+            # Skip empty lines at the end
+            if line:
+                cleaned_lines.append(line)
+        
+        # Join back and clean up
+        cleaned_message = '\n'.join(cleaned_lines).strip()
+        
+        # Remove any trailing metadata that might be at the end
+        # Look for patterns like "- Questions: X - Risk: Y - Approach: Z"
+        cleaned_message = re.sub(r'\s*-\s*(Questions Selected|Risk Level|Approach):\s*\w+(\s*-\s*(Questions Selected|Risk Level|Approach):\s*\w+)*\s*$', '', cleaned_message, flags=re.IGNORECASE)
+        
+        # Clean up any remaining metadata patterns
+        cleaned_message = re.sub(r'\s*Total\s+\w+\s+Steps:\s*\d+\s*', '', cleaned_message, flags=re.IGNORECASE)
+        cleaned_message = re.sub(r'\s*Risk\s+Level:\s*\w+\s*', '', cleaned_message, flags=re.IGNORECASE)
+        cleaned_message = re.sub(r'\s*Approach:\s*\w+\s*', '', cleaned_message, flags=re.IGNORECASE)
+        
+        return cleaned_message.strip()
     
     def _create_fallback_decision(self, available_questions: List[Dict], analysis: Dict) -> Dict[str, Any]:
         """Create fallback decision when LLM fails."""

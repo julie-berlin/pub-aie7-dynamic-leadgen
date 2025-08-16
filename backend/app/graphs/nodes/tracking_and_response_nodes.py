@@ -158,6 +158,16 @@ def initialize_session_with_tracking_node(state: Dict[str, Any]) -> Dict[str, An
         
         logger.info(f"Initialized session {session_id} with tracking")
         
+        # Check if this is a fresh initialization or continuing with existing state
+        existing_question_strategy = state.get('question_strategy', {})
+        existing_lead_intelligence = state.get('lead_intelligence', {})
+        
+        # Only preserve existing state if it has meaningful data
+        preserve_questions = bool(existing_question_strategy.get('asked_questions'))
+        preserve_responses = bool(existing_lead_intelligence.get('responses'))
+        
+        logger.info(f"🔥 INIT: preserve_questions={preserve_questions}, preserve_responses={preserve_responses}")
+        
         # Initialize all state sections
         return {
             'core': core_state,
@@ -169,20 +179,20 @@ def initialize_session_with_tracking_node(state: Dict[str, Any]) -> Dict[str, An
             },
             'question_strategy': {
                 'all_questions': [],  # Will be loaded
-                'asked_questions': [],
-                'current_questions': [],
-                'phrased_questions': [],
-                'question_strategy': {},
-                'selection_history': []
+                'asked_questions': existing_question_strategy.get('asked_questions', []) if preserve_questions else [],
+                'current_questions': existing_question_strategy.get('current_questions', []) if preserve_questions else [],
+                'phrased_questions': existing_question_strategy.get('phrased_questions', []) if preserve_questions else [],
+                'question_strategy': existing_question_strategy.get('question_strategy', {}),
+                'selection_history': existing_question_strategy.get('selection_history', []) if preserve_questions else []
             },
             'lead_intelligence': {
-                'responses': [],
-                'current_score': 0,
-                'score_history': [],
-                'lead_status': 'unknown',
-                'qualification_reasoning': [],
-                'risk_factors': [],
-                'positive_indicators': []
+                'responses': existing_lead_intelligence.get('responses', []) if preserve_responses else [],
+                'current_score': existing_lead_intelligence.get('current_score', 0),
+                'score_history': existing_lead_intelligence.get('score_history', []),
+                'lead_status': existing_lead_intelligence.get('lead_status', 'unknown'),
+                'qualification_reasoning': existing_lead_intelligence.get('qualification_reasoning', []),
+                'risk_factors': existing_lead_intelligence.get('risk_factors', []),
+                'positive_indicators': existing_lead_intelligence.get('positive_indicators', [])
             },
             'engagement': {
                 'abandonment_risk': 0.3,

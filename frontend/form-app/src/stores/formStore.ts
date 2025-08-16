@@ -114,8 +114,20 @@ export const useFormStore = create<FormStore>()(
 
           const response: SubmitResponseResponse = await apiClient.submitResponses(submitRequest);
 
-          // Update form state with new responses
-          const updatedResponses = { ...formState.responses };
+          // If we got new questions back, clear responses and only keep current step responses
+          // This prevents old answers from persisting when question IDs are reused
+          let updatedResponses: Record<string, any>;
+          
+          if (response.nextStep && response.nextStep.questions) {
+            // New questions received - start fresh with only current responses
+            updatedResponses = {};
+            console.log('New questions received, clearing old responses');
+          } else {
+            // No new questions, keep existing responses
+            updatedResponses = { ...formState.responses };
+          }
+
+          // Add the current submitted responses
           Object.entries(responses).forEach(([questionId, value]) => {
             updatedResponses[questionId] = {
               questionId,

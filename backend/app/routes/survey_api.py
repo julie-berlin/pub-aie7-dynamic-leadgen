@@ -211,24 +211,69 @@ async def submit_and_continue(
         if not db_session_data:
             return not_found_response("Session", session_id)
         
-        # Prepare state with full session context plus new responses
-        logger.info(f"🔥 API DEBUG: request.responses = {request.responses}")
-        state_update = {
-            'core': {
+        # Load latest session snapshot to get full state including question_strategy
+        session_snapshot = db.get_latest_session_snapshot(session_id)
+        
+        if session_snapshot:
+            # Restore full state from snapshot
+            logger.info(f"🔥 API DEBUG: Loaded session snapshot with state")
+            state_update = session_snapshot.get('full_state', {})
+            
+            # Update core data with latest from database
+            state_update['core'] = {
+                **state_update.get('core', {}),
                 'session_id': session_id,
-                'form_id': db_session_data.get('form_id'),  # Critical: include form_id
+                'form_id': db_session_data.get('form_id'),
                 'step': db_session_data.get('step', 0),
                 'client_id': db_session_data.get('client_id')
-            },
-            'pending_responses': request.responses
-        }
-        logger.info(f"🔥 API DEBUG: state_update = {state_update}")
+            }
+            
+            # Add new responses
+            state_update['pending_responses'] = request.responses
+        else:
+            # First time - create minimal state
+            logger.info(f"🔥 API DEBUG: No session snapshot found, creating new state")
+            state_update = {
+                'core': {
+                    'session_id': session_id,
+                    'form_id': db_session_data.get('form_id'),
+                    'step': db_session_data.get('step', 0),
+                    'client_id': db_session_data.get('client_id')
+                },
+                'question_strategy': {
+                    'asked_questions': [],
+                    'current_questions': [],
+                    'selection_history': []
+                },
+                'lead_intelligence': {
+                    'responses': [],
+                    'current_score': 0,
+                    'lead_status': 'unknown'
+                },
+                'pending_responses': request.responses
+            }
+        
+        logger.info(f"🔥 API DEBUG: state_update keys = {list(state_update.keys())}")
+        logger.info(f"🔥 API DEBUG: asked_questions = {state_update.get('question_strategy', {}).get('asked_questions', [])}")
         
         # Run the graph starting from response processing
         result = await intelligent_survey_graph.ainvoke(
             state_update,
             {"recursion_limit": 25}
         )
+        
+        # Save session snapshot for state persistence
+        try:
+            current_step = result.get('core', {}).get('step', 0)
+            db.save_session_snapshot(
+                session_id=session_id, 
+                full_state=result, 
+                step=current_step,
+                recovery_reason="after_step_processing"
+            )
+            logger.info(f"🔥 SNAPSHOT: Saved session snapshot for step {current_step}")
+        except Exception as e:
+            logger.warning(f"Failed to save session snapshot: {e}")
         
         # Check if survey is complete
         core = result.get('core', {})
