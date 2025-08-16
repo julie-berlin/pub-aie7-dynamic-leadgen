@@ -222,12 +222,21 @@ Confidence: [0.0-1.0]
             question_strategy = state.get('question_strategy', {})
             asked_ids = question_strategy.get('asked_questions', [])
             
-            logger.debug(f"Already asked question IDs: {asked_ids}")
+            logger.info(f"🔥 QUESTION TRACKING: Already asked question IDs: {asked_ids}")
+            logger.debug(f"Already asked question IDs types: {[type(id).__name__ for id in asked_ids]}")
             
             # Filter to available questions
-            available_questions = [q for q in all_questions if q.get('id') not in asked_ids]
+            # CRITICAL: Compare IDs as they are (can be integers or UUIDs)
+            available_questions = []
+            for q in all_questions:
+                q_id = q.get('id')
+                if q_id is not None:
+                    if q_id not in asked_ids:
+                        available_questions.append(q)
+                    else:
+                        logger.debug(f"🔥 FILTERING: Question ID {q_id} already asked, skipping")
             
-            logger.info(f"Loaded {len(available_questions)} available questions for form {form_id}")
+            logger.info(f"🔥 QUESTION TRACKING: Loaded {len(available_questions)} available questions for form {form_id} (filtered from {len(all_questions)} total, {len(asked_ids)} already asked)")
             return available_questions
             
         except Exception as e:
@@ -595,21 +604,37 @@ Provide the complete JSON response with selected, phrased, and engagement-enhanc
         }
     
     def _prepare_frontend_response(self, decision: Dict, state: SurveyState) -> Dict[str, Any]:
-        """Prepare the final response for frontend consumption."""
+        """Prepare the final response for frontend consumption.
+        
+        CRITICAL: This method MUST include question IDs in the response to prevent
+        questions from repeating. See FIX_DOCUMENTATION.md for details on the 
+        recurring question repetition bug and its fix.
+        """
         # Update state with selected questions
         question_strategy = state.get('question_strategy', {})
         asked_questions = question_strategy.get('asked_questions', [])
         
         # Add newly selected question IDs to asked list
+        # CRITICAL: IDs can be integers or UUIDs - keep them as is
         for q in decision["selected_questions"]:
-            if q.get("id") not in asked_questions:
-                asked_questions.append(q.get("id"))
+            q_id = q.get("id")
+            if q_id is not None:
+                if q_id not in asked_questions:
+                    asked_questions.append(q_id)
+                    logger.info(f"🔥 QUESTION TRACKING: Added question ID {q_id} to asked_questions, total now: {len(asked_questions)}")
+            else:
+                logger.error(f"🔥 ERROR: Question missing ID: {q}")
         
         # Format questions for frontend API client (using backend format that frontend transforms)
         # NOTE: Never expose scoring_rubric to frontend - that's sensitive business logic
+        # CRITICAL FIX: Include question ID for proper tracking
         frontend_questions = []
         for q in decision["selected_questions"]:
+            q_id = q.get("id")
+            if q_id is None:
+                logger.error(f"🔥 ERROR: Question missing ID: {q.get('question_text', 'unknown')}")
             frontend_questions.append({
+                "id": q_id,  # CRITICAL: Include ID for tracking
                 "question": q.get("question", q.get("question_text", "")),
                 "phrased_question": q.get("final_text", q.get("phrased_text", q.get("question", q.get("question_text", "")))),
                 "data_type": q.get("data_type", q.get("question_type", "text")),

@@ -134,7 +134,17 @@ class SupabaseClient:
     def get_form_questions(self, form_id: str) -> List[Dict[str, Any]]:
         """Get all questions for a form"""
         result = self.client.table("form_questions").select("*").eq("form_id", form_id).order("question_order").execute()
-        return result.data or []
+        questions = result.data or []
+        
+        # CRITICAL FIX: Map question_id to id for consistent internal usage
+        # The database stores question ID as 'question_id' but the code expects 'id'
+        # This prevents questions from repeating - see FIX_DOCUMENTATION.md
+        for q in questions:
+            if 'question_id' in q and 'id' not in q:
+                q['id'] = q['question_id']
+                logger.debug(f"🔥 QUESTION ID MAPPING: Mapped question_id {q['question_id']} to id field")
+        
+        return questions
     
     def get_client_by_form(self, form_id: str) -> Optional[Dict[str, Any]]:
         """Get client information associated with a form"""

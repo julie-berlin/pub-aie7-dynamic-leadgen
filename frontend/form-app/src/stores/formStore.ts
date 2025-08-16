@@ -104,8 +104,9 @@ export const useFormStore = create<FormStore>()(
 
         try {
           // Convert responses to the expected API format
+          // CRITICAL FIX: Don't parse as integer - question IDs can be UUIDs or numbers
           const apiResponses = Object.entries(responses).map(([questionId, value]) => ({
-            question_id: parseInt(questionId),
+            question_id: questionId,  // Keep as string (backend handles conversion)
             answer: value
           }));
 
