@@ -1,0 +1,108 @@
+# File Upload Configuration
+
+# Storage settings
+storage:
+  # Base directory for all uploads (relative to backend root)
+  base_directory: "uploads"
+  
+  # Subdirectories for different file types
+  subdirectories:
+    logos: "logos"
+    images: "images"
+    documents: "documents"
+    temp: "temp"
+
+# File size limits (in bytes)
+file_size_limits:
+  # Maximum file size for logos (5MB)
+  logo_max_size: 5242880
+  
+  # Maximum file size for general images (10MB)
+  image_max_size: 10485760
+  
+  # Maximum file size for documents (20MB)
+  document_max_size: 20971520
+
+# Image constraints
+image_constraints:
+  # Logo-specific constraints
+  logo:
+    max_width: 500
+    max_height: 200
+    min_width: 50
+    min_height: 20
+    recommended_aspect_ratio: 2.5  # width/height ratio
+  
+  # General image constraints
+  image:
+    max_width: 1920
+    max_height: 1080
+    min_width: 100
+    min_height: 100
+
+# Allowed file types
+allowed_types:
+  # Image types for logos and general images
+  images:
+    - "image/jpeg"
+    - "image/png" 
+    - "image/gif"
+    - "image/webp"
+    - "image/svg+xml"
+  
+  # Extensions mapped to MIME types
+  extensions:
+    ".jpg": "image/jpeg"
+    ".jpeg": "image/jpeg"
+    ".png": "image/png"
+    ".gif": "image/gif"
+    ".webp": "image/webp"
+    ".svg": "image/svg+xml"
+
+# Security settings
+security:
+  # Virus scanning (future implementation)
+  enable_virus_scan: false
+  
+  # Content type validation
+  strict_mime_validation: true
+  
+  # File content validation
+  validate_image_content: true
+  
+  # Maximum number of uploads per client per hour
+  rate_limit_per_hour: 20
+
+# Cleanup settings
+cleanup:
+  # Delete temporary files older than X hours
+  temp_file_retention_hours: 24
+  
+  # Delete orphaned files (not referenced in database) older than X days
+  orphaned_file_retention_days: 7
+  
+  # Enable automatic cleanup
+  enable_auto_cleanup: true
+
+# URL generation
+url_settings:
+  # Base URL for serving files
+  base_url: "/api/files"
+  
+  # Cache headers for static files
+  cache_max_age: 86400  # 24 hours
+  
+  # Enable CDN support (future)
+  enable_cdn: false
+  cdn_base_url: null
+
+# Logging
+logging:
+  # Log all upload attempts
+  log_uploads: true
+  
+  # Log file access attempts
+  log_file_access: true
+  
+  # Log cleanup operations
+  log_cleanup: true

@@ -8,7 +8,7 @@ This module provides API endpoints for:
 4. Team member invitation and role management
 """
 
-from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, HTTPException, Depends, status, UploadFile, File
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field, EmailStr, validator
 from typing import Dict, Any, List, Optional, Literal
@@ -20,6 +20,7 @@ import secrets
 import jwt
 
 from app.database import get_database_connection
+from app.utils.file_upload import validate_and_store_logo, remove_logo
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -601,3 +602,95 @@ async def remove_team_member(
     except Exception as e:
         logger.error(f"Failed to remove team member: {e}")
         raise HTTPException(status_code=500, detail="Failed to remove team member")
+
+# === LOGO UPLOAD ENDPOINTS ===
+
+@router.post("/upload/logo")
+async def upload_logo(
+    file: UploadFile = File(...),
+    current_user: AdminUserResponse = Depends(get_current_admin_user)
+):
+    """Upload a logo for the client."""
+    try:
+        # Validate file is provided
+        if not file:
+            raise HTTPException(status_code=400, detail="No file provided")
+        
+        # Process the logo upload
+        upload_result = await validate_and_store_logo(file, current_user.client_id)
+        
+        # Update the client_settings table with the new logo URL
+        conn = get_database_connection()
+        with conn.cursor() as cursor:
+            # Check if client_settings record exists
+            cursor.execute("""
+                SELECT id FROM client_settings WHERE client_id = %s
+            """, (current_user.client_id,))
+            
+            if cursor.fetchone():
+                # Update existing record
+                cursor.execute("""
+                    UPDATE client_settings 
+                    SET logo_url = %s, updated_at = NOW()
+                    WHERE client_id = %s
+                """, (upload_result['url'], current_user.client_id))
+            else:
+                # Create new record
+                cursor.execute("""
+                    INSERT INTO client_settings (id, client_id, logo_url)
+                    VALUES (%s, %s, %s)
+                """, (str(uuid.uuid4()), current_user.client_id, upload_result['url']))
+            
+            conn.commit()
+        
+        return {
+            "success": True,
+            "data": {
+                "logo_url": upload_result['url'],
+                "filename": upload_result['filename'],
+                "size": upload_result['size'],
+                "uploaded_at": upload_result['uploaded_at']
+            },
+            "message": "Logo uploaded successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to upload logo: {e}")
+        raise HTTPException(status_code=500, detail="Failed to upload logo")
+
+@router.delete("/upload/logo/{filename}")
+async def delete_logo(
+    filename: str,
+    current_user: AdminUserResponse = Depends(get_current_admin_user)
+):
+    """Delete a logo file."""
+    try:
+        # Delete the file
+        success = remove_logo(filename, current_user.client_id)
+        
+        if success:
+            # Update client_settings to remove logo_url
+            conn = get_database_connection()
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    UPDATE client_settings 
+                    SET logo_url = NULL, updated_at = NOW()
+                    WHERE client_id = %s
+                """, (current_user.client_id,))
+                conn.commit()
+            
+            return {
+                "success": True,
+                "data": {"filename": filename},
+                "message": "Logo deleted successfully"
+            }
+        else:
+            raise HTTPException(status_code=404, detail="Logo not found")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to delete logo: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete logo")

@@ -6,6 +6,9 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
     git \
+    libmagic1 \
+    libmagic-dev \
+    file \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv package manager

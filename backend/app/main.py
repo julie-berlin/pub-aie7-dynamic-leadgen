@@ -57,7 +57,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.session_store import RedisSessionStore
 
 # Import routes
-from app.routes import survey_api, health, theme_api, analytics_api, admin_api
+from app.routes import survey_api, health, theme_api, analytics_api, admin_api, files_api
 # Import new RESTful routes
 from app.routes import forms_api, clients_api
 
@@ -92,6 +92,10 @@ app = FastAPI(
         {
             "name": "admin",
             "description": "Admin authentication and user management endpoints"
+        },
+        {
+            "name": "files",
+            "description": "File upload and serving endpoints for logos and assets"
         },
         {
             "name": "health", 
@@ -149,6 +153,9 @@ app.include_router(clients_api.router, tags=["clients"])
 
 # Admin authentication routes
 app.include_router(admin_api.router, tags=["admin"])
+
+# File serving routes
+app.include_router(files_api.router, tags=["files"])
 
 app.include_router(health.router, tags=["health"])
 

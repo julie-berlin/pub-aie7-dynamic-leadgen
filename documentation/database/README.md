@@ -8,6 +8,8 @@ This directory contains all scripts and documentation needed to set up a complet
 ### Database Scripts
 - **`001_initial_schema.sql`** - Complete database schema with all tables, indexes, constraints, and helper functions
 - **`002_populate_example_data.sql`** - Populates 5 example businesses with clients, forms, and 50+ questions  
+- **`005_admin_support_schema.sql`** - Admin features including client_settings and client_themes tables
+- **`007_theme_customization_columns.sql`** - Adds primary_color, secondary_color, and font_family columns for easier theme management
 - **`001_rollback_schema.sql`** - Safe rollback script to remove all tables (use with caution)
 
 ### Documentation
@@ -47,7 +49,22 @@ Open your Supabase SQL Editor and run:
 \i 002_populate_example_data.sql
 ```
 
-### 3. Verify Setup
+### 3. Theme Customization Setup (Optional)
+For enhanced theme management with dedicated color and font columns:
+```sql
+-- Run this file to add theme customization columns
+\i 007_theme_customization_columns.sql
+```
+
+This migration adds:
+- `primary_color` column with hex color validation
+- `secondary_color` column with hex color validation  
+- `font_family` column for typography customization
+- Indexes for performance optimization
+- Helper functions and views for theme management
+- Automatic sync between dedicated columns and JSONB theme_config
+
+### 4. Verify Setup
 Run the test script:
 ```bash
 cd /path/to/project
