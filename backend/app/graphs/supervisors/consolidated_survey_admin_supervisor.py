@@ -421,7 +421,7 @@ Provide the complete JSON response with selected, phrased, and engagement-enhanc
             
             # Debug parsed questions
             for i, q in enumerate(decision_data.get('selected_questions', [])):
-                original_text = q.get('question_text', 'NO_ORIGINAL')
+                original_text = q.get('question', q.get('question_text', 'NO_ORIGINAL'))
                 final_text = q.get('final_text', 'NO_FINAL')
                 phrased_text = q.get('phrased_text', 'NO_PHRASED')
                 logger.info(f"🔥 Q{i+1}: orig='{original_text}', final='{final_text}', phrased='{phrased_text}'")
@@ -509,8 +509,8 @@ Provide the complete JSON response with selected, phrased, and engagement-enhanc
             if not result["selected_questions"] and available_questions:
                 result["selected_questions"] = available_questions[:min(2, len(available_questions))]
                 for q in result["selected_questions"]:
-                    q["phrased_text"] = q.get("question_text", "")
-                    q["final_text"] = q.get("question_text", "")
+                    q["phrased_text"] = q.get("question", q.get("question_text", ""))
+                    q["final_text"] = q.get("question", q.get("question_text", ""))
             
             logger.debug(f"Parsed {len(result['selected_questions'])} questions from markdown")
             return result
@@ -533,8 +533,8 @@ Provide the complete JSON response with selected, phrased, and engagement-enhanc
         selected = available_questions[:count]
         
         for q in selected:
-            q["phrased_text"] = q.get("question_text")
-            q["final_text"] = q.get("question_text")
+            q["phrased_text"] = q.get("question", q.get("question_text"))
+            q["final_text"] = q.get("question", q.get("question_text"))
         
         engagement_headline = "Let's learn more about you!"
         engagement_message = "Help us understand your needs so we can provide you with the best possible service."
@@ -572,9 +572,9 @@ Provide the complete JSON response with selected, phrased, and engagement-enhanc
         frontend_questions = []
         for q in decision["selected_questions"]:
             frontend_questions.append({
-                "question": q.get("question_text", ""),
-                "phrased_question": q.get("final_text", q.get("question_text", "")),
-                "data_type": q.get("question_type", "text"),
+                "question": q.get("question", q.get("question_text", "")),
+                "phrased_question": q.get("final_text", q.get("phrased_text", q.get("question", q.get("question_text", "")))),
+                "data_type": q.get("data_type", q.get("question_type", "text")),
                 "is_required": q.get("is_required", False),
                 "options": q.get("options"),
                 "description": q.get("description"),
