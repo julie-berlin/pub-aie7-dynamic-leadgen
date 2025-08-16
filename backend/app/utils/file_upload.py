@@ -39,8 +39,8 @@ ALLOWED_IMAGE_TYPES = {
 # Maximum image dimensions
 MAX_IMAGE_WIDTH = 1920
 MAX_IMAGE_HEIGHT = 1080
-MAX_LOGO_WIDTH = 500
-MAX_LOGO_HEIGHT = 200
+MAX_LOGO_WIDTH = 1000
+MAX_LOGO_HEIGHT = 1000
 
 class FileUploadError(Exception):
     """Custom exception for file upload errors"""
@@ -323,8 +323,12 @@ class FileUploadHandler:
             # Read file content
             file_content = await file.read()
             
-            # Validate file size
-            self.validator.validate_file_size(file, max_size)
+            # Validate file size using content
+            if len(file_content) > max_size:
+                raise FileUploadError(f"File size {len(file_content)} bytes exceeds maximum allowed size {max_size} bytes")
+            
+            if len(file_content) == 0:
+                raise FileUploadError("File is empty")
             
             # Validate file type
             mime_type = self.validator.validate_file_type(file_content, file.filename)

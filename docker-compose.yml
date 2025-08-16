@@ -62,14 +62,14 @@ services:
       context: ./frontend/form-app
       dockerfile: Dockerfile.dev  # Development Dockerfile
       args:
-        - REACT_APP_API_URL=http://localhost:8000
-        - REACT_APP_ENVIRONMENT=development
+        - VITE_API_URL=http://localhost:8000
+        - VITE_ENVIRONMENT=development
     image: dynamic-survey-frontend:dev
     container_name: survey-frontend-dev
 
     environment:
       - NODE_ENV=development
-      - REACT_APP_API_URL=http://backend:8000
+      - VITE_API_URL=http://localhost:8000
       - WATCHPACK_POLLING=true  # For file watching in Docker
 
     ports:
@@ -101,7 +101,7 @@ services:
 
     environment:
       - NODE_ENV=development
-      - VITE_API_URL=http://backend:8000
+      - VITE_API_URL=http://localhost:8000
       - WATCHPACK_POLLING=true  # For file watching in Docker
 
     ports:

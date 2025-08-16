@@ -68,9 +68,34 @@ async def start_session(
     Security: Session managed by fastapi-sessions with Redis backend.
     """
     try:
-        # Prepare initial state with tracking data
+        # Create session ID first, before calling LangGraph
+        import uuid
+        session_id = str(uuid.uuid4())
+        
+        # Create session data for HTTP session immediately
+        session_data = {
+            "session_id": session_id,
+            "form_id": request.form_id,
+            "client_id": request.client_id,
+            "created_at": datetime.now().isoformat(),
+            "utm_data": {
+                "utm_source": request.utm_source,
+                "utm_medium": request.utm_medium,
+                "utm_campaign": request.utm_campaign,
+                "utm_content": request.utm_content,
+                "utm_term": request.utm_term,
+                "landing_page": request.landing_page
+            }
+        }
+        
+        # Create HTTP session using Starlette session manager
+        session_uuid = await create_survey_session(http_request, session_data)
+        logger.info(f"Created secure session: {session_uuid}")
+        
+        # Prepare initial state with tracking data, including pre-created session ID
         initial_state = {
             'metadata': {
+                'session_id': session_id,  # Pass the pre-created session ID
                 'form_id': request.form_id,
                 'client_id': request.client_id,
                 'utm_source': request.utm_source,
@@ -94,29 +119,6 @@ async def start_session(
         # Extract frontend response
         frontend_data = result.get('frontend_response', {})
         logger.debug(f"Frontend data: {frontend_data}")
-        session_id = frontend_data.get('session_id')
-        logger.debug(f"Extracted session_id: {session_id}")
-        
-        # Create session data for fastapi-sessions
-        if session_id:
-            session_data = {
-                "session_id": session_id,
-                "form_id": request.form_id,
-                "client_id": request.client_id,
-                "created_at": datetime.now().isoformat(),
-                "utm_data": {
-                    "utm_source": request.utm_source,
-                    "utm_medium": request.utm_medium,
-                    "utm_campaign": request.utm_campaign,
-                    "utm_content": request.utm_content,
-                    "utm_term": request.utm_term,
-                    "landing_page": request.landing_page
-                }
-            }
-            
-            # Create session using Starlette session manager
-            session_uuid = await create_survey_session(http_request, session_data)
-            logger.info(f"Created secure session: {session_uuid}")
             
         # Extract form details from graph response
         form_details = result.get('form_details', {})
@@ -127,22 +129,24 @@ async def start_session(
             
         logger.debug(f"Extracted form_details: {form_details}")
         
-        # Load business name from client_id (server-side only)
+        # Load business name and logo from client_id (server-side only)
         business_name = None
+        logo_url = None
         client_id = form_details.get('client_id')
-        logger.info(f"🏢 Loading business name for client_id: {client_id}")
+        logger.info(f"🏢 Loading business info for client_id: {client_id}")
         if client_id:
             try:
                 from ..database import db
-                client_data = db.client.table('clients').select('business_name').eq('id', client_id).execute()
+                client_data = db.client.table('clients').select('business_name', 'company_logo_url').eq('id', client_id).execute()
                 logger.info(f"🏢 Client query result: {client_data.data}")
                 if client_data.data and len(client_data.data) > 0:
                     business_name = client_data.data[0].get('business_name')
-                    logger.info(f"🏢 Successfully loaded business name: {business_name}")
+                    logo_url = client_data.data[0].get('company_logo_url')
+                    logger.info(f"🏢 Successfully loaded business name: {business_name}, logo_url: {logo_url}")
                 else:
                     logger.warning(f"🏢 No client data found for client_id: {client_id}")
             except Exception as e:
-                logger.error(f"🏢 Failed to load business name for client {client_id}: {e}")
+                logger.error(f"🏢 Failed to load business info for client {client_id}: {e}")
         else:
             logger.warning(f"🏢 No client_id found in form_details: {form_details}")
         
@@ -154,6 +158,7 @@ async def start_session(
                     "title": form_details.get('title', 'Survey'),
                     "description": form_details.get('description'),
                     "businessName": business_name,
+                    "logoUrl": logo_url,
                     "theme": frontend_data.get('theme')
                 },
                 "step": {

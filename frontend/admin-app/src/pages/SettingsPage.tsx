@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAdminStore } from '../stores/adminStore';
 import { API_ENDPOINTS } from '../config/api';
+import LogoUpload from '../components/LogoUpload';
 
 interface CompanySettings {
   name: string;
@@ -10,6 +11,7 @@ interface CompanySettings {
   website?: string;
   phone?: string;
   address?: string;
+  logoUrl?: string;
 }
 
 export default function SettingsPage() {
@@ -23,7 +25,8 @@ export default function SettingsPage() {
     description: '',
     website: '',
     phone: '',
-    address: ''
+    address: '',
+    logoUrl: ''
   });
   const [originalSettings, setOriginalSettings] = useState<CompanySettings | null>(null);
 
@@ -51,7 +54,8 @@ export default function SettingsPage() {
           description: data.background || '',
           website: data.website || '',
           phone: data.phone || '',
-          address: data.address || ''
+          address: data.address || '',
+          logoUrl: data.logo_url || ''
         };
         setSettings(clientSettings);
         setOriginalSettings(clientSettings);
@@ -78,7 +82,8 @@ export default function SettingsPage() {
           business_description: settings.description,
           website_url: settings.website,
           contact_phone: settings.phone,
-          business_address: settings.address
+          business_address: settings.address,
+          logo_url: settings.logoUrl
         })
       });
 
@@ -91,7 +96,8 @@ export default function SettingsPage() {
           description: data.background || '',
           website: data.website || '',
           phone: data.phone || '',
-          address: data.address || ''
+          address: data.address || '',
+          logoUrl: data.logo_url || ''
         };
         setOriginalSettings(updatedSettings);
         setSettings(updatedSettings);
@@ -110,6 +116,10 @@ export default function SettingsPage() {
     if (originalSettings) {
       setSettings({ ...originalSettings });
     }
+  };
+
+  const handleLogoChange = (logoUrl: string | null) => {
+    setSettings(prev => ({ ...prev, logoUrl: logoUrl || '' }));
   };
 
   if (loading) {
@@ -264,6 +274,21 @@ export default function SettingsPage() {
               </button>
             </div>
           </div>
+        </div>
+      </div>
+
+      <div className="admin-card">
+        <div className="admin-card-header">
+          <h3 className="text-lg font-medium text-slate-900">Brand Assets</h3>
+          <p className="text-sm text-slate-500">Upload your company logo to personalize your forms and surveys.</p>
+        </div>
+        
+        <div className="admin-card-body">
+          <LogoUpload
+            currentLogoUrl={settings.logoUrl}
+            onLogoChange={handleLogoChange}
+            disabled={saving}
+          />
         </div>
       </div>
 

@@ -1,8 +1,10 @@
+import SimpleLayout from '../components/SimpleLayout';
 
 export default function NotFoundPage() {
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="form-container max-w-md w-full p-8 text-center">
+    <SimpleLayout>
+      <div className="flex items-center justify-center min-h-96">
+        <div className="max-w-md text-center">
         <div className="text-8xl font-bold text-text-muted mb-4">
           404
         </div>
@@ -27,7 +29,8 @@ export default function NotFoundPage() {
         <div className="mt-8 text-sm text-text-muted">
           If you believe this is an error, please check the URL or contact support.
         </div>
+        </div>
       </div>
-    </div>
+    </SimpleLayout>
   );
 }

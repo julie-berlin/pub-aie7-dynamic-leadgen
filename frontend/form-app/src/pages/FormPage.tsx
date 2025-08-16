@@ -23,8 +23,9 @@ export default function FormPage() {
     initializeForm
   } = useFormStore();
 
-  // Business name from form data
+  // Business name and logo from form data
   const businessName = currentForm?.businessName;
+  const logoUrl = currentForm?.logoUrl;
   const { loadTheme } = useThemeStore();
 
   useEffect(() => {
@@ -97,7 +98,7 @@ export default function FormPage() {
   return (
     <PageLayout 
       businessName={businessName}
-      // TODO: Add logoUrl prop when logo upload is implemented
+      logoUrl={logoUrl}
     >
       {/* Engagement Content */}
       <EngagementHeader 

@@ -1,4 +1,5 @@
 import { useLocation, useNavigate } from 'react-router-dom';
+import SimpleLayout from '../components/SimpleLayout';
 
 export default function ErrorPage() {
   const location = useLocation();
@@ -8,35 +9,9 @@ export default function ErrorPage() {
   const message = location.state?.message || 'Please try again or contact support if the problem persists.';
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ backgroundColor: 'var(--color-background-light)' }}>
-      {/* Header with Logo */}
-      <header className="w-full">
-        <div className="container mx-auto px-6 py-4 max-w-6xl">
-          <div className="flex items-center justify-center">
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-                <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-xl font-bold" style={{ color: 'var(--color-text)' }}>
-                  Varyq
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Error Content */}
-      <main className="flex-1 flex items-center justify-center py-8" style={{ padding: 'var(--spacing-page)' }}>
-        <div className="container mx-auto max-w-md">
-          <div className="rounded-2xl text-center" style={{ 
-            backgroundColor: 'var(--color-background)', 
-            padding: 'var(--spacing-page)',
-            borderRadius: 'var(--border-radius-lg)'
-          }}>
+    <SimpleLayout>
+      <div className="flex items-center justify-center min-h-96">
+        <div className="max-w-md text-center">
             {/* Error Icon */}
             <div 
               className="w-20 h-20 mx-auto mb-8 rounded-full flex items-center justify-center"
@@ -107,18 +82,8 @@ export default function ErrorPage() {
                 {error}
               </div>
             </details>
-          </div>
         </div>
-      </main>
-
-      {/* Footer */}
-      <footer className="w-full py-4 text-center" style={{ backgroundColor: 'var(--color-background-light)' }}>
-        <div className="container mx-auto">
-          <span className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
-            Varyq - Intelligent Leads
-          </span>
-        </div>
-      </footer>
-    </div>
+      </div>
+    </SimpleLayout>
   );
 }

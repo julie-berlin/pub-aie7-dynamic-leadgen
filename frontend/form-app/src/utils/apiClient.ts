@@ -39,13 +39,15 @@ interface BackendStartSessionResponse {
     title: string;
     description?: string;
     businessName?: string;
+    logoUrl?: string;
     theme?: ThemeConfig;
   };
   step: BackendFormStep;
 }
 
 // API configuration
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+// In development, use relative URLs to go through Vite proxy
+const API_BASE_URL = import.meta.env.PROD ? (import.meta.env.VITE_API_URL || 'http://localhost:8000') : '';
 
 class APIClient {
   private baseUrl: string;
@@ -215,6 +217,7 @@ class APIClient {
         title: response.form.title,
         description: response.form.description,
         businessName: response.form.businessName,
+        logoUrl: response.form.logoUrl,
         theme: response.form.theme
       },
       step: this.transformFormStep(response.step)
@@ -246,28 +249,24 @@ class APIClient {
   }
 
   /**
-   * Get a specific form step
+   * Get current form step (not implemented in backend yet)
+   * TODO: Backend should provide a GET /api/survey/step endpoint
    */
-  async getStep(sessionId: string, step: number): Promise<FormStep> {
-    return this.request<FormStep>(`/api/survey/step/${sessionId}/${step}`, {
-      method: 'GET',
-    });
+  async getCurrentStep(): Promise<FormStep> {
+    throw new Error('getCurrentStep not implemented - backend should provide GET /api/survey/step');
   }
 
   /**
-   * Save progress for session recovery
+   * Save progress for session recovery using session cookie
    */
-  async saveProgress(sessionId: string, data: {
+  async saveProgress(data: {
     responses: Record<string, any>;
     currentStep: number;
     lastUpdated: string;
   }): Promise<void> {
     await this.request<void>('/api/survey/save-progress', {
       method: 'POST',
-      body: JSON.stringify({
-        session_id: sessionId,
-        ...data
-      }),
+      body: JSON.stringify(data),
     });
   }
 
@@ -317,25 +316,25 @@ class APIClient {
   }
 
   /**
-   * Resume session from recovery data
+   * Resume session from recovery data using session cookie
    */
-  async resumeSession(sessionId: string): Promise<StartSessionResponse> {
-    return this.request<StartSessionResponse>(`/api/survey/resume/${sessionId}`, {
+  async resumeSession(): Promise<StartSessionResponse> {
+    return this.request<StartSessionResponse>('/api/survey/resume', {
       method: 'POST',
     });
   }
 
   /**
-   * Get form completion data
+   * Get form completion data using session cookie
    */
-  async getCompletionData(sessionId: string): Promise<{
+  async getCompletionData(): Promise<{
     leadStatus: string;
     score: number;
     message: string;
     redirectUrl?: string;
     nextSteps?: string[];
   }> {
-    return this.request(`/api/survey/completion/${sessionId}`, {
+    return this.request('/api/survey/completion', {
       method: 'GET',
     });
   }

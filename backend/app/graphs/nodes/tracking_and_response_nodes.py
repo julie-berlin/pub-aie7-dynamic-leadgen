@@ -40,9 +40,16 @@ def initialize_session_with_tracking_node(state: Dict[str, Any]) -> Dict[str, An
             # This is likely an initial API call, create proper state
             metadata = state.get('metadata', {})
             
+            # Use session ID from metadata if provided, otherwise create new one
+            session_id = metadata.get('session_id')
+            if not session_id:
+                import uuid
+                session_id = str(uuid.uuid4())
+                logger.warning(f"No session_id provided in metadata for initial state, created new one: {session_id}")
+                
             # Create validated initial state
             survey_state = create_initial_state(
-                session_id=f"session_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                session_id=session_id,
                 form_id=metadata.get('form_id', ''),
                 client_id=metadata.get('client_id'),
                 utm_data={
@@ -98,9 +105,18 @@ def initialize_session_with_tracking_node(state: Dict[str, Any]) -> Dict[str, An
             # Note: session_started removed - not in tracking_data schema, use created_at instead
         }
         
-        # Create session ID
-        import uuid
-        session_id = str(uuid.uuid4())
+        # Use session ID that was already extracted from core data or metadata
+        if not session_id:
+            # Fall back to metadata if session_id wasn't found in core data
+            session_id = metadata.get('session_id')
+            if not session_id:
+                import uuid
+                session_id = str(uuid.uuid4())
+                logger.warning(f"No session_id found in core data or metadata, created new one: {session_id}")
+            else:
+                logger.info(f"Using session_id from metadata: {session_id}")
+        else:
+            logger.info(f"Using session_id from core data: {session_id}")
         
         # Validate form exists in database
         if not form_id:

@@ -43,13 +43,13 @@ export const useFormStore = create<FormStore>()(
             }
           });
 
-          // Generate a new session ID for frontend state (backend manages real session via cookies)
-          const frontendSessionId = `frontend_${Date.now()}`;
+          // Note: Backend manages session via HTTP-only cookies, no frontend session ID needed
+          // Frontend state tracks progress independently of backend session management
           
           const newFormState: FormState = {
             formId,
             clientId,
-            sessionId: frontendSessionId,
+            sessionId: '', // Backend session managed via HTTP-only cookies
             currentStep: response.step.stepNumber,
             totalSteps: response.step.totalSteps,
             responses: existingState?.responses || {},
@@ -65,6 +65,7 @@ export const useFormStore = create<FormStore>()(
               title: response.form.title,
               description: response.form.description,
               businessName: response.form.businessName,
+              logoUrl: response.form.logoUrl,
               questions: [], // Will be populated from steps
               theme: response.form.theme,
               settings: {
@@ -152,9 +153,9 @@ export const useFormStore = create<FormStore>()(
 
           // If form is complete, handle completion
           if (response.isComplete && response.completionData) {
-            // Store completion data for the completion page
+            // Store completion data for the completion page (using form ID since session is cookie-managed)
             localStorage.setItem(
-              `completion_${formState.sessionId}`, 
+              `completion_${formState.formId}_${Date.now()}`, 
               JSON.stringify(response.completionData)
             );
           }
@@ -193,35 +194,9 @@ export const useFormStore = create<FormStore>()(
       },
 
       goToStep: async (step: number) => {
-        const { formState } = get();
-        
-        if (!formState) {
-          set({ error: 'No active form session' });
-          return;
-        }
-
-        set({ loading: true, error: null });
-
-        try {
-          const response = await apiClient.getStep(formState.sessionId, step);
-          
-          set({
-            currentStep: response,
-            formState: {
-              ...formState,
-              currentStep: step,
-              lastUpdated: new Date()
-            },
-            loading: false
-          });
-
-        } catch (error) {
-          console.error('Failed to navigate to step:', error);
-          set({ 
-            error: error instanceof Error ? error.message : 'Failed to navigate',
-            loading: false 
-          });
-        }
+        // TODO: Implement step navigation when backend supports it
+        console.warn('Step navigation not yet implemented');
+        set({ error: 'Step navigation not yet supported' });
       },
 
       updateTheme: (theme: ThemeConfig) => {
@@ -253,7 +228,7 @@ export const useFormStore = create<FormStore>()(
         if (!formState) return;
 
         try {
-          await apiClient.saveProgress(formState.sessionId, {
+          await apiClient.saveProgress({
             responses: formState.responses,
             currentStep: formState.currentStep,
             lastUpdated: formState.lastUpdated.toISOString()
