@@ -258,6 +258,7 @@ async def submit_and_continue(
             # Restore full state from snapshot
             logger.info(f"🔥 API DEBUG: Loaded session snapshot with state")
             state_update = session_snapshot.get('full_state', {})
+            logger.info(f"🔥 SNAPSHOT LOADED: asked_questions = {state_update.get('question_strategy', {}).get('asked_questions', [])}")
             
             # Update core data with latest from database
             state_update['core'] = {
@@ -306,15 +307,42 @@ async def submit_and_continue(
         # Save session snapshot for state persistence
         try:
             current_step = result.get('core', {}).get('step', 0)
+            
+            # Debug: Check what's in the result before creating snapshot
+            result_asked_questions = result.get('question_strategy', {}).get('asked_questions', [])
+            logger.info(f"🔥 RESULT DEBUG: asked_questions in result = {result_asked_questions}")
+            
+            # Create JSON-serializable snapshot of critical state
+            snapshot_state = {
+                'core': result.get('core', {}),
+                'question_strategy': {
+                    'asked_questions': result.get('question_strategy', {}).get('asked_questions', []),
+                    'current_questions': result.get('question_strategy', {}).get('current_questions', []),
+                    'selection_history': result.get('question_strategy', {}).get('selection_history', [])
+                },
+                'lead_intelligence': {
+                    'responses': result.get('lead_intelligence', {}).get('responses', []),
+                    'current_score': result.get('lead_intelligence', {}).get('current_score', 0),
+                    'lead_status': result.get('lead_intelligence', {}).get('lead_status', 'unknown')
+                }
+            }
+            
+            # Convert any remaining non-serializable objects to strings
+            import json
+            snapshot_json = json.dumps(snapshot_state, default=str)  # Test serialization
+            snapshot_state = json.loads(snapshot_json)  # Parse back to ensure clean dict
+            
             db.save_session_snapshot(
                 session_id=session_id, 
-                full_state=result, 
+                full_state=snapshot_state, 
                 step=current_step,
                 recovery_reason="after_step_processing"
             )
-            logger.info(f"🔥 SNAPSHOT: Saved session snapshot for step {current_step}")
+            logger.info(f"🔥 SNAPSHOT: Saved session snapshot for step {current_step} with {len(snapshot_state.get('question_strategy', {}).get('asked_questions', []))} asked questions")
         except Exception as e:
-            logger.warning(f"Failed to save session snapshot: {e}")
+            logger.error(f"Failed to save session snapshot: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
         
         # Check if survey is complete
         core = result.get('core', {})

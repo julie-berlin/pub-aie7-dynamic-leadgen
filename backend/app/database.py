@@ -328,6 +328,54 @@ class SupabaseClient:
         result = query.execute()
         return result.data or []
     
+    # === Question Tracking Management ===
+    
+    def get_asked_questions(self, session_id: str) -> List[int]:
+        """Get list of question_ids already asked for this session"""
+        try:
+            # Simple and reliable: get all questions that have responses (including placeholders)
+            result = self.client.table("responses").select("question_id").eq("session_id", session_id).execute()
+            asked_questions = [r["question_id"] for r in result.data] if result.data else []
+            return asked_questions
+        except Exception as e:
+            logger.error(f"Error getting asked questions for session {session_id}: {e}")
+            return []
+    
+    def mark_questions_asked(self, session_id: str, question_ids: List[int], questions_data: List[Dict] = None) -> bool:
+        """Mark questions as asked by creating entries in responses table"""
+        try:
+            for q_id in question_ids:
+                # Check if already exists
+                existing = self.client.table("responses").select("id").eq("session_id", session_id).eq("question_id", q_id).execute()
+                if existing.data:
+                    continue  # Already marked
+                
+                # Find question text from questions_data if provided
+                question_text = f"Question {q_id}"  # Default
+                if questions_data:
+                    for q in questions_data:
+                        if q.get('question_id') == q_id:
+                            question_text = q.get('question', q.get('question_text', f"Question {q_id}"))
+                            break
+                
+                # Create placeholder response to mark as asked
+                placeholder = {
+                    "session_id": session_id,
+                    "question_id": q_id,
+                    "question_text": question_text,
+                    "answer": "ASKED_PLACEHOLDER",  # Placeholder to mark as asked
+                    "timestamp": "now()",
+                    "step": 0
+                }
+                
+                self.client.table("responses").insert(placeholder).execute()
+                logger.info(f"DATABASE: Marked question {q_id} as asked with placeholder response")
+            
+            return True
+        except Exception as e:
+            logger.error(f"Error marking questions as asked for session {session_id}: {e}")
+            return False
+    
     # === Lead Outcome Management ===
     
     def create_lead_outcome(self, outcome_data: Dict[str, Any]) -> Dict[str, Any]:

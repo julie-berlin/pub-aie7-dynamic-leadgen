@@ -44,7 +44,7 @@ def should_continue_survey(state: SurveyGraphState) -> str:
         asked_questions = question_strategy.get('asked_questions', [])
         current_questions = question_strategy.get('current_questions', [])
         
-        available_questions = [q for q in all_questions if q['id'] not in asked_questions]
+        available_questions = [q for q in all_questions if q.get('question_id', q.get('id')) not in asked_questions]
         
         lead_status = lead_intelligence.get('lead_status', 'unknown')
         abandonment_status = engagement.get('abandonment_status', 'active')

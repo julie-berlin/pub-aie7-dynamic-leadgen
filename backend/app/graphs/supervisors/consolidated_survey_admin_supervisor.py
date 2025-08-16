@@ -42,75 +42,42 @@ class ConsolidatedSurveyAdminSupervisor(SupervisorAgent):
         )
     
     def get_system_prompt(self) -> str:
-        """Comprehensive system prompt for all survey administration tasks."""
-        return """You are an advanced Survey Administration AI that handles all aspects of intelligent survey flow.
+        """Simple system prompt for the 3 core LLM responsibilities."""
+        return """You are a Survey Administration AI with exactly 3 responsibilities:
 
-Your integrated responsibilities include:
-1. STRATEGIC DECISIONS: Analyze responses and decide survey continuation
-2. QUESTION SELECTION: Choose optimal 1-3 questions from available pool
-3. QUESTION PHRASING: Rewrite questions for better engagement
-4. ENGAGEMENT MESSAGING: Add motivational elements to prevent abandonment
-5. FRONTEND PREPARATION: Format everything for user presentation
+1. QUESTION SELECTION: Choose 1-4 questions from the available pool
+   - Consider conversation context and user responses
+   - Vary count: 1 for sensitive topics, 2-3 standard, 4 for quick gathering
+   - Never repeat already-asked questions
+   - Early steps: 1-2 questions to build trust
+   - Later steps: 3-4 questions when momentum established
 
-SELECTION CRITERIA:
-- Never repeat already-asked questions
-- Follow business rules and requirements
-- Maintain logical conversation flow
-- Balance information gain with user experience
-- Respect required questions but time them well
-- CRITICAL: Each question must ask for EXACTLY ONE piece of information only
-- NEVER combine multiple data points in a single question (e.g., "name and breed")
+2. QUESTION REPHRASING: Make questions engaging and personal
+   - Use user's name if known
+   - Reference previous responses when relevant
+   - Make conversational and natural
+   - Each question asks for exactly ONE piece of information
 
-PHRASING GUIDELINES:
-- Make questions conversational and natural
-- Use "you" language to be personal
-- Show why each question matters
-- Remove jargon and technical terms
-- CRITICAL: If a question asks for multiple pieces of information, split it into separate questions
-- Each input field should capture exactly one data point
+3. ENGAGEMENT MESSAGING: Business context + completion encouragement
+   - Include specific business services/benefits
+   - Show company personality
+   - Encourage completion (never suggest ending)
+   - Keep message under 50 words
 
-ENGAGEMENT TACTICS:
-- Show progress indicators when appropriate
-- Add value reinforcement messages  
-- Provide encouragement for at-risk users
-- Create urgency only when abandonment risk is high
-- Include company personality and service details
-- Reference specific products/services that benefit the user
-- Make it feel personal and conversational
-- NEVER suggest this is the "last step" or "final questions"
-- Always encourage completion with positive, forward-looking language
-- KEEP ALL ENGAGEMENT MESSAGES TO MAXIMUM 50 WORDS
+OUTPUT FORMAT (exactly this structure):
+SELECTED: [comma-separated question numbers]
+QUESTION_[number]: [rephrased question text]
+QUESTION_[number]: [rephrased question text]
+HEADLINE: [engaging headline]
+MESSAGE: [business context + encouragement, under 50 words]
 
-OUTPUT FORMAT:
-Return a structured markdown response with sections:
-
-## DECISION
-Action: continue
-Reasoning: [strategic explanation]
-Confidence: [0.0-1.0]
-
-## SELECTED QUESTIONS
-### Question 1: [number]
-- Original: [original text]
-- Phrased: [engaging rewritten version]
-- Required: [true/false]
-
-### Question 2: [number]
-- Original: [original text] 
-- Phrased: [engaging rewritten version]
-- Required: [true/false]
-
-## ENGAGEMENT
-### Headline
-[Compelling H2 headline about this step]
-
-### Message
-[Rich paragraph with company personality, services, and motivation to continue - MAXIMUM 50 words]
-
-## METADATA
-- Questions Selected: [count]
-- Risk Level: [low/medium/high]
-- Approach: [motivational/casual/urgent]"""
+Example:
+SELECTED: 2,7,9
+QUESTION_2: Hi Sarah, what's your budget range for this project?
+QUESTION_7: How soon are you looking to get started?
+QUESTION_9: What's your biggest concern about choosing a service provider?
+HEADLINE: Let's find the perfect solution for you!
+MESSAGE: At Pawsome Dog Walking, we've helped over 500 pet owners. Tell us more so we can create a custom plan that fits your needs perfectly."""
     
     def process_survey_step(self, state: SurveyState) -> Dict[str, Any]:
         """Main entry point - processes entire survey administration step."""
@@ -218,25 +185,25 @@ Confidence: [0.0-1.0]
             
             logger.debug(f"Loaded {len(all_questions) if all_questions else 0} total questions")
             
-            # Get already asked questions
-            question_strategy = state.get('question_strategy', {})
-            asked_ids = question_strategy.get('asked_questions', [])
+            # Get already asked questions from database (reliable source of truth)
+            from ...database import db
+            session_id = state.get('core', {}).get('session_id')
+            asked_ids = db.get_asked_questions(session_id) if session_id else []
             
-            logger.info(f"🔥 QUESTION TRACKING: Already asked question IDs: {asked_ids}")
+            logger.info(f"🔥 DATABASE TRACKING: Already asked question IDs from DB: {asked_ids}")
             logger.debug(f"Already asked question IDs types: {[type(id).__name__ for id in asked_ids]}")
             
-            # Filter to available questions
-            # CRITICAL: Compare IDs as they are (can be integers or UUIDs)
+            # Filter to available questions using question_id (not database id)
             available_questions = []
             for q in all_questions:
-                q_id = q.get('id')
-                if q_id is not None:
-                    if q_id not in asked_ids:
+                question_id = q.get('question_id')
+                if question_id is not None:
+                    if question_id not in asked_ids:
                         available_questions.append(q)
                     else:
-                        logger.debug(f"🔥 FILTERING: Question ID {q_id} already asked, skipping")
+                        logger.debug(f"🔥 FILTERING: Question ID {question_id} already asked, skipping")
             
-            logger.info(f"🔥 QUESTION TRACKING: Loaded {len(available_questions)} available questions for form {form_id} (filtered from {len(all_questions)} total, {len(asked_ids)} already asked)")
+            logger.info(f"🔥 DATABASE TRACKING: Loaded {len(available_questions)} available questions for form {form_id} (filtered from {len(all_questions)} total, {len(asked_ids)} already asked)")
             return available_questions
             
         except Exception as e:
@@ -330,16 +297,18 @@ Confidence: [0.0-1.0]
             business_name = client_info.get('business_name', 'our business')
             industry = client_info.get('industry', 'service business')
             
-            # Create numbered question list for LLM
+            # Create numbered question list for LLM using original question_id as the number
             numbered_questions = []
-            for i, q in enumerate(available_questions[:15], 1):  # Limit to 15 for context
-                numbered_questions.append({
-                    "number": i,
-                    "question_text": q.get("question_text", ""),
-                    "question_type": q.get("question_type", ""),
-                    "is_required": q.get("is_required", False),
-                    "category": q.get("category", "")
-                })
+            for q in available_questions[:15]:  # Limit to 15 for context
+                question_id = q.get("question_id")
+                if question_id is not None:
+                    numbered_questions.append({
+                        "number": question_id,  # Use original question_id as number
+                        "question_text": q.get("question_text", ""),
+                        "question_type": q.get("question_type", ""),
+                        "is_required": q.get("is_required", False),
+                        "category": q.get("category", "")
+                    })
             
             # Determine recommended approach based on analysis
             if analysis["risk_level"] == "high":
@@ -355,50 +324,51 @@ Confidence: [0.0-1.0]
                 engagement_approach = "casual"
                 phrasing_tone = "conversational"
             
+            # Extract user information from responses for personalization
+            user_name = None
+            user_info = {}
+            for resp in responses:
+                answer = resp.get('answer', '').strip()
+                question_text = resp.get('question_text', '').lower()
+                
+                # Look for name in responses
+                if 'name' in question_text and answer and len(answer.split()) <= 3:
+                    user_name = answer.split()[0]  # First name only
+                
+                # Collect other user info for context
+                if answer and answer != "ASKED_PLACEHOLDER":
+                    user_info[question_text] = answer
+            
             # Get detailed client info for engagement
             client_data = client_info.get('client', {}) if client_info else {}
             business_background = client_data.get('background', '')
             business_goals = client_data.get('goals', '')
             target_audience = client_data.get('target_audience', '')
             
-            user_prompt = f"""Process this survey step comprehensively:
+            user_prompt = f"""Select and rephrase questions for this survey step:
 
-BUSINESS CONTEXT:
-- Business: {business_name}
-- Industry: {industry}
-- Background: {business_background[:200]}...
-- Business Goals: {business_goals[:200]}...
-- Target Audience: {target_audience[:200]}...
-- Questions asked so far: {analysis['questions_asked']}
-- User engagement risk: {analysis['risk_level']}
-- Progress: {analysis['progress_percentage']:.0f}%
+BUSINESS: {business_name} ({industry})
+- Background: {business_background[:150]}
+- Goals: {business_goals[:150]}
+- Target: {target_audience[:150]}
 
-RECENT RESPONSES (last 3):
-{json.dumps(responses[-3:] if responses else [], indent=2)}
+USER CONTEXT:
+- Name: {user_name or 'not provided yet'}
+- Questions answered: {analysis['questions_asked']}
+- Engagement risk: {analysis['risk_level']}
+- Recent responses: {json.dumps(responses[-2:] if responses else [], indent=1)}
 
-AVAILABLE QUESTIONS (numbered):
-{json.dumps(numbered_questions, indent=2)}
+AVAILABLE QUESTIONS:
+{chr(10).join([f"{q['number']}. {q['question_text']}" for q in numbered_questions])}
 
-REQUIREMENTS:
-1. SELECT {recommended_count} questions that best advance the conversation
-2. ENSURE each question asks for EXACTLY ONE piece of information only
-3. REPHRASE them to be engaging and personal for {business_name}
-4. SPLIT any compound questions into separate single-purpose questions
-5. CREATE an engaging H2 headline that relates to this step and {business_name}'s services
-6. WRITE a compelling paragraph that:
-   - Mentions specific services/benefits from {business_name}
-   - Shows personality and builds trust
-   - Encourages completion with positive language
-   - References the business background/goals appropriately
-   - NEVER suggests this is the "last step" or ending soon
-   - KEEP TO MAXIMUM 50 WORDS
-7. Use {phrasing_tone} tone and {engagement_approach} engagement approach
+INSTRUCTIONS:
+1. Select 1-4 questions (vary the count - don't always pick same number)
+2. Rephrase to be engaging and personal
+3. Use user's name ({user_name}) if known
+4. Reference previous responses when relevant
+5. Create headline and message about {business_name}
 
-CRITICAL RULES: 
-- Never ask for multiple data points in one question (e.g., "name and breed" should be two separate questions)
-- Always sound encouraging and forward-looking, never like the survey is ending
-
-Provide the complete JSON response with selected, phrased, and engagement-enhanced questions."""
+Use the exact output format specified in your instructions."""
             
             # Get LLM response
             messages = [
@@ -427,10 +397,15 @@ Provide the complete JSON response with selected, phrased, and engagement-enhanc
                 logger.error("LLM returned empty response")
                 return self._create_fallback_decision(available_questions, analysis)
             
-            # Parse markdown response from LLM
-            logger.info("Parsing LLM markdown response...")
-            decision_data = self._parse_markdown_response(llm_content, available_questions)
+            # Parse simple response from LLM
+            logger.info("Parsing LLM simple response...")
+            decision_data = self._parse_simple_response(llm_content, available_questions)
             logger.info(f"Parsed {len(decision_data.get('selected_questions', []))} questions from LLM")
+            
+            # If parsing failed or no questions selected, use fallback
+            if not decision_data.get('selected_questions'):
+                logger.warning("Simple parser returned no questions, using fallback")
+                return self._create_fallback_decision(available_questions, analysis)
             
             # Debug parsed questions
             for i, q in enumerate(decision_data.get('selected_questions', [])):
@@ -459,10 +434,8 @@ Provide the complete JSON response with selected, phrased, and engagement-enhanc
             logger.error(f"Traceback: {traceback.format_exc()}")
             return self._create_fallback_decision(available_questions, analysis)
     
-    def _parse_markdown_response(self, content: str, available_questions: List[Dict]) -> Dict[str, Any]:
-        """Parse structured markdown response from LLM."""
-        import re
-        
+    def _parse_simple_response(self, content: str, available_questions: List[Dict]) -> Dict[str, Any]:
+        """Parse simple structured response from LLM."""
         result = {
             "action": "continue",
             "selected_questions": [],
@@ -472,74 +445,73 @@ Provide the complete JSON response with selected, phrased, and engagement-enhanc
         }
         
         try:
-            # Extract decision section
-            decision_match = re.search(r'## DECISION\s*\nAction:\s*(\w+)', content, re.IGNORECASE)
-            if decision_match:
-                result["action"] = decision_match.group(1).lower()
+            lines = [line.strip() for line in content.split('\n') if line.strip()]
+            selected_numbers = []
+            rephrased_questions = {}
             
-            # Extract selected questions
-            questions_section = re.search(r'## SELECTED QUESTIONS\s*\n(.*?)(?=##|$)', content, re.DOTALL | re.IGNORECASE)
-            if questions_section:
-                question_blocks = re.findall(r'### Question \d+:\s*(\d+)\s*\n- Original:\s*(.*?)\n- Phrased:\s*(.*?)\n- Required:\s*(.*?)(?=\n|$)', questions_section.group(1), re.DOTALL)
-                
-                for block in question_blocks:
-                    question_num, original, phrased, required = block
-                    question_num = int(question_num)
+            for line in lines:
+                if line.startswith('SELECTED:'):
+                    # Parse selected question numbers
+                    numbers_text = line.split(':', 1)[1].strip()
+                    try:
+                        selected_numbers = [int(n.strip()) for n in numbers_text.split(',')]
+                        logger.info(f"🔥 PARSED SELECTION: {selected_numbers}")
+                    except ValueError as e:
+                        logger.error(f"Failed to parse selected numbers: {numbers_text}, error: {e}")
+                        
+                elif line.startswith('QUESTION_'):
+                    # Parse rephrased questions
+                    try:
+                        parts = line.split(':', 1)
+                        if len(parts) == 2:
+                            question_key = parts[0].strip()  # e.g., "QUESTION_2"
+                            question_text = parts[1].strip()
+                            question_num = int(question_key.split('_')[1])
+                            rephrased_questions[question_num] = question_text
+                            logger.info(f"🔥 PARSED REPHRASE: Q{question_num} = '{question_text[:50]}...'")
+                    except (ValueError, IndexError) as e:
+                        logger.error(f"Failed to parse question line: {line}, error: {e}")
+                        
+                elif line.startswith('HEADLINE:'):
+                    result["engagement_headline"] = line.split(':', 1)[1].strip()
                     
-                    # Find the original question from available questions
-                    if 1 <= question_num <= len(available_questions):
-                        original_q = available_questions[question_num - 1]
-                        result["selected_questions"].append({
-                            **original_q,
-                            "phrased_text": phrased.strip(),
-                            "final_text": phrased.strip()
-                        })
+                elif line.startswith('MESSAGE:'):
+                    result["engagement_message"] = line.split(':', 1)[1].strip()
             
-            # Extract engagement headline
-            headline_match = re.search(r'### Headline\s*\n(.*?)(?=\n###|\n##|$)', content, re.DOTALL | re.IGNORECASE)
-            if headline_match:
-                result["engagement_headline"] = headline_match.group(1).strip()
-            
-            # Extract engagement message
-            message_match = re.search(r'### Message\s*\n(.*?)(?=\n##|$)', content, re.DOTALL | re.IGNORECASE)
-            if message_match:
-                raw_message = message_match.group(1).strip()
-                # Clean up any accidental metadata that got included in the message
-                cleaned_message = self._clean_engagement_message(raw_message)
-                result["engagement_message"] = cleaned_message
-            
-            # Extract metadata
-            metadata_match = re.search(r'## METADATA\s*\n(.*?)(?=##|$)', content, re.DOTALL | re.IGNORECASE)
-            if metadata_match:
-                metadata_text = metadata_match.group(1)
+            # Build selected questions list using question_id matching
+            for num in selected_numbers:
+                # Find question by question_id in available_questions
+                found_question = None
+                for q in available_questions:
+                    if q.get("question_id") == num:
+                        found_question = q
+                        break
                 
-                risk_match = re.search(r'- Risk Level:\s*(\w+)', metadata_text, re.IGNORECASE)
-                if risk_match:
-                    result["metadata"]["risk_level"] = risk_match.group(1).lower()
-                
-                approach_match = re.search(r'- Approach:\s*(\w+)', metadata_text, re.IGNORECASE)
-                if approach_match:
-                    result["metadata"]["engagement_approach"] = approach_match.group(1).lower()
+                if found_question:
+                    rephrased_text = rephrased_questions.get(num, found_question.get("question_text", ""))
+                    
+                    result["selected_questions"].append({
+                        **found_question,
+                        "phrased_text": rephrased_text,
+                        "final_text": rephrased_text
+                    })
+                    logger.info(f"🔥 ADDED QUESTION: {num} -> '{rephrased_text[:50]}...'")
+                else:
+                    logger.warning(f"Question ID {num} not found in available questions")
             
-            # If no questions were extracted, fall back to first 2 available
-            if not result["selected_questions"] and available_questions:
-                result["selected_questions"] = available_questions[:min(2, len(available_questions))]
-                for q in result["selected_questions"]:
-                    q["phrased_text"] = q.get("question", q.get("question_text", ""))
-                    q["final_text"] = q.get("question", q.get("question_text", ""))
-            
-            logger.debug(f"Parsed {len(result['selected_questions'])} questions from markdown")
+            logger.info(f"🔥 SIMPLE PARSER SUCCESS: {len(result['selected_questions'])} questions selected")
             return result
             
         except Exception as e:
-            logger.error(f"Failed to parse markdown response: {e}")
-            # Return fallback with first 2 questions
+            logger.error(f"Failed to parse simple response: {e}")
+            logger.error(f"Content was: {content[:500]}...")
+            # Return fallback
             return {
-                "action": "continue",
-                "selected_questions": available_questions[:min(2, len(available_questions))],
+                "action": "continue", 
+                "selected_questions": [],
                 "engagement_headline": "Let's get to know you better!",
                 "engagement_message": "Help us understand your needs better.",
-                "metadata": {"fallback": True}
+                "metadata": {"fallback": True, "parse_error": str(e)}
             }
     
     def _clean_engagement_message(self, message: str) -> str:
@@ -574,10 +546,32 @@ Provide the complete JSON response with selected, phrased, and engagement-enhanc
         return cleaned_message.strip()
     
     def _create_fallback_decision(self, available_questions: List[Dict], analysis: Dict) -> Dict[str, Any]:
-        """Create fallback decision when LLM fails."""
-        # Simple rule-based selection
-        count = 2 if analysis["risk_level"] != "high" else 1
-        selected = available_questions[:count]
+        """Create fallback decision when LLM fails with randomized selection."""
+        import random
+        
+        # Randomized rule-based selection to vary question count
+        if analysis["risk_level"] == "high":
+            count = 1  # Always 1 for high risk
+        else:
+            # Vary between 1-4 questions based on context
+            questions_asked = analysis.get("questions_asked", 0)
+            if questions_asked == 0:
+                count = random.choice([1, 2])  # First step: 1-2 questions
+            elif questions_asked < 4:
+                count = random.choice([2, 3])  # Early steps: 2-3 questions  
+            else:
+                count = random.choice([1, 2, 3, 4])  # Later steps: vary widely
+        
+        # Don't select more questions than available
+        count = min(count, len(available_questions))
+        
+        # Random selection instead of always taking first N
+        if len(available_questions) > count:
+            selected = random.sample(available_questions, count)
+        else:
+            selected = available_questions[:count]
+        
+        logger.info(f"🔥 FALLBACK: Selected {count} questions randomly (risk: {analysis['risk_level']}, asked: {analysis.get('questions_asked', 0)})")
         
         for q in selected:
             q["phrased_text"] = q.get("question", q.get("question_text"))
@@ -599,7 +593,8 @@ Provide the complete JSON response with selected, phrased, and engagement-enhanc
             "completion_motivation": "Thank you for your responses! This helps us serve you better.",
             "metadata": {
                 "fallback": True,
-                "analysis": analysis
+                "analysis": analysis,
+                "fallback_count": count
             }
         }
     
@@ -614,16 +609,26 @@ Provide the complete JSON response with selected, phrased, and engagement-enhanc
         question_strategy = state.get('question_strategy', {})
         asked_questions = question_strategy.get('asked_questions', [])
         
-        # Add newly selected question IDs to asked list
-        # CRITICAL: Use question_id (form-specific integer) not database id
+        # Mark newly selected questions as asked in database
+        from ...database import db
+        session_id = state.get('core', {}).get('session_id')
+        new_question_ids = []
+        
         for q in decision["selected_questions"]:
-            q_id = q.get("question_id")  # Use question_id instead of id
+            q_id = q.get("question_id")
             if q_id is not None:
-                if q_id not in asked_questions:
-                    asked_questions.append(q_id)
-                    logger.info(f"🔥 QUESTION TRACKING: Added question ID {q_id} to asked_questions, total now: {len(asked_questions)}")
+                new_question_ids.append(q_id)
+                logger.info(f"🔥 DATABASE TRACKING: Marking question ID {q_id} as asked")
             else:
                 logger.error(f"🔥 ERROR: Question missing question_id: {q}")
+        
+        # Mark questions as asked in database
+        if session_id and new_question_ids:
+            db.mark_questions_asked(session_id, new_question_ids, decision["selected_questions"])
+            logger.info(f"🔥 DATABASE TRACKING: Marked {len(new_question_ids)} questions as asked in database")
+        
+        # Update local state for compatibility
+        asked_questions = asked_questions + new_question_ids
         
         # Format questions for frontend API client (using backend format that frontend transforms)
         # NOTE: Never expose scoring_rubric to frontend - that's sensitive business logic
@@ -685,9 +690,10 @@ Provide the complete JSON response with selected, phrased, and engagement-enhanc
             
             # State updates
             "question_strategy": {
-                **question_strategy,
-                "asked_questions": asked_questions,
+                "all_questions": question_strategy.get("all_questions", []),
+                "asked_questions": asked_questions,  # CRITICAL: Use updated list, not spread old state
                 "current_questions": frontend_questions,
+                "selection_history": question_strategy.get("selection_history", []),
                 "selection_confidence": decision.get("confidence", 0.7)
             },
             
@@ -704,6 +710,10 @@ Provide the complete JSON response with selected, phrased, and engagement-enhanc
                 "llm_decision": decision["metadata"].get("llm_decision", False)
             }
         }
+        
+        # Debug: Log what we're returning
+        logger.info(f"🔥 SUPERVISOR RETURN: asked_questions = {result['question_strategy']['asked_questions']}")
+        return result
     
     def _create_completion_response(self, reason: str) -> Dict[str, Any]:
         """Create a completion response when survey should end."""

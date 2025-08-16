@@ -23,7 +23,13 @@ export const useFormStore = create<FormStore>()(
 
       // Actions
       initializeForm: async (clientId: string, formId: string, trackingData?: Partial<TrackingData>) => {
-        set({ loading: true, error: null });
+        // Clear any stale state when initializing
+        set({ 
+          loading: true, 
+          error: null,
+          currentStep: null,  // Clear old step data
+          formState: null     // Clear old form state
+        });
         
         try {
           // Check if we have an existing session for this form
@@ -103,9 +109,9 @@ export const useFormStore = create<FormStore>()(
 
         try {
           // Convert responses to the expected API format
-          // CRITICAL FIX: Don't parse as integer - question IDs can be UUIDs or numbers
+          // CRITICAL FIX: Backend expects numeric question IDs
           const apiResponses = Object.entries(responses).map(([questionId, value]) => ({
-            question_id: questionId,  // Keep as string (backend handles conversion)
+            question_id: parseInt(questionId, 10),  // Convert to number for backend
             answer: value
           }));
 
@@ -265,10 +271,14 @@ export const useFormStore = create<FormStore>()(
     {
       name: 'form-storage',
       storage: createJSONStorage(() => localStorage),
-      // Only persist form state and current step
+      // Only persist minimal form state (no questions data)
       partialize: (state) => ({
-        formState: state.formState,
-        currentStep: state.currentStep
+        formState: state.formState ? {
+          ...state.formState,
+          // Don't persist responses to avoid stale data
+          responses: {}
+        } : null
+        // Don't persist currentStep - always fetch fresh from backend
       }),
       // Skip hydration for sensitive data
       skipHydration: false,
