@@ -128,49 +128,6 @@ export default function FormContainer({ form, currentStep, formState }: FormCont
 
   return (
     <div className="form-container">
-      {/* Form Header */}
-      <div className="mb-16">
-        {/* Company Name as H1 */}
-        <h1 
-          className="text-3xl md:text-4xl font-bold mb-8 text-center"
-          style={{ color: 'var(--color-text)' }}
-        >
-          {form.title}
-        </h1>
-
-        {/* Step Headline as H2 */}
-        {currentStep.headline && (
-          <h2 
-            className="text-2xl md:text-3xl font-semibold mb-6 text-center"
-            style={{ color: 'var(--color-primary)' }}
-          >
-            {currentStep.headline}
-          </h2>
-        )}
-
-        {/* Engagement Content as P */}
-        {currentStep.subheading && (
-          <p 
-            className="text-lg md:text-xl leading-relaxed max-w-3xl mx-auto text-center"
-            style={{ color: 'var(--color-text-light)' }}
-          >
-            {currentStep.subheading}
-          </p>
-        )}
-
-        {/* Fallback to form description if no engagement content */}
-        {!currentStep.subheading && form.description && (
-          <p 
-            className="text-lg md:text-xl leading-relaxed max-w-3xl mx-auto text-center"
-            style={{ color: 'var(--color-text-light)' }}
-          >
-            {form.description}
-          </p>
-        )}
-      </div>
-
-      {/* Progress Bar removed - dynamic surveys can't show accurate progress */}
-
       {/* Error Message */}
       {error && (
         <div className="mb-6 p-4 bg-error bg-opacity-10 border border-error border-opacity-20 rounded-theme">

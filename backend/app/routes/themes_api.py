@@ -103,8 +103,6 @@ class ThemeResponse(BaseModel):
     font_family: str
     is_default: bool
     is_system_theme: bool
-    usage_count: int
-    last_used_at: Optional[datetime]
     created_at: datetime
     updated_at: datetime
 
@@ -258,8 +256,6 @@ async def list_themes(
                 "font_family": theme_data.get("font_family", "Inter, system-ui, sans-serif"),
                 "is_default": theme_data["is_default"],
                 "is_system_theme": theme_data["is_system_theme"],
-                "usage_count": theme_data.get("usage_count", 0),
-                "last_used_at": theme_data.get("last_used_at"),
                 "created_at": theme_data["created_at"],
                 "updated_at": theme_data["updated_at"]
             })
@@ -285,6 +281,7 @@ async def create_theme(
 ):
     """Create a new theme for the authenticated client."""
     try:
+        logger.info(f"Creating theme for client {current_user.client_id}: {theme_request}")
         db = get_database_connection()
         
         # If setting as default, unset other default themes for this client
@@ -307,15 +304,17 @@ async def create_theme(
             "secondary_color": theme_request.secondary_color,
             "font_family": theme_request.font_family,
             "is_default": theme_request.is_default,
-            "is_system_theme": False,
-            "usage_count": 0
+            "is_system_theme": False
         }
         
         result = db.client.table("client_themes")\
             .insert(theme_data)\
             .execute()
         
+        logger.info(f"Theme creation result: {result}")
+        
         if not result.data:
+            logger.error(f"Theme creation failed - no data returned: {result}")
             return error_response("Failed to create theme", status_code=500)
         
         created_theme = result.data[0]
@@ -332,8 +331,6 @@ async def create_theme(
                 "font_family": created_theme["font_family"],
                 "is_default": created_theme["is_default"],
                 "is_system_theme": created_theme["is_system_theme"],
-                "usage_count": created_theme["usage_count"],
-                "last_used_at": created_theme.get("last_used_at"),
                 "created_at": created_theme["created_at"],
                 "updated_at": created_theme["updated_at"]
             },
@@ -380,8 +377,6 @@ async def get_theme(
                 "font_family": theme_data.get("font_family", "Inter, system-ui, sans-serif"),
                 "is_default": theme_data["is_default"],
                 "is_system_theme": theme_data["is_system_theme"],
-                "usage_count": theme_data.get("usage_count", 0),
-                "last_used_at": theme_data.get("last_used_at"),
                 "created_at": theme_data["created_at"],
                 "updated_at": theme_data["updated_at"]
             },
@@ -464,8 +459,6 @@ async def update_theme(
                 "font_family": updated_theme["font_family"],
                 "is_default": updated_theme["is_default"],
                 "is_system_theme": updated_theme["is_system_theme"],
-                "usage_count": updated_theme["usage_count"],
-                "last_used_at": updated_theme.get("last_used_at"),
                 "created_at": updated_theme["created_at"],
                 "updated_at": updated_theme["updated_at"]
             },

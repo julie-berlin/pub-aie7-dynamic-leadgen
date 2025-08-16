@@ -267,6 +267,9 @@ export interface Role {
 // Export status types
 export type ExportStatus = 'pending' | 'processing' | 'completed' | 'failed';
 
+// Form status types
+export type FormStatus = 'draft' | 'active' | 'paused' | 'archived';
+
 export interface ExportJob {
   id: string;
   type: 'analytics' | 'forms' | 'responses';
