@@ -32,6 +32,9 @@ def initialize_session_with_tracking_node(state: Dict[str, Any]) -> Dict[str, An
         Updated state dictionary with validated Pydantic models
     """
     try:
+        logger.info(f"🔥 INIT NODE DEBUG: Input state keys = {list(state.keys())}")
+        logger.info(f"🔥 INIT NODE DEBUG: pending_responses = {state.get('pending_responses')}")
+        
         # Create proper Pydantic state if we have minimal data
         if 'core' not in state and 'metadata' in state:
             # This is likely an initial API call, create proper state
@@ -196,7 +199,7 @@ def initialize_session_with_tracking_node(state: Dict[str, Any]) -> Dict[str, An
             # Communication and API fields
             'supervisor_messages': [],
             'shared_context': {},
-            'pending_responses': [],
+            'pending_responses': state.get('pending_responses', []),
             'frontend_response': None,
             # Session management
             'session_recovery_data': None,

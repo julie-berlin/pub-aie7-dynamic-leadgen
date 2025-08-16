@@ -41,18 +41,12 @@ export default function TextInput({ question, register, error, disabled }: TextI
         placeholder={question.placeholder}
         disabled={disabled}
         className={`
-          w-full px-6 py-5 text-lg 
-          transition-all duration-200 ease-in-out
-          focus:outline-none
+          input-field text-lg 
           ${disabled ? 'cursor-not-allowed' : ''}
+          ${error ? 'input-error' : ''}
         `}
         style={{
-          backgroundColor: disabled ? 'var(--color-background-light)' : 'var(--color-background)',
-          border: error 
-            ? '2px solid var(--color-error)' 
-            : '2px solid var(--color-border)',
           borderRadius: 'var(--border-radius-lg)',
-          color: 'var(--color-text)',
         }}
         onFocus={(e) => {
           if (!error) {
@@ -60,13 +54,14 @@ export default function TextInput({ question, register, error, disabled }: TextI
             e.target.style.boxShadow = '0 0 0 4px var(--color-primary-light)';
           }
         }}
-        onBlur={(e) => {
-          if (!error) {
-            e.target.style.borderColor = 'var(--color-border)';
-            e.target.style.boxShadow = 'none';
+        {...register(question.id, {
+          onBlur: (e) => {
+            if (!error) {
+              e.target.style.borderColor = 'var(--color-border)';
+              e.target.style.boxShadow = 'none';
+            }
           }
-        }}
-        {...register(question.id)}
+        })}
       />
       
       {error && (

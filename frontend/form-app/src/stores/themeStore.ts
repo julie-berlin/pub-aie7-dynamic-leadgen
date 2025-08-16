@@ -30,7 +30,10 @@ const defaultTheme: ThemeConfig = {
   },
   spacing: {
     section: '2rem',
-    element: '1rem'
+    element: '1rem',
+    page: '2rem',
+    input: '1rem',
+    button: '0.75rem 1.5rem'
   },
   borderRadius: '0.5rem',
   borderRadiusLg: '0.75rem',
@@ -97,6 +100,9 @@ export const useThemeStore = create<ThemeStore>()(
         // Apply spacing
         root.style.setProperty('--spacing-section', theme.spacing.section);
         root.style.setProperty('--spacing-element', theme.spacing.element);
+        root.style.setProperty('--spacing-page', theme.spacing.page);
+        root.style.setProperty('--spacing-input', theme.spacing.input);
+        root.style.setProperty('--spacing-button', theme.spacing.button);
 
         // Apply border radius
         root.style.setProperty('--border-radius', theme.borderRadius);
@@ -120,7 +126,14 @@ export const useThemeStore = create<ThemeStore>()(
           name: theme.name || defaultTheme.name,
           colors: { ...defaultTheme.colors, ...theme.colors },
           typography: { ...defaultTheme.typography, ...theme.typography },
-          spacing: { ...defaultTheme.spacing, ...theme.spacing },
+          spacing: { 
+            ...defaultTheme.spacing, 
+            ...theme.spacing,
+            // Ensure all spacing properties exist
+            page: theme.spacing?.page || defaultTheme.spacing.page,
+            input: theme.spacing?.input || defaultTheme.spacing.input,
+            button: theme.spacing?.button || defaultTheme.spacing.button
+          },
           borderRadius: theme.borderRadius || defaultTheme.borderRadius,
           borderRadiusLg: theme.borderRadiusLg || defaultTheme.borderRadiusLg,
           shadow: theme.shadow || defaultTheme.shadow,

@@ -119,7 +119,9 @@ Confidence: [0.0-1.0]
             logger.debug(f"State keys: {list(state.keys()) if isinstance(state, dict) else 'Not a dict'}")
             
             # Check if we have pending responses - if so, signal to route to lead intelligence
-            if state.get("pending_responses"):
+            # This should only happen on the first entry, not after lead intelligence processes them
+            pending_responses = state.get("pending_responses")
+            if pending_responses and len(pending_responses) > 0:
                 logger.info("Found pending responses - survey admin will route to lead intelligence")
                 return {
                     "route_to_lead_intelligence": True,

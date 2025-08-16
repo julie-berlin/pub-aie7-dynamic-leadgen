@@ -127,7 +127,16 @@ Return comprehensive JSON with all processing results:
             # Step 6: Update database with final status
             self._update_database_status(state, final_classification)
             
-            return final_classification
+            # Step 7: Return proper state update with cleared pending responses
+            return {
+                **final_classification,
+                'pending_responses': [],  # Clear after processing
+                'lead_intelligence': {
+                    **state.get('lead_intelligence', {}),
+                    'last_classification': final_classification,
+                    'classification_timestamp': datetime.now().isoformat()
+                }
+            }
             
         except Exception as e:
             logger.error(f"Lead intelligence processing error: {e}")
@@ -411,7 +420,8 @@ Make a comprehensive decision including:
             "final_score": 0,
             "confidence": 0,
             "completed": False,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
+            "pending_responses": []  # Clear pending responses even on error
         }
 
 

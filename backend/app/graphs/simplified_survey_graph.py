@@ -52,8 +52,15 @@ def build_simplified_survey_graph() -> StateGraph:
     # Entry point
     graph.set_entry_point("initialize_with_tracking")
     
-    # After initialization, go to survey administration
-    graph.add_edge("initialize_with_tracking", "survey_administration")
+    # After initialization, conditional routing based on whether we have pending responses
+    graph.add_conditional_edges(
+        "initialize_with_tracking",
+        route_after_initialization,
+        {
+            "survey_administration": "survey_administration",  # New session or no pending responses
+            "lead_intelligence": "lead_intelligence"  # Process pending responses
+        }
+    )
     
     # After survey admin prepares questions, conditional routing
     graph.add_conditional_edges(
@@ -129,15 +136,35 @@ def check_abandonment_node(state: SurveyState) -> Dict[str, Any]:
 
 # === ROUTING FUNCTIONS ===
 
+def route_after_initialization(state: SurveyState) -> str:
+    """Determine routing after initialization - check for pending responses first."""
+    
+    pending_responses = state.get("pending_responses")
+    logger.info(f"🔥 INIT ROUTING: pending_responses = {pending_responses}")
+    
+    # If we have pending responses, go to lead intelligence first
+    if pending_responses and len(pending_responses) > 0:
+        logger.info("🔥 INIT ROUTING: Going to lead_intelligence to process pending responses")
+        return "lead_intelligence"
+    
+    # Otherwise, go to survey administration to get new questions
+    logger.info("🔥 INIT ROUTING: Going to survey_administration for new questions")
+    return "survey_administration"
+
 def route_after_survey_admin(state: SurveyState) -> str:
     """Determine routing after survey administration."""
     
+    logger.info(f"🔥 ROUTING DEBUG: route_to_lead_intelligence = {state.get('route_to_lead_intelligence')}")
+    logger.info(f"🔥 ROUTING DEBUG: pending_responses = {state.get('pending_responses')}")
+    
     # Check if survey admin indicated to route to lead intelligence
     if state.get("route_to_lead_intelligence"):
+        logger.info("🔥 ROUTING: Going to lead_intelligence via route_to_lead_intelligence flag")
         return "lead_intelligence"
     
     # Check if we have pending responses to process (legacy check)
     if state.get("pending_responses"):
+        logger.info("🔥 ROUTING: Going to lead_intelligence via pending_responses")
         return "lead_intelligence"
     
     # Check for abandonment flag

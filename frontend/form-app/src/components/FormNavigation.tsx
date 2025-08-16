@@ -25,7 +25,7 @@ export default function FormNavigation({ currentStep, canGoBack = false, loading
             type="button"
             onClick={handleBack}
             disabled={loading}
-            className="px-8 py-4 font-semibold flex items-center transition-colors duration-200"
+            className="btn-secondary font-semibold flex items-center transition-colors duration-200"
             style={{
               color: 'var(--color-text-light)',
               backgroundColor: 'var(--color-background-light)',
@@ -58,7 +58,7 @@ export default function FormNavigation({ currentStep, canGoBack = false, loading
         <button
           type="submit"
           disabled={loading}
-          className={`px-12 py-4 text-lg font-semibold text-white flex items-center transition-all duration-200 ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+          className={`btn-primary text-lg font-semibold text-white flex items-center transition-all duration-200 ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
           style={{
             backgroundColor: 'var(--color-primary)',
             borderRadius: 'var(--border-radius-lg)',

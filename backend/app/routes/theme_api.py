@@ -51,6 +51,9 @@ class ThemeSpacing(BaseModel):
     """Spacing configuration for a theme."""
     section: str = Field("2rem", description="Section spacing")
     element: str = Field("1rem", description="Element spacing")
+    page: str = Field("2rem", description="Page padding")
+    input: str = Field("1rem", description="Input field padding")
+    button: str = Field("0.75rem 1.5rem", description="Button padding")
 
 class ThemeConfig(BaseModel):
     """Complete theme configuration."""

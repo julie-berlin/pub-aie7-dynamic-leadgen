@@ -123,6 +123,9 @@ export interface ThemeConfig {
   spacing: {
     section: string;
     element: string;
+    page: string;
+    input: string;
+    button: string;
   };
   borderRadius: string;
   borderRadiusLg: string;

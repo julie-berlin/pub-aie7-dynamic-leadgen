@@ -93,7 +93,7 @@ export default function FormPage() {
   }
 
   return (
-    <div className="bg-gray-200">
+    <div className="min-h-screen bg-gray-200 flex flex-col">
       {/* Header with Logo */}
       <header className="w-full">
         <div className="container mx-auto px-6 py-4 max-w-6xl">
@@ -106,20 +106,20 @@ export default function FormPage() {
                 </svg>
               </div>
               <div className="flex flex-col">
+                {/* TODO add logo */}
                 <span className="text-xl font-bold text-gray-900">
                   {businessName || 'Varyq'}
                 </span>
-                <span className="text-xs text-gray-500">Varyq Intelligent Leads</span>
               </div>
             </div>
           </div>
         </div>
       </header>
 
-      {/* Main Content with proper padding */}
-      <main className="min-h-screen py-8">
-        <div className="container mx-auto px-6 md:px-8 lg:px-12 max-w-4xl">
-          <div className="bg-white rounded-2xl shadow-sm p-8 md:p-12 lg:p-16">
+      {/* Main Content with theme-based padding */}
+      <main className="flex-1 py-8 px-4">
+        <div className="container mx-auto max-w-4xl">
+          <div className="bg-white rounded-2xl" style={{ padding: 'var(--spacing-page)' }}>
             <FormContainer
               form={currentForm}
               currentStep={currentStep}
@@ -128,6 +128,15 @@ export default function FormPage() {
           </div>
         </div>
       </main>
+
+      {/* Footer */}
+      <footer className="w-full p-4 text-center" style={{ backgroundColor: 'var(--color-background-light)' }}>
+        <div className="container mx-auto">
+          <span className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
+            Varyq - Intelligent Leads
+          </span>
+        </div>
+      </footer>
     </div>
   );
 }

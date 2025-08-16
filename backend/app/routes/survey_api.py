@@ -212,6 +212,7 @@ async def submit_and_continue(
             return not_found_response("Session", session_id)
         
         # Prepare state with full session context plus new responses
+        logger.info(f"🔥 API DEBUG: request.responses = {request.responses}")
         state_update = {
             'core': {
                 'session_id': session_id,
@@ -221,6 +222,7 @@ async def submit_and_continue(
             },
             'pending_responses': request.responses
         }
+        logger.info(f"🔥 API DEBUG: state_update = {state_update}")
         
         # Run the graph starting from response processing
         result = await intelligent_survey_graph.ainvoke(
