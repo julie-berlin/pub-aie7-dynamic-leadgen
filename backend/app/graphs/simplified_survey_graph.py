@@ -186,15 +186,28 @@ def route_after_lead_intelligence(state: SurveyState) -> str:
     lead_status = state.get("lead_status", "continue")
     completed = state.get("completed", False)
     
+    # Log routing decision
+    logger.info(f"🔥 ROUTING after lead_intelligence: lead_status={lead_status}, completed={completed}")
+    
     # If completed or final status reached
     if completed or lead_status in ["qualified", "maybe", "no"]:
+        logger.info("🔥 ROUTING: Ending survey (completed or final status)")
+        return END
+    
+    # Check for too many iterations to prevent infinite loops
+    core = state.get("core", {})
+    step = core.get("step", 0)
+    if step > 20:  # Prevent more than 20 steps
+        logger.warning(f"🔥 ROUTING: Forcing END due to too many steps ({step})")
         return END
     
     # Continue survey for more questions
     if lead_status == "continue":
+        logger.info("🔥 ROUTING: Continuing to survey_administration")
         return "survey_administration"
     
     # Default to END
+    logger.info("🔥 ROUTING: Default to END")
     return END
 
 

@@ -110,8 +110,21 @@ async def start_session(
             }
         }
         
-        # Run the graph to initialize and get first questions
-        result = await intelligent_survey_graph.ainvoke(initial_state)
+        # Run the graph to initialize and get first questions with timeout
+        import asyncio
+        try:
+            result = await asyncio.wait_for(
+                intelligent_survey_graph.ainvoke(initial_state),
+                timeout=20.0  # 20 second timeout for initialization
+            )
+        except asyncio.TimeoutError:
+            logger.error("Graph initialization timed out after 20 seconds")
+            return server_error_response("Initialization timed out. Please try again.")
+        except Exception as e:
+            logger.error(f"Graph initialization failed: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            return server_error_response(f"Failed to initialize survey: {str(e)}")
         
         logger.debug(f"Graph result type: {type(result)}")
         logger.debug(f"Graph result keys: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}")
@@ -260,12 +273,26 @@ async def submit_and_continue(
         
         logger.info(f"🔥 API DEBUG: state_update keys = {list(state_update.keys())}")
         logger.info(f"🔥 API DEBUG: asked_questions = {state_update.get('question_strategy', {}).get('asked_questions', [])}")
+        logger.info(f"🔥 API DEBUG: pending_responses = {request.responses}")
         
-        # Run the graph starting from response processing
-        result = await intelligent_survey_graph.ainvoke(
-            state_update,
-            {"recursion_limit": 25}
-        )
+        # Run the graph with timeout and reduced recursion limit
+        import asyncio
+        try:
+            result = await asyncio.wait_for(
+                intelligent_survey_graph.ainvoke(
+                    state_update,
+                    {"recursion_limit": 10}  # Reduced from 25 to prevent loops
+                ),
+                timeout=30.0  # 30 second timeout for entire graph execution
+            )
+        except asyncio.TimeoutError:
+            logger.error("Graph execution timed out after 30 seconds")
+            return server_error_response("Request timed out. Please try again.")
+        except Exception as e:
+            logger.error(f"Graph execution failed: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            return server_error_response(f"Failed to process survey: {str(e)}")
         
         # Save session snapshot for state persistence
         try:

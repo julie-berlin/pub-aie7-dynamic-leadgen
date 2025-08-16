@@ -407,12 +407,31 @@ Provide the complete JSON response with selected, phrased, and engagement-enhanc
             ]
             
             logger.info("Calling LLM for question selection and rephrasing...")
-            response = self.llm.invoke(messages)
-            
-            if hasattr(response, 'content'):
-                llm_content = response.content
-            else:
-                llm_content = str(response)
+            import asyncio
+            try:
+                # Add timeout to prevent hanging
+                if asyncio.iscoroutinefunction(self.llm.ainvoke):
+                    response = await asyncio.wait_for(
+                        self.llm.ainvoke(messages),
+                        timeout=10.0  # 10 second timeout
+                    )
+                else:
+                    # Synchronous call with timeout using threading
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        future = executor.submit(self.llm.invoke, messages)
+                        response = future.result(timeout=10.0)
+                
+                if hasattr(response, 'content'):
+                    llm_content = response.content
+                else:
+                    llm_content = str(response)
+            except (asyncio.TimeoutError, concurrent.futures.TimeoutError):
+                logger.error("LLM call timed out after 10 seconds")
+                return self._create_fallback_decision(available_questions, analysis)
+            except Exception as e:
+                logger.error(f"LLM call failed: {e}")
+                return self._create_fallback_decision(available_questions, analysis)
             
             logger.info(f"LLM response received, length: {len(llm_content)}")
             # Log first 1000 chars to avoid truncation in logs

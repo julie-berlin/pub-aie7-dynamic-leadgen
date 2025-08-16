@@ -161,13 +161,18 @@ def initialize_session_with_tracking_node(state: Dict[str, Any]) -> Dict[str, An
             'abandonment_risk': 0.3
         }
         
-        # Create lead session in database
+        # Create lead session in database only if it doesn't exist
         from ...database import db
         try:
-            db.create_lead_session(session_data)
-            logger.info(f"Created lead session in database: {session_id}")
+            # Check if session already exists
+            existing_session = db.get_lead_session(session_id)
+            if existing_session:
+                logger.info(f"Session {session_id} already exists in database, skipping creation")
+            else:
+                db.create_lead_session(session_data)
+                logger.info(f"Created new lead session in database: {session_id}")
         except Exception as e:
-            logger.error(f"Failed to create lead session: {e}")
+            logger.error(f"Failed to create/check lead session: {e}")
         
         # Save tracking data immediately to database (fire-and-forget)
         async_db.save_tracking_data(session_id, tracking_data)
