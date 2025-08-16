@@ -12,7 +12,7 @@ import type {
 
 // Backend API response types
 interface BackendQuestion {
-  id?: string | number;  // CRITICAL: Include ID from backend for question tracking
+  question_id?: string | number;  // CRITICAL: Form-specific question ID from backend
   question: string;
   phrased_question: string;
   data_type: string;
@@ -61,11 +61,11 @@ class APIClient {
    * Transform backend question data to frontend format
    */
   private transformQuestion(backendQuestion: BackendQuestion, index: number): Question {
-    // CRITICAL FIX: Use actual question ID from backend for proper tracking
-    // Backend now sends question IDs - use them instead of generating from index
-    const questionId = backendQuestion.id 
-      ? String(backendQuestion.id)  // Convert to string (can be UUID or number)
-      : (index + 1).toString();      // Fallback only if no ID provided
+    // CRITICAL FIX: Use actual question_id from backend for proper tracking
+    // Backend now sends question_id - use them instead of generating from index
+    const questionId = backendQuestion.question_id 
+      ? String(backendQuestion.question_id)  // Convert to string (can be UUID or number)
+      : (index + 1).toString();              // Fallback only if no ID provided
     
     return {
       id: questionId,

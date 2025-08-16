@@ -615,26 +615,26 @@ Provide the complete JSON response with selected, phrased, and engagement-enhanc
         asked_questions = question_strategy.get('asked_questions', [])
         
         # Add newly selected question IDs to asked list
-        # CRITICAL: IDs can be integers or UUIDs - keep them as is
+        # CRITICAL: Use question_id (form-specific integer) not database id
         for q in decision["selected_questions"]:
-            q_id = q.get("id")
+            q_id = q.get("question_id")  # Use question_id instead of id
             if q_id is not None:
                 if q_id not in asked_questions:
                     asked_questions.append(q_id)
                     logger.info(f"🔥 QUESTION TRACKING: Added question ID {q_id} to asked_questions, total now: {len(asked_questions)}")
             else:
-                logger.error(f"🔥 ERROR: Question missing ID: {q}")
+                logger.error(f"🔥 ERROR: Question missing question_id: {q}")
         
         # Format questions for frontend API client (using backend format that frontend transforms)
         # NOTE: Never expose scoring_rubric to frontend - that's sensitive business logic
         # CRITICAL FIX: Include question ID for proper tracking
         frontend_questions = []
         for q in decision["selected_questions"]:
-            q_id = q.get("id")
+            q_id = q.get("question_id")  # Use question_id instead of id
             if q_id is None:
-                logger.error(f"🔥 ERROR: Question missing ID: {q.get('question_text', 'unknown')}")
+                logger.error(f"🔥 ERROR: Question missing question_id: {q.get('question_text', 'unknown')}")
             frontend_questions.append({
-                "id": q_id,  # CRITICAL: Include ID for tracking
+                "question_id": q_id,  # CRITICAL: Include question_id for tracking
                 "question": q.get("question", q.get("question_text", "")),
                 "phrased_question": q.get("final_text", q.get("phrased_text", q.get("question", q.get("question_text", "")))),
                 "data_type": q.get("data_type", q.get("question_type", "text")),

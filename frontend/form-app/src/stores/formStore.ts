@@ -37,9 +37,8 @@ export const useFormStore = create<FormStore>()(
             formId,
             clientId,
             trackingData: {
-              ...trackingData,
-              userAgent: navigator.userAgent,
-              timestamp: new Date()
+              ...trackingData
+              // userAgent and timestamp are not supported by backend API
             }
           });
 

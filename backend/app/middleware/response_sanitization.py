@@ -48,7 +48,8 @@ class ResponseSanitizer:
         # Public fields that are safe to display (exempt from sensitivity checks)
         self.public_fields = {
             'businessname', 'business_name', 'company_name', 'companyname',
-            'organization_name', 'organizationname', 'brand_name', 'brandname'
+            'organization_name', 'organizationname', 'brand_name', 'brandname',
+            'question_id'  # Form-specific question identifier needed by frontend
         }
         
         # Fields to mask instead of remove (show partial data)
