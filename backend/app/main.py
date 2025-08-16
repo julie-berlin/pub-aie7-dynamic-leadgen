@@ -119,7 +119,7 @@ app.add_middleware(
     SessionMiddleware, 
     secret_key=os.getenv('SESSION_SECRET_KEY', 'dev-secret-key-change-in-production'),
     max_age=1800,  # 30 minutes
-    path='/api/survey',
+    path='/',  # Changed from '/api/survey' to allow all API paths
     same_site='lax',
     https_only=os.getenv('ENVIRONMENT', 'development').lower() != 'development'
 )

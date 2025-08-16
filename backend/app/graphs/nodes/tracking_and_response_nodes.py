@@ -147,32 +147,8 @@ def initialize_session_with_tracking_node(state: Dict[str, Any]) -> Dict[str, An
             'landing_page': metadata.get('landing_page')
         }
         
-        # Save session to database immediately
-        session_data = {
-            'session_id': session_id,
-            'form_id': form_id,
-            'client_id': core_state.get('client_id'),
-            'started_at': core_state['started_at'],
-            'last_updated': core_state['last_updated'],
-            'step': core_state['step'],
-            'completed': core_state['completed'],
-            'lead_status': 'unknown',
-            'abandonment_status': 'active',
-            'abandonment_risk': 0.3
-        }
-        
-        # Create lead session in database only if it doesn't exist
-        from ...database import db
-        try:
-            # Check if session already exists
-            existing_session = db.get_lead_session(session_id)
-            if existing_session:
-                logger.info(f"Session {session_id} already exists in database, skipping creation")
-            else:
-                db.create_lead_session(session_data)
-                logger.info(f"Created new lead session in database: {session_id}")
-        except Exception as e:
-            logger.error(f"Failed to create/check lead session: {e}")
+        # Session already created in API endpoint - just log initialization
+        logger.info(f"🔥 SESSION: Using pre-created session {session_id}")
         
         # Save tracking data immediately to database (fire-and-forget)
         async_db.save_tracking_data(session_id, tracking_data)

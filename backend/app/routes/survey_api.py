@@ -71,8 +71,9 @@ async def start_session(
         # Create session ID first, before calling LangGraph
         import uuid
         session_id = str(uuid.uuid4())
+        logger.info(f"🔥 START: Creating new session with ID: {session_id}")
         
-        # Create session data for HTTP session immediately
+        # Create session data for HTTP session
         session_data = {
             "session_id": session_id,
             "form_id": request.form_id,
@@ -88,9 +89,31 @@ async def start_session(
             }
         }
         
+        # Create session in database first
+        from ..database import db
+        try:
+            db_session_data = {
+                'session_id': session_id,
+                'form_id': request.form_id,
+                'client_id': request.client_id,
+                'started_at': datetime.now().isoformat(),
+                'last_updated': datetime.now().isoformat(),
+                'step': 0,
+                'completed': False,
+                'lead_status': 'unknown',
+                'abandonment_status': 'active',
+                'abandonment_risk': 0.3
+            }
+            
+            result = db.client.table("lead_sessions").insert(db_session_data).execute()
+            logger.info(f"🔥 START: Created session {session_id} in database")
+        except Exception as e:
+            logger.error(f"🔥 START: Failed to create database session: {e}")
+            raise HTTPException(status_code=500, detail="Failed to create session")
+        
         # Create HTTP session using Starlette session manager
         session_uuid = await create_survey_session(http_request, session_data)
-        logger.info(f"Created secure session: {session_uuid}")
+        logger.info(f"🔥 START: Created secure cookie session: {session_uuid}")
         
         # Prepare initial state with tracking data, including pre-created session ID
         initial_state = {
@@ -110,21 +133,10 @@ async def start_session(
             }
         }
         
-        # Run the graph to initialize and get first questions with timeout
-        import asyncio
-        try:
-            result = await asyncio.wait_for(
-                intelligent_survey_graph.ainvoke(initial_state),
-                timeout=20.0  # 20 second timeout for initialization
-            )
-        except asyncio.TimeoutError:
-            logger.error("Graph initialization timed out after 20 seconds")
-            return server_error_response("Initialization timed out. Please try again.")
-        except Exception as e:
-            logger.error(f"Graph initialization failed: {e}")
-            import traceback
-            logger.error(f"Traceback: {traceback.format_exc()}")
-            return server_error_response(f"Failed to initialize survey: {str(e)}")
+        # Run the graph to initialize and get first questions
+        logger.info(f"🔥 START: Invoking graph with session_id: {session_id}")
+        result = await intelligent_survey_graph.ainvoke(initial_state)
+        logger.info(f"🔥 START: Graph invocation completed for session: {session_id}")
         
         logger.debug(f"Graph result type: {type(result)}")
         logger.debug(f"Graph result keys: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}")
@@ -221,13 +233,23 @@ async def submit_and_continue(
             )
             
         session_id = session_data.get('session_id')
-        logger.info(f"Processing step for session: {session_id}")
+        logger.info(f"🔥 STEP: Processing step for session: {session_id}")
+        logger.info(f"🔥 STEP: Full session_data from cookie: {session_data}")
         
         # Load existing session data from database to get form_id and other state
         from ..database import db
+        logger.info(f"🔥 STEP: Looking for session {session_id} in database...")
         db_session_data = db.get_lead_session(session_id)
         if not db_session_data:
+            logger.error(f"🔥 STEP: Session {session_id} NOT FOUND in database!")
+            # Try to list recent sessions for debugging
+            try:
+                recent = db.client.table('lead_sessions').select('session_id, created_at').order('created_at', desc=True).limit(5).execute()
+                logger.error(f"🔥 STEP: Recent sessions in DB: {recent.data}")
+            except:
+                pass
             return not_found_response("Session", session_id)
+        logger.info(f"🔥 STEP: Found session in database: {db_session_data}")
         
         # Load latest session snapshot to get full state including question_strategy
         session_snapshot = db.get_latest_session_snapshot(session_id)
@@ -275,24 +297,11 @@ async def submit_and_continue(
         logger.info(f"🔥 API DEBUG: asked_questions = {state_update.get('question_strategy', {}).get('asked_questions', [])}")
         logger.info(f"🔥 API DEBUG: pending_responses = {request.responses}")
         
-        # Run the graph with timeout and reduced recursion limit
-        import asyncio
-        try:
-            result = await asyncio.wait_for(
-                intelligent_survey_graph.ainvoke(
-                    state_update,
-                    {"recursion_limit": 10}  # Reduced from 25 to prevent loops
-                ),
-                timeout=30.0  # 30 second timeout for entire graph execution
-            )
-        except asyncio.TimeoutError:
-            logger.error("Graph execution timed out after 30 seconds")
-            return server_error_response("Request timed out. Please try again.")
-        except Exception as e:
-            logger.error(f"Graph execution failed: {e}")
-            import traceback
-            logger.error(f"Traceback: {traceback.format_exc()}")
-            return server_error_response(f"Failed to process survey: {str(e)}")
+        # Run the graph starting from response processing
+        result = await intelligent_survey_graph.ainvoke(
+            state_update,
+            {"recursion_limit": 25}
+        )
         
         # Save session snapshot for state persistence
         try:
@@ -452,6 +461,31 @@ async def get_session_status(request: Request):
         logger.error(f"Failed to get session status: {e}")
         return server_error_response("Failed to retrieve session status")
 
+
+@router.get("/debug-session/{session_id}")
+async def debug_session(session_id: str):
+    """Debug endpoint to check if a session exists in the database."""
+    try:
+        from ..database import db
+        
+        # Try to find the session
+        session = db.get_lead_session(session_id)
+        
+        # Also get recent sessions
+        recent = db.client.table('lead_sessions').select('session_id, created_at').order('created_at', desc=True).limit(10).execute()
+        
+        return success_response(
+            data={
+                "requested_session_id": session_id,
+                "session_found": session is not None,
+                "session_data": session,
+                "recent_sessions": recent.data
+            },
+            message=f"Session {'found' if session else 'not found'}"
+        )
+    except Exception as e:
+        logger.error(f"Debug session failed: {e}")
+        return error_response(str(e))
 
 @router.get("/db-health")
 async def database_health_check():
