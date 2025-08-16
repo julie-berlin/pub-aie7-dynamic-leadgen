@@ -37,7 +37,7 @@ PYTHONPATH=/path/to/project/backend python3 backend/generate_typescript_types.py
 
 This will:
 - Generate `backend/survey-api-types.ts` with all current types
-- Automatically copy the file to `documentation/frontend-integration/typescript-types.ts`
+- Automatically copy the file to `docs/frontend-integration/typescript-types.ts`
 - Create JSON schemas for additional tooling in `backend/survey-api-schemas.json`
 
 ### Type Generation Features
@@ -126,7 +126,7 @@ Consider adding the type generation to your development workflow:
 # .git/hooks/pre-commit
 cd backend
 uv run python3 generate_typescript_types.py
-git add ../documentation/frontend-integration/typescript-types.ts
+git add ../docs/frontend-integration/typescript-types.ts
 ```
 
 #### CI/CD Pipeline
@@ -135,7 +135,7 @@ git add ../documentation/frontend-integration/typescript-types.ts
 - name: Generate TypeScript Types
   run: |
     uv run python3 backend/generate_typescript_types.py
-    git diff --exit-code documentation/frontend-integration/typescript-types.ts || {
+    git diff --exit-code docs/frontend-integration/typescript-types.ts || {
       echo "TypeScript types are out of date. Please regenerate."
       exit 1
     }

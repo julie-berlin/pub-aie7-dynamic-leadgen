@@ -17,6 +17,7 @@ import json
 import uuid
 
 from app.database import get_database_connection
+from app.utils.response_helpers import success_response, error_response, not_found_response, server_error_response
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/themes", tags=["themes"])
@@ -123,7 +124,7 @@ class ThemeListResponse(BaseModel):
 
 # === THEME MANAGEMENT ENDPOINTS ===
 
-@router.get("/client/{client_id}", response_model=ThemeListResponse)
+@router.get("/client/{client_id}")
 async def get_client_themes(client_id: str, include_system: bool = True):
     """Get all themes available to a client."""
     try:
@@ -169,17 +170,20 @@ async def get_client_themes(client_id: str, include_system: bool = True):
                     updated_at=row[10]
                 ))
             
-            return ThemeListResponse(
-                themes=themes,
-                total_count=len(themes),
-                system_themes_count=system_count
+            return success_response(
+                data={
+                    "themes": [theme.dict() for theme in themes],
+                    "total_count": len(themes),
+                    "system_themes_count": system_count
+                },
+                message="Client themes retrieved successfully"
             )
             
     except Exception as e:
         logger.error(f"Failed to get client themes: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve themes")
+        return server_error_response("Failed to retrieve themes")
 
-@router.post("/client/{client_id}", response_model=ClientThemeResponse)
+@router.post("/client/{client_id}")
 async def create_client_theme(client_id: str, theme_request: ClientThemeRequest):
     """Create a new theme for a client."""
     try:
@@ -212,27 +216,31 @@ async def create_client_theme(client_id: str, theme_request: ClientThemeRequest)
             result = cursor.fetchone()
             conn.commit()
             
-            return ClientThemeResponse(
-                id=theme_id,
-                client_id=client_id,
-                name=theme_request.name,
-                description=theme_request.description,
-                theme_config=theme_request.theme_config,
-                is_default=theme_request.is_default,
-                is_system_theme=False,
-                usage_count=0,
-                last_used_at=None,
-                created_at=result[1],
-                updated_at=result[2]
+            return success_response(
+                data={
+                    "id": theme_id,
+                    "client_id": client_id,
+                    "name": theme_request.name,
+                    "description": theme_request.description,
+                    "theme_config": theme_request.theme_config.dict(),
+                    "is_default": theme_request.is_default,
+                    "is_system_theme": False,
+                    "usage_count": 0,
+                    "last_used_at": None,
+                    "created_at": result[1].isoformat(),
+                    "updated_at": result[2].isoformat()
+                },
+                message="Theme created successfully",
+                status_code=201
             )
             
     except Exception as e:
         logger.error(f"Failed to create client theme: {e}")
         if "unique constraint" in str(e).lower():
-            raise HTTPException(status_code=409, detail="Theme name already exists for this client")
-        raise HTTPException(status_code=500, detail="Failed to create theme")
+            return error_response("Theme name already exists for this client", status_code=409)
+        return server_error_response("Failed to create theme")
 
-@router.get("/theme/{theme_id}", response_model=ClientThemeResponse)
+@router.get("/theme/{theme_id}")
 async def get_theme_by_id(theme_id: str):
     """Get a specific theme by ID."""
     try:
@@ -247,29 +255,30 @@ async def get_theme_by_id(theme_id: str):
             
             row = cursor.fetchone()
             if not row:
-                raise HTTPException(status_code=404, detail="Theme not found")
+                return not_found_response("Theme", theme_id)
             
-            return ClientThemeResponse(
-                id=str(row[0]),
-                client_id=str(row[1]) if row[1] else None,
-                name=row[2],
-                description=row[3],
-                theme_config=ThemeConfig(**row[4]),
-                is_default=row[5],
-                is_system_theme=row[6],
-                usage_count=row[7],
-                last_used_at=row[8],
-                created_at=row[9],
-                updated_at=row[10]
+            return success_response(
+                data={
+                    "id": str(row[0]),
+                    "client_id": str(row[1]) if row[1] else None,
+                    "name": row[2],
+                    "description": row[3],
+                    "theme_config": row[4],
+                    "is_default": row[5],
+                    "is_system_theme": row[6],
+                    "usage_count": row[7],
+                    "last_used_at": row[8].isoformat() if row[8] else None,
+                    "created_at": row[9].isoformat(),
+                    "updated_at": row[10].isoformat()
+                },
+                message="Theme retrieved successfully"
             )
             
-    except HTTPException:
-        raise
     except Exception as e:
         logger.error(f"Failed to get theme: {e}")
-        raise HTTPException(status_code=500, detail="Failed to retrieve theme")
+        return server_error_response("Failed to retrieve theme")
 
-@router.put("/theme/{theme_id}", response_model=ClientThemeResponse)
+@router.put("/theme/{theme_id}")
 async def update_theme(theme_id: str, theme_request: ClientThemeRequest):
     """Update an existing theme."""
     try:
@@ -279,11 +288,11 @@ async def update_theme(theme_id: str, theme_request: ClientThemeRequest):
             cursor.execute("SELECT client_id, is_system_theme FROM client_themes WHERE id = %s", (theme_id,))
             result = cursor.fetchone()
             if not result:
-                raise HTTPException(status_code=404, detail="Theme not found")
+                return not_found_response("Theme", theme_id)
             
             client_id, is_system_theme = result
             if is_system_theme:
-                raise HTTPException(status_code=403, detail="Cannot modify system themes")
+                return error_response("Cannot modify system themes", status_code=403)
             
             # If setting as default, unset other default themes
             if theme_request.is_default:

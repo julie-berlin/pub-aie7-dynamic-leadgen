@@ -57,7 +57,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.session_store import RedisSessionStore
 
 # Import routes
-from app.routes import survey_api, health, theme_api, analytics_api, admin_api, files_api
+from app.routes import survey_api, health, themes_api, analytics_api, admin_api, files_api
 # Import new RESTful routes
 from app.routes import forms_api, clients_api
 
@@ -144,7 +144,7 @@ app.add_middleware(LoggingMiddleware)
 
 # Include routers
 app.include_router(survey_api.router, tags=["survey"])
-app.include_router(theme_api.router, tags=["themes"])
+app.include_router(themes_api.router, tags=["themes"])
 app.include_router(analytics_api.router, tags=["analytics"])
 
 # New RESTful routes for admin interface

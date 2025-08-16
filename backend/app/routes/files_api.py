@@ -10,6 +10,7 @@ import mimetypes
 from pathlib import Path
 from typing import Optional
 import logging
+from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, status, Response, Request
 from fastapi.responses import FileResponse
@@ -219,25 +220,33 @@ def _is_safe_filename(filename: str) -> bool:
 async def files_health_check() -> dict:
     """Health check for file serving functionality"""
     try:
-        # Check if upload directories exist
-        logos_dir = file_upload_handler.storage.logos_dir
+        # Check if base upload directories exist
+        base_dir = file_upload_handler.storage.base_upload_dir
+        temp_dir = file_upload_handler.storage.temp_dir
         
         health_status = {
             "status": "healthy",
             "directories": {
-                "logos_dir": {
-                    "exists": logos_dir.exists(),
-                    "writable": os.access(logos_dir, os.W_OK) if logos_dir.exists() else False,
-                    "path": str(logos_dir)
+                "base_upload_dir": {
+                    "exists": base_dir.exists(),
+                    "writable": os.access(base_dir, os.W_OK) if base_dir.exists() else False,
+                    "path": str(base_dir)
+                },
+                "temp_dir": {
+                    "exists": temp_dir.exists(), 
+                    "writable": os.access(temp_dir, os.W_OK) if temp_dir.exists() else False,
+                    "path": str(temp_dir)
                 }
             },
-            "timestamp": "{{ datetime.now().isoformat() }}"
+            "timestamp": datetime.now().isoformat()
         }
         
         # Overall health check
         all_healthy = all([
-            health_status["directories"]["logos_dir"]["exists"],
-            health_status["directories"]["logos_dir"]["writable"]
+            health_status["directories"]["base_upload_dir"]["exists"],
+            health_status["directories"]["base_upload_dir"]["writable"],
+            health_status["directories"]["temp_dir"]["exists"],
+            health_status["directories"]["temp_dir"]["writable"]
         ])
         
         if not all_healthy:
