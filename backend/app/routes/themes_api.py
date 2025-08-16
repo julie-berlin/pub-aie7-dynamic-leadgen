@@ -115,6 +115,80 @@ class ThemeListResponse(BaseModel):
 
 # === UTILITY FUNCTIONS WITH CLIENT SCOPING ===
 
+def transform_theme_to_frontend_format(admin_theme_config: dict) -> dict:
+    """
+    Transform admin-saved theme config to complete frontend ThemeConfig format.
+    
+    Admin saves: {primary_color, font_family, border_radius}
+    Frontend expects: Complete ThemeConfig with colors, typography, spacing, etc.
+    """
+    primary_color = admin_theme_config.get('primary_color', '#3b82f6')
+    font_family = admin_theme_config.get('font_family', 'Inter')
+    border_radius = admin_theme_config.get('border_radius', '0.5rem')
+    
+    # Generate color variations from primary color
+    def hex_to_rgb(hex_color):
+        hex_color = hex_color.lstrip('#')
+        return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+    
+    def rgb_to_hex(r, g, b):
+        return f"#{r:02x}{g:02x}{b:02x}"
+    
+    def darken_color(hex_color, factor=0.8):
+        r, g, b = hex_to_rgb(hex_color)
+        r = int(r * factor)
+        g = int(g * factor) 
+        b = int(b * factor)
+        return rgb_to_hex(r, g, b)
+    
+    def lighten_color(hex_color, factor=0.9):
+        r, g, b = hex_to_rgb(hex_color)
+        r = min(255, int(r + (255 - r) * factor))
+        g = min(255, int(g + (255 - g) * factor))
+        b = min(255, int(b + (255 - b) * factor))
+        return rgb_to_hex(r, g, b)
+    
+    # Generate theme variations
+    primary_hover = darken_color(primary_color, 0.85)
+    primary_light = lighten_color(primary_color, 0.85)
+    
+    return {
+        "name": "Custom Theme",
+        "colors": {
+            "primary": primary_color,
+            "primaryHover": primary_hover,
+            "primaryLight": primary_light,
+            "secondary": "#6b7280",
+            "secondaryHover": "#4b5563",
+            "secondaryLight": "#f3f4f6",
+            "accent": "#10b981",
+            "text": "#111827",
+            "textLight": "#6b7280",
+            "textMuted": "#9ca3af",
+            "background": "#ffffff",
+            "backgroundLight": "#f9fafb",
+            "border": "#e5e7eb",
+            "error": "#ef4444",
+            "success": "#10b981",
+            "warning": "#f59e0b"
+        },
+        "typography": {
+            "primary": f"{font_family}, sans-serif",
+            "secondary": f"{font_family}, sans-serif"
+        },
+        "spacing": {
+            "section": "2rem",
+            "element": "1rem",
+            "page": "2rem",
+            "input": "1rem",
+            "button": "0.75rem 1.5rem"
+        },
+        "borderRadius": border_radius,
+        "borderRadiusLg": "0.75rem",
+        "shadow": "0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)",
+        "shadowLg": "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)"
+    }
+
 def verify_theme_ownership(theme_id: str, client_id: str) -> bool:
     """
     Verify that a theme belongs to the specified client.
@@ -451,3 +525,102 @@ async def delete_theme(
     except Exception as e:
         logger.error(f"Failed to delete theme: {e}")
         return error_response("Failed to delete theme", status_code=500)
+
+# === FORM THEME ENDPOINTS ===
+
+@router.get("/form/{form_id}/theme")
+async def get_form_theme(form_id: str):
+    """
+    Get the effective theme for a form (form-specific or client default).
+    
+    This endpoint is called by the frontend form application to load theme configuration.
+    No authentication required as this is called by public forms.
+    """
+    try:
+        from ..database import db
+        
+        # Get form data including theme_config
+        form_data = db.get_form(form_id)
+        if not form_data:
+            return error_response("Form not found", status_code=404)
+        
+        # Check if form has a specific theme_config
+        theme_config = form_data.get('theme_config')
+        
+        if theme_config:
+            logger.info(f"Found theme_config for form {form_id}: {type(theme_config)}")
+            # Transform admin-format theme config to frontend format
+            transformed_theme = transform_theme_to_frontend_format(theme_config)
+            return success_response(
+                data=transformed_theme,
+                message="Form-specific theme loaded successfully"
+            )
+        
+        # If no form-specific theme, try to get client's default theme
+        client_id = form_data.get('client_id')
+        if client_id:
+            logger.info(f"Looking for default theme for client {client_id}")
+            try:
+                # Get client's default theme from client_themes table using Supabase client
+                client_theme_data = db.client.table('client_themes').select('theme_config').eq('client_id', client_id).eq('is_default', True).limit(1).execute()
+                
+                if client_theme_data.data and len(client_theme_data.data) > 0:
+                    theme_config = client_theme_data.data[0].get('theme_config')
+                    if theme_config:
+                        logger.info(f"Found client default theme for {client_id}")
+                        # Transform client default theme to frontend format
+                        transformed_theme = transform_theme_to_frontend_format(theme_config)
+                        return success_response(
+                            data=transformed_theme,
+                            message="Client default theme loaded successfully"
+                        )
+            except Exception as e:
+                logger.warning(f"Error loading client theme: {e}")
+        
+        # Fallback to default theme if no specific theme is found
+        logger.info(f"Using fallback default theme for form {form_id}")
+        default_theme = {
+            "name": "Default Theme",
+            "colors": {
+                "primary": "#3b82f6",
+                "primaryHover": "#2563eb",
+                "primaryLight": "#dbeafe",
+                "secondary": "#6b7280",
+                "secondaryHover": "#4b5563",
+                "secondaryLight": "#f3f4f6",
+                "accent": "#10b981",
+                "text": "#111827",
+                "textLight": "#6b7280",
+                "textMuted": "#9ca3af",
+                "background": "#ffffff",
+                "backgroundLight": "#f9fafb",
+                "border": "#e5e7eb",
+                "error": "#ef4444",
+                "success": "#10b981",
+                "warning": "#f59e0b"
+            },
+            "typography": {
+                "primary": "Inter, sans-serif",
+                "secondary": "Inter, sans-serif"
+            },
+            "spacing": {
+                "section": "2rem",
+                "element": "1rem",
+                "page": "2rem",
+                "input": "1rem",
+                "button": "0.75rem 1.5rem"
+            },
+            "borderRadius": "0.5rem",
+            "borderRadiusLg": "0.75rem",
+            "shadow": "0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)",
+            "shadowLg": "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)"
+        }
+        
+        return success_response(
+            data=default_theme,
+            message="Default theme loaded successfully"
+        )
+            
+    except Exception as e:
+        logger.error(f"Failed to get form theme: {e}")
+        return error_response("Failed to retrieve form theme", status_code=500)
