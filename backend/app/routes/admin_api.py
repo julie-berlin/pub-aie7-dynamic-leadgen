@@ -11,6 +11,9 @@ This module provides API endpoints for:
 from fastapi import APIRouter, HTTPException, Depends, status, UploadFile, File
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field, EmailStr, validator
+import re
+from urllib.parse import urlparse
+from pathlib import Path
 from typing import Dict, Any, List, Optional, Literal
 import logging
 from datetime import datetime, timedelta
@@ -94,6 +97,27 @@ class ClientSettingsRequest(BaseModel):
     from_email: Optional[EmailStr] = None
     reply_to_email: Optional[EmailStr] = None
     webhook_url: Optional[str] = None
+
+    @validator('logo_url')
+    def validate_logo_url(cls, v):
+        """Validate logo URL format and path."""
+        if v is None:
+            return v
+        
+        # Check if it's a valid URL format or relative path
+        if v.startswith('http://') or v.startswith('https://'):
+            # External URL - validate URL format
+            parsed = urlparse(v)
+            if not parsed.netloc:
+                raise ValueError('Invalid URL format')
+        elif v.startswith('/api/files/'):
+            # Internal API path - validate format
+            if not re.match(r'^/api/files/clients/[a-zA-Z0-9-]+/logos/[a-zA-Z0-9._-]+$', v):
+                raise ValueError('Invalid internal logo path format')
+        else:
+            raise ValueError('Logo URL must be either an external URL (http/https) or internal API path (/api/files/)')
+        
+        return v
 
 class ClientSettingsResponse(BaseModel):
     """Response model for client settings."""
@@ -416,6 +440,31 @@ async def get_client_settings(current_user: AdminUserResponse = Depends(get_curr
         logger.error(f"Failed to get client settings: {e}")
         raise HTTPException(status_code=500, detail="Failed to retrieve client settings")
 
+def _validate_logo_file_exists(logo_url: str, client_id: str) -> bool:
+    """Validate that the logo file exists on the server."""
+    if not logo_url.startswith('/api/files/'):
+        # External URL - assume it exists (we can't validate external URLs)
+        return True
+    
+    # Extract filename from internal API path: /api/files/clients/{client_id}/logos/{filename}
+    try:
+        parts = logo_url.split('/')
+        if len(parts) >= 6 and parts[3] == 'clients' and parts[5] == 'logos':
+            url_client_id = parts[4]
+            filename = parts[6]
+            
+            # Ensure the client_id matches
+            if url_client_id != client_id:
+                return False
+            
+            # Check if file exists in the uploads directory
+            from app.utils.file_upload import file_upload_handler
+            file_info = file_upload_handler.get_logo_info(filename, client_id)
+            return file_info is not None
+        return False
+    except Exception:
+        return False
+
 @router.put("/client/settings", response_model=ClientSettingsResponse)
 async def update_client_settings(
     settings_request: ClientSettingsRequest,
@@ -423,6 +472,14 @@ async def update_client_settings(
 ):
     """Update client settings and branding."""
     try:
+        # Validate logo file existence if logo_url is provided
+        if settings_request.logo_url:
+            if not _validate_logo_file_exists(settings_request.logo_url, current_user.client_id):
+                raise HTTPException(
+                    status_code=400, 
+                    detail="Logo file does not exist or is not accessible"
+                )
+        
         conn = get_database_connection()
         with conn.cursor() as cursor:
             # Build dynamic update query
@@ -450,6 +507,8 @@ async def update_client_settings(
             # Return updated settings
             return await get_client_settings(current_user)
             
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to update client settings: {e}")
         raise HTTPException(status_code=500, detail="Failed to update client settings")
