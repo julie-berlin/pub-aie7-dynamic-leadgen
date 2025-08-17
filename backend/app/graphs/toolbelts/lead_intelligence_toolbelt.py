@@ -53,7 +53,7 @@ class LeadIntelligenceToolbelt:
                         "answered_at": datetime.now().isoformat()
                     }
                     
-                    db.save_response(response_data)
+                    db.save_individual_response(session_id, response_data)
                     saved_count += 1
                     
                 except Exception as e:

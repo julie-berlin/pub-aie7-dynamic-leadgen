@@ -347,12 +347,12 @@ MESSAGE: At Pawsome Dog Walking, we've helped over 500 pet owners. Tell us more 
             
             user_prompt = f"""Select and rephrase questions for this survey step:
 
-BUSINESS: {business_name} ({industry})
+BUSINESS PROVIDING SERVICE: {business_name} ({industry})
 - Background: {business_background[:150]}
 - Goals: {business_goals[:150]}
 - Target: {target_audience[:150]}
 
-USER CONTEXT:
+USER FILLING OUT FORM:
 - Name: {user_name or 'not provided yet'}
 - Questions answered: {analysis['questions_asked']}
 - Engagement risk: {analysis['risk_level']}
@@ -361,12 +361,25 @@ USER CONTEXT:
 AVAILABLE QUESTIONS:
 {chr(10).join([f"{q['number']}. {q['question_text']}" for q in numbered_questions])}
 
-INSTRUCTIONS:
+CRITICAL INSTRUCTIONS:
 1. Select 1-4 questions (vary the count - don't always pick same number)
-2. Rephrase to be engaging and personal
-3. Use user's name ({user_name}) if known
-4. Reference previous responses when relevant
-5. Create headline and message about {business_name}
+2. Rephrase questions FOR THE USER (person filling out form)
+3. Use user's name ({user_name}) if known - NOT business owner info
+4. Questions ask about USER'S needs/info - NOT business owner's info
+5. ENGAGEMENT MESSAGES (HEADLINE + MESSAGE): Use business info to entice user
+   - Mention {business_name}'s background, qualifications, experience
+   - Highlight specific services and benefits offered
+   - Show why the business is perfect for the user's needs
+   - Reference business owner's expertise to build trust
+6. NEVER mix business owner details into user questions
+
+QUESTION PHRASING:
+WRONG: "What should we call you, the dog-loving recent Psychology graduate?"
+RIGHT: "What should we call you?" or "Hi {user_name}, what should we call you?"
+
+ENGAGEMENT MESSAGING:
+GOOD: "As a Psychology graduate who loves dogs, [Business] provides expert care..."
+GOOD: "With experience hiking and jogging with dogs, we understand..."
 
 Use the exact output format specified in your instructions."""
             
@@ -607,7 +620,8 @@ Use the exact output format specified in your instructions."""
         """
         # Update state with selected questions
         question_strategy = state.get('question_strategy', {})
-        asked_questions = question_strategy.get('asked_questions', [])
+        # Don't use state's asked_questions - database is source of truth
+        # asked_questions = question_strategy.get('asked_questions', [])
         
         # Mark newly selected questions as asked in database
         from ...database import db
@@ -627,8 +641,13 @@ Use the exact output format specified in your instructions."""
             db.mark_questions_asked(session_id, new_question_ids, decision["selected_questions"])
             logger.info(f"🔥 DATABASE TRACKING: Marked {len(new_question_ids)} questions as asked in database")
         
-        # Update local state for compatibility
-        asked_questions = asked_questions + new_question_ids
+        # Get current asked questions from database (source of truth) and state  
+        db_asked_questions = db.get_asked_questions(session_id) if session_id else []
+        state_asked_questions = question_strategy.get('asked_questions', [])
+        
+        # Combine database and state (state should now only contain integers)
+        all_asked_questions = list(set(db_asked_questions + state_asked_questions))
+        logger.info(f"🔥 STATE SYNC: DB={db_asked_questions}, State={state_asked_questions}, Final={all_asked_questions}")
         
         # Format questions for frontend API client (using backend format that frontend transforms)
         # NOTE: Never expose scoring_rubric to frontend - that's sensitive business logic
@@ -691,7 +710,7 @@ Use the exact output format specified in your instructions."""
             # State updates
             "question_strategy": {
                 "all_questions": question_strategy.get("all_questions", []),
-                "asked_questions": asked_questions,  # CRITICAL: Use updated list, not spread old state
+                "asked_questions": all_asked_questions,  # CRITICAL: Clean state with only integer question IDs
                 "current_questions": frontend_questions,
                 "selection_history": question_strategy.get("selection_history", []),
                 "selection_confidence": decision.get("confidence", 0.7)
@@ -712,7 +731,7 @@ Use the exact output format specified in your instructions."""
         }
         
         # Debug: Log what we're returning
-        logger.info(f"🔥 SUPERVISOR RETURN: asked_questions = {result['question_strategy']['asked_questions']}")
+        logger.info(f"🔥 SUPERVISOR RETURN: asked_questions = {all_asked_questions}")
         return result
     
     def _create_completion_response(self, reason: str) -> Dict[str, Any]:
