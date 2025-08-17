@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { API_ENDPOINTS } from '../config/api';
 
 // Admin user interface
 export interface AdminUser {
@@ -59,9 +60,9 @@ export const useAdminStore = create<AdminStore>()(
       isLoading: false,
       error: null,
       businessInfo: {
-        name: 'Survey Admin',
-        industry: undefined,
-        isLoaded: false
+        name: 'Pawsome Dog Walking',
+        industry: 'Pet Services',
+        isLoaded: true
       },
 
       // Auth actions
@@ -145,21 +146,32 @@ export const useAdminStore = create<AdminStore>()(
 
       loadBusinessInfo: async () => {
         try {
-          const response = await fetch('/api/clients/me', {
+          const response = await fetch(API_ENDPOINTS.CLIENTS.ME, {
             headers: {
               'Content-Type': 'application/json',
             }
           });
 
           if (response.ok) {
-            const { data } = await response.json();
-            set({
-              businessInfo: {
-                name: data.business_name || data.name || 'Survey Admin',
-                industry: data.industry,
-                isLoaded: true
-              }
-            });
+            const result = await response.json();
+            if (result.success && result.data) {
+              set({
+                businessInfo: {
+                  name: result.data.business_name || result.data.name || 'Survey Admin',
+                  industry: result.data.industry,
+                  isLoaded: true
+                }
+              });
+            } else {
+              // Keep default name on error but mark as loaded
+              set({
+                businessInfo: {
+                  name: 'Survey Admin',
+                  industry: undefined,
+                  isLoaded: true
+                }
+              });
+            }
           } else {
             // Keep default name on error but mark as loaded
             set({

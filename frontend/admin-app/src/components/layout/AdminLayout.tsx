@@ -5,7 +5,8 @@ import {
   DocumentTextIcon, 
   ChartBarIcon, 
   CogIcon,
-  UserIcon
+  UserIcon,
+  UsersIcon
 } from '@heroicons/react/24/outline';
 import { useAdminStore } from '../../stores/adminStore';
 import Breadcrumb, { useBreadcrumbs } from '../common/Breadcrumb';
@@ -18,6 +19,7 @@ interface AdminLayoutProps {
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
   { name: 'Forms', href: '/forms', icon: DocumentTextIcon },
+  { name: 'Leads', href: '/leads', icon: UsersIcon },
   { name: 'Analytics', href: '/analytics', icon: ChartBarIcon },
   { name: 'Settings', href: '/settings', icon: CogIcon },
 ];

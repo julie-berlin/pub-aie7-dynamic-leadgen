@@ -82,15 +82,20 @@
 /* Admin component classes */
 @layer components {
   .admin-card {
-    @apply bg-white rounded-lg border border-slate-200 shadow-sm;
+    @apply bg-white rounded-lg border border-slate-200 shadow-sm p-6;
   }
 
   .admin-card-header {
-    @apply px-6 py-4 border-b border-slate-200;
+    @apply -m-6 mb-6 px-6 py-4 border-b border-slate-200;
   }
 
   .admin-card-body {
-    @apply px-6 py-4;
+    @apply -m-6 mt-0 px-6 py-4;
+  }
+
+  /* For cards with only header */
+  .admin-card-header:last-child {
+    @apply mb-0;
   }
 
   .admin-btn-primary {
@@ -210,6 +215,31 @@
 
   .shadow-admin-md {
     box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  }
+
+  /* Metric components */
+  .admin-metric {
+    @apply bg-white rounded-lg border border-slate-200 shadow-sm p-6;
+  }
+
+  .admin-metric-label {
+    @apply text-sm font-medium text-slate-600;
+  }
+
+  .admin-metric-value {
+    @apply text-2xl font-semibold text-slate-900 mt-1;
+  }
+
+  .admin-metric-change-positive {
+    @apply text-sm text-success-600 mt-1;
+  }
+
+  .admin-metric-change-negative {
+    @apply text-sm text-danger-600 mt-1;
+  }
+
+  .admin-metric-change-neutral {
+    @apply text-sm text-slate-500 mt-1;
   }
 }
 
