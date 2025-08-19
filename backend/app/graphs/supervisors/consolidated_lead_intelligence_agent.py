@@ -132,15 +132,16 @@ Return comprehensive JSON with all processing results:
             
             # Step 8: Return proper state update with cleared pending responses
             current_question_strategy = state.get('question_strategy', {})
-            existing_asked = current_question_strategy.get('asked_questions', [])
-            updated_asked = existing_asked + asked_question_uuids
+            # Don't pollute asked_questions with UUIDs - keep only integer question IDs
+            # Database tracking handles the actual question marking
             
             return {
                 **final_classification,
                 'pending_responses': [],  # Clear after processing
                 'question_strategy': {
                     **current_question_strategy,
-                    'asked_questions': updated_asked
+                    # Keep asked_questions unchanged - Survey Admin manages this with database
+                    'asked_questions': current_question_strategy.get('asked_questions', [])
                 },
                 'lead_intelligence': {
                     **state.get('lead_intelligence', {}),
