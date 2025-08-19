@@ -1,20 +1,48 @@
-# this is the planning agent
-engagement_agent:
+# Survey Administration Supervisor - strategic survey flow decisions
+survey_administration_supervisor:
+  model: gpt-4o-mini
+  temperature: 0.2
+  max_tokens: 2000
+  timeout_seconds: 45
+
+# Lead Intelligence Supervisor - lead analysis and tool decisions  
+lead_intelligence_supervisor:
   model: gpt-4o-mini
   temperature: 0.1
-  max_tokens: 1000
-  timeout_seconds: 30
+  max_tokens: 3000
+  timeout_seconds: 60
 
-#
-lead_scoring_agent:
-  model: gpt-4o-mini
-  temperature: 0.1
-  max_tokens: 1000
-  timeout_seconds: 30
-
-# can be fast
+# Question Selection - intelligent selection within business rules
 question_selection_agent:
   model: gpt-4o-mini
-  temperature: 0.1
+  temperature: 0.3
+  max_tokens: 1500
+  timeout_seconds: 30
+
+# Question Phrasing - adaptive language for engagement
+question_phrasing_agent:
+  model: gpt-4o-mini
+  temperature: 0.4
   max_tokens: 1000
+  timeout_seconds: 30
+
+# Engagement - motivational messaging
+engagement_agent:
+  model: gpt-4o-mini
+  temperature: 0.3
+  max_tokens: 1000
+  timeout_seconds: 30
+
+# Score Validation - validates mathematical scores make business sense
+score_validation_agent:
+  model: gpt-4o-mini
+  temperature: 0.1
+  max_tokens: 1500
+  timeout_seconds: 45
+
+# Completion Messages - personalized completion messaging
+completion_message_agent:
+  model: gpt-4o-mini
+  temperature: 0.3
+  max_tokens: 1200
   timeout_seconds: 30

@@ -7,7 +7,7 @@ import logging
 from datetime import datetime
 
 # Import Pydantic models for type safety
-from ....pydantic_models import (
+from pydantic_models import (
     SurveyGraphState,
     CoreSurveyState,
     ResponseData,
@@ -71,6 +71,17 @@ def initialize_session_with_tracking_node(state: Dict[str, Any]) -> Dict[str, An
         
         # Extract tracking data from metadata or core
         metadata = state.get('metadata', {})
+        
+        # Try to get form_id from multiple possible locations
+        form_id = (
+            metadata.get('form_id') or  # Original metadata
+            core_data.get('form_id') if isinstance(core_data, dict) else None or  # Core data as dict
+            (core_data.form_id if hasattr(core_data, 'form_id') else None)  # Core data as object
+        )
+        
+        # Log for debugging
+        logger.debug(f"Extracting form_id - metadata: {metadata.get('form_id')}, core_data: {core_data}, final form_id: {form_id}")
+        
         tracking_data = {
             'utm_source': metadata.get('utm_source'),
             'utm_medium': metadata.get('utm_medium'),
@@ -89,7 +100,8 @@ def initialize_session_with_tracking_node(state: Dict[str, Any]) -> Dict[str, An
         session_id = str(uuid.uuid4())
         
         # Validate form exists in database
-        form_id = metadata.get('form_id', 'default')
+        if not form_id:
+            raise ValueError("form_id is required but not found in state")
         from ...database import db
         form_config = db.get_form(form_id)
         if not form_config:
@@ -116,6 +128,28 @@ def initialize_session_with_tracking_node(state: Dict[str, Any]) -> Dict[str, An
             'landing_page': metadata.get('landing_page')
         }
         
+        # Save session to database immediately
+        session_data = {
+            'session_id': session_id,
+            'form_id': form_id,
+            'client_id': core_state.get('client_id'),
+            'started_at': core_state['started_at'],
+            'last_updated': core_state['last_updated'],
+            'step': core_state['step'],
+            'completed': core_state['completed'],
+            'lead_status': 'unknown',
+            'abandonment_status': 'active',
+            'abandonment_risk': 0.3
+        }
+        
+        # Create lead session in database
+        from ...database import db
+        try:
+            db.create_lead_session(session_data)
+            logger.info(f"Created lead session in database: {session_id}")
+        except Exception as e:
+            logger.error(f"Failed to create lead session: {e}")
+        
         # Save tracking data immediately to database (fire-and-forget)
         async_db.save_tracking_data(session_id, tracking_data)
         
@@ -126,9 +160,9 @@ def initialize_session_with_tracking_node(state: Dict[str, Any]) -> Dict[str, An
             'core': core_state,
             'master_flow': {
                 'core': core_state,
-                'flow_phase': 'initializing',
+                'flow_phase': 'initialization',
                 'completion_probability': 0.5,
-                'flow_strategy': 'EXPLORATORY'
+                'flow_strategy': 'STANDARD'
             },
             'question_strategy': {
                 'all_questions': [],  # Will be loaded
@@ -331,16 +365,39 @@ def prepare_step_for_frontend_node(state: SurveyGraphState) -> Dict[str, Any]:
     Returns a clean structure for /session/step endpoint.
     """
     try:
+        # Convert Pydantic object to dict if needed
+        if hasattr(state, 'model_dump'):
+            state_dict = state.model_dump()
+        else:
+            state_dict = state
+        
         # Extract data for frontend
-        question_strategy = state.get('question_strategy', {})
-        engagement = state.get('engagement', {})
-        core = state.get('core', {})
+        question_strategy = state_dict.get('question_strategy', {})
+        engagement = state_dict.get('engagement', {})
+        core = state_dict.get('core', {})
+        
+        # Convert QuestionDataInternal to QuestionData format for API
+        phrased_questions = question_strategy.get('phrased_questions', [])
+        frontend_questions = []
+        
+        for q in phrased_questions:
+            if isinstance(q, dict):
+                frontend_question = {
+                    'id': q.get('question_id', 0),
+                    'question': q.get('question_text', ''),
+                    'phrased_question': q.get('phrased_question', q.get('question_text', '')),
+                    'data_type': q.get('data_type', 'text'),
+                    'is_required': q.get('is_required', False),
+                    'options': q.get('options'),
+                    'scoring_rubric': q.get('scoring_rubric')
+                }
+                frontend_questions.append(frontend_question)
         
         # Prepare frontend response
         frontend_data = {
             'session_id': core.get('session_id'),
             'step': core.get('step', 0) + 1,
-            'questions': question_strategy.get('phrased_questions', []),
+            'questions': frontend_questions,
             'question_metadata': question_strategy.get('current_questions', []),
             'headline': engagement.get('step_headline', 'Let\'s continue!'),
             'motivation': engagement.get('step_motivation', 'Thank you for your time.'),
@@ -370,7 +427,7 @@ def qualified_message_generation_node(state: SurveyGraphState) -> Dict[str, Any]
         core = state.get('core', {})
         lead_intelligence = state.get('lead_intelligence', {})
         
-        form_id = core.get('form_id', 'default')
+        form_id = core.get('form_id')
         session_id = core.get('session_id')
         lead_status = lead_intelligence.get('lead_status', 'unknown')
         responses = lead_intelligence.get('responses', [])

@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import Dict, List, Any, Optional
 from supabase import create_client, Client
 from dotenv import load_dotenv
-from app.utils.config_loader import get_database_config, DatabaseConfig
+from .utils.config_loader import get_database_config, DatabaseConfig
 
 # Load environment variables
 load_dotenv()

@@ -1,8 +1,6 @@
 # Production Docker Compose configuration
 # For full-stack deployment with backend API and frontend
 
-version: '3.8'
-
 services:
   # Backend API
   backend:
@@ -12,7 +10,7 @@ services:
     image: dynamic-survey-api:production
     container_name: survey-backend-prod
     restart: unless-stopped
-    
+
     environment:
       - ENVIRONMENT=production
       - LOG_LEVEL=INFO
@@ -29,21 +27,21 @@ services:
       # Optional services
       - LANGCHAIN_API_KEY=${LANGCHAIN_API_KEY}
       - SENTRY_DSN=${SENTRY_DSN}
-    
+
     ports:
       - "${BACKEND_PORT:-8000}:8000"
-    
+
     volumes:
       # Persistent logs
       - ./backend/logs:/app/logs
-      # Configuration override (optional)  
+      # Configuration override (optional)
       - ./backend/config/production:/app/config:ro
       # Cache directory
       - backend_cache:/app/data/cache
-    
+
     networks:
       - survey_network
-    
+
     # Resource limits for production
     deploy:
       resources:
@@ -53,7 +51,7 @@ services:
         reservations:
           cpus: '0.5'
           memory: 512M
-    
+
     # Health check
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -73,23 +71,23 @@ services:
     image: dynamic-survey-frontend:production
     container_name: survey-frontend-prod
     restart: unless-stopped
-    
+
     environment:
       - NODE_ENV=production
       - REACT_APP_API_URL=${REACT_APP_API_URL:-http://backend:8000}
-    
+
     ports:
       - "${FRONTEND_PORT:-3000}:80"
-    
+
     volumes:
       - frontend_cache:/app/node_modules/.cache
-    
+
     networks:
       - survey_network
-    
+
     depends_on:
       - backend
-    
+
     # Resource limits
     deploy:
       resources:
@@ -99,7 +97,7 @@ services:
         reservations:
           cpus: '0.25'
           memory: 256M
-    
+
     # Health check
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
@@ -112,23 +110,23 @@ services:
     image: nginx:alpine
     container_name: survey-nginx-prod
     restart: unless-stopped
-    
+
     ports:
       - "${NGINX_HTTP_PORT:-80}:80"
       - "${NGINX_HTTPS_PORT:-443}:443"
-    
+
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/ssl:/etc/nginx/ssl:ro
       - ./logs/nginx:/var/log/nginx
-    
+
     networks:
       - survey_network
-    
+
     depends_on:
       - backend
       - frontend
-    
+
     # Health check for nginx
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
@@ -141,15 +139,15 @@ services:
     image: redis:7-alpine
     container_name: survey-redis-prod
     restart: unless-stopped
-    
+
     command: redis-server --requirepass ${REDIS_PASSWORD:-changeme} --maxmemory 256mb --maxmemory-policy allkeys-lru
-    
+
     volumes:
       - redis_data:/data
-    
+
     networks:
       - survey_network
-    
+
     # Health check
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -162,15 +160,15 @@ services:
     image: linkyard/docker-logrotate
     container_name: survey-logrotate-prod
     restart: unless-stopped
-    
+
     volumes:
       - ./logs:/logs
       - /var/run/docker.sock:/var/run/docker.sock:ro
-    
+
     environment:
       - LOGROTATE_INTERVAL=daily
       - LOGROTATE_COPIES=7
-    
+
     networks:
       - survey_network
 

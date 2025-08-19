@@ -31,7 +31,7 @@ def lead_scoring_node(state: SurveyState) -> Dict[str, Any]:
             if question.get('scoring_rubric'):
                 rubrics[question['id']] = {
                     'scoring_rubric': question['scoring_rubric'],
-                    'question': question['question']
+                    'question': question['question_text']
                 }
         
         # Analyze responses and calculate score

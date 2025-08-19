@@ -1,5 +1,73 @@
 # pub-aie7-dynamic-leadgen
 
+## 🚀 Quick Start with Docker
+
+### Prerequisites
+- Docker and Docker Compose installed
+- OpenAI API key
+- Supabase account with project credentials
+
+### Setup Instructions
+
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd pub-aie7-dynamic-surveys
+   ```
+
+2. **Create environment file**
+   ```bash
+   cp .env.example .env
+   # Edit .env and add:
+   # - OPENAI_API_KEY
+   # - SUPABASE_URL
+   # - SUPABASE_PUBLISHABLE_KEY
+   # - SUPABASE_SECRET_KEY
+   ```
+
+3. **Start all services**
+   ```bash
+   docker-compose up
+   ```
+
+   This will start:
+   - Redis cache (port 6379)
+   - FastAPI backend (port 8000) - connected to Supabase
+   - React frontend (port 5173)
+
+4. **Access the application**
+   - Frontend: http://localhost:5173
+   - Backend API: http://localhost:8000
+   - API Documentation: http://localhost:8000/docs
+
+### Docker Commands
+
+```bash
+# Start services in background
+docker-compose up -d
+
+# View logs
+docker-compose logs -f [service-name]
+
+# Stop all services
+docker-compose down
+
+# Stop and remove volumes (clean database)
+docker-compose down -v
+
+# Rebuild after code changes
+docker-compose build
+docker-compose up
+```
+
+### Available Test Forms
+The Supabase database should be populated with 5 example business scenarios. Test with these form IDs:
+- `f1111111-1111-1111-1111-111111111111` - Pawsome Dog Walking
+- `f2222222-2222-2222-2222-222222222222` - Metro Realty Group
+- `f3333333-3333-3333-3333-333333333333` - TechSolve Consulting
+- `f4444444-4444-4444-4444-444444444444` - FitLife Personal Training
+- `f5555555-5555-5555-5555-555555555555` - Sparkle Clean Solutions
+
 ## ✅ Problem Worth Solving
 
 Businesses spend time customizing multi-step forms and still fail to capture quality leads. Most lead gen funnels are static, hard to personalize, and high-friction. Users either abandon them mid-way or provide low-quality responses.
