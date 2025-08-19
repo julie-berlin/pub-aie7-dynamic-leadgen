@@ -1,13 +1,16 @@
-import { type ReactNode } from 'react';
+import { type ReactNode, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
   HomeIcon, 
   DocumentTextIcon, 
   ChartBarIcon, 
   CogIcon,
-  UserIcon
+  UserIcon,
+  UsersIcon
 } from '@heroicons/react/24/outline';
 import { useAdminStore } from '../../stores/adminStore';
+import Breadcrumb, { useBreadcrumbs } from '../common/Breadcrumb';
+import { useBreadcrumbContext } from '../common/BreadcrumbContext';
 
 interface AdminLayoutProps {
   children: ReactNode;
@@ -16,13 +19,22 @@ interface AdminLayoutProps {
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
   { name: 'Forms', href: '/forms', icon: DocumentTextIcon },
+  { name: 'Leads', href: '/leads', icon: UsersIcon },
   { name: 'Analytics', href: '/analytics', icon: ChartBarIcon },
   { name: 'Settings', href: '/settings', icon: CogIcon },
 ];
 
 export default function AdminLayout({ children }: AdminLayoutProps) {
   const location = useLocation();
-  const { user, logout } = useAdminStore();
+  const { user, logout, businessInfo, loadBusinessInfo } = useAdminStore();
+  const { customBreadcrumbs } = useBreadcrumbContext();
+  const breadcrumbs = useBreadcrumbs(customBreadcrumbs);
+
+  useEffect(() => {
+    if (!businessInfo.isLoaded) {
+      loadBusinessInfo();
+    }
+  }, [businessInfo.isLoaded, loadBusinessInfo]);
 
   return (
     <div className="flex h-screen bg-slate-50">
@@ -31,10 +43,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         {/* Logo */}
         <div className="px-6 py-8">
           <h1 className="text-xl font-bold text-slate-900">
-            Survey Admin
+            {!businessInfo.isLoaded ? 'Loading...' : businessInfo.name}
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Lead Generation Platform
+            Varyq - Intelligent Leads
           </p>
         </div>
 
@@ -93,9 +105,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         {/* Header */}
         <header className="bg-white border-b border-slate-200 px-6 py-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-slate-900">
-              {navigation.find(item => item.href === location.pathname)?.name || 'Admin'}
-            </h2>
+            <div className="flex flex-col space-y-2">
+              <h2 className="text-xl font-semibold text-slate-900">
+                {navigation.find(item => item.href === location.pathname)?.name || 'Admin'}
+              </h2>
+              <Breadcrumb items={breadcrumbs} />
+            </div>
             
             {/* Header actions */}
             <div className="flex items-center space-x-4">

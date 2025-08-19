@@ -68,9 +68,57 @@ async def start_session(
     Security: Session managed by fastapi-sessions with Redis backend.
     """
     try:
-        # Prepare initial state with tracking data
+        # Create session ID first, before calling LangGraph
+        import uuid
+        session_id = str(uuid.uuid4())
+        logger.info(f"🔥 START: Creating new session with ID: {session_id}")
+        
+        # Create session data for HTTP session
+        session_data = {
+            "session_id": session_id,
+            "form_id": request.form_id,
+            "client_id": request.client_id,
+            "created_at": datetime.now().isoformat(),
+            "utm_data": {
+                "utm_source": request.utm_source,
+                "utm_medium": request.utm_medium,
+                "utm_campaign": request.utm_campaign,
+                "utm_content": request.utm_content,
+                "utm_term": request.utm_term,
+                "landing_page": request.landing_page
+            }
+        }
+        
+        # Create session in database first
+        from ..database import db
+        try:
+            db_session_data = {
+                'session_id': session_id,
+                'form_id': request.form_id,
+                'client_id': request.client_id,
+                'started_at': datetime.now().isoformat(),
+                'last_updated': datetime.now().isoformat(),
+                'step': 0,
+                'completed': False,
+                'lead_status': 'unknown',
+                'abandonment_status': 'active',
+                'abandonment_risk': 0.3
+            }
+            
+            result = db.client.table("lead_sessions").insert(db_session_data).execute()
+            logger.info(f"🔥 START: Created session {session_id} in database")
+        except Exception as e:
+            logger.error(f"🔥 START: Failed to create database session: {e}")
+            raise HTTPException(status_code=500, detail="Failed to create session")
+        
+        # Create HTTP session using Starlette session manager
+        session_uuid = await create_survey_session(http_request, session_data)
+        logger.info(f"🔥 START: Created secure cookie session: {session_uuid}")
+        
+        # Prepare initial state with tracking data, including pre-created session ID
         initial_state = {
             'metadata': {
+                'session_id': session_id,  # Pass the pre-created session ID
                 'form_id': request.form_id,
                 'client_id': request.client_id,
                 'utm_source': request.utm_source,
@@ -86,7 +134,9 @@ async def start_session(
         }
         
         # Run the graph to initialize and get first questions
+        logger.info(f"🔥 START: Invoking graph with session_id: {session_id}")
         result = await intelligent_survey_graph.ainvoke(initial_state)
+        logger.info(f"🔥 START: Graph invocation completed for session: {session_id}")
         
         logger.debug(f"Graph result type: {type(result)}")
         logger.debug(f"Graph result keys: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}")
@@ -94,29 +144,6 @@ async def start_session(
         # Extract frontend response
         frontend_data = result.get('frontend_response', {})
         logger.debug(f"Frontend data: {frontend_data}")
-        session_id = frontend_data.get('session_id')
-        logger.debug(f"Extracted session_id: {session_id}")
-        
-        # Create session data for fastapi-sessions
-        if session_id:
-            session_data = {
-                "session_id": session_id,
-                "form_id": request.form_id,
-                "client_id": request.client_id,
-                "created_at": datetime.now().isoformat(),
-                "utm_data": {
-                    "utm_source": request.utm_source,
-                    "utm_medium": request.utm_medium,
-                    "utm_campaign": request.utm_campaign,
-                    "utm_content": request.utm_content,
-                    "utm_term": request.utm_term,
-                    "landing_page": request.landing_page
-                }
-            }
-            
-            # Create session using Starlette session manager
-            session_uuid = await create_survey_session(http_request, session_data)
-            logger.info(f"Created secure session: {session_uuid}")
             
         # Extract form details from graph response
         form_details = result.get('form_details', {})
@@ -127,6 +154,27 @@ async def start_session(
             
         logger.debug(f"Extracted form_details: {form_details}")
         
+        # Load business name and logo from client_id (server-side only)
+        business_name = None
+        logo_url = None
+        client_id = form_details.get('client_id')
+        logger.info(f"🏢 Loading business info for client_id: {client_id}")
+        if client_id:
+            try:
+                from ..database import db
+                client_data = db.client.table('clients').select('business_name', 'company_logo_url').eq('id', client_id).execute()
+                logger.info(f"🏢 Client query result: {client_data.data}")
+                if client_data.data and len(client_data.data) > 0:
+                    business_name = client_data.data[0].get('business_name')
+                    logo_url = client_data.data[0].get('company_logo_url')
+                    logger.info(f"🏢 Successfully loaded business name: {business_name}, logo_url: {logo_url}")
+                else:
+                    logger.warning(f"🏢 No client data found for client_id: {client_id}")
+            except Exception as e:
+                logger.error(f"🏢 Failed to load business info for client {client_id}: {e}")
+        else:
+            logger.warning(f"🏢 No client_id found in form_details: {form_details}")
+        
         # Create response with consistent format
         json_response = success_response(
             data={
@@ -134,6 +182,8 @@ async def start_session(
                     "id": form_details.get('id', request.form_id),
                     "title": form_details.get('title', 'Survey'),
                     "description": form_details.get('description'),
+                    "businessName": business_name,
+                    "logoUrl": logo_url,
                     "theme": frontend_data.get('theme')
                 },
                 "step": {
@@ -183,30 +233,116 @@ async def submit_and_continue(
             )
             
         session_id = session_data.get('session_id')
-        logger.info(f"Processing step for session: {session_id}")
+        logger.info(f"🔥 STEP: Processing step for session: {session_id}")
+        logger.info(f"🔥 STEP: Full session_data from cookie: {session_data}")
         
         # Load existing session data from database to get form_id and other state
         from ..database import db
+        logger.info(f"🔥 STEP: Looking for session {session_id} in database...")
         db_session_data = db.get_lead_session(session_id)
         if not db_session_data:
+            logger.error(f"🔥 STEP: Session {session_id} NOT FOUND in database!")
+            # Try to list recent sessions for debugging
+            try:
+                recent = db.client.table('lead_sessions').select('session_id, created_at').order('created_at', desc=True).limit(5).execute()
+                logger.error(f"🔥 STEP: Recent sessions in DB: {recent.data}")
+            except:
+                pass
             return not_found_response("Session", session_id)
+        logger.info(f"🔥 STEP: Found session in database: {db_session_data}")
         
-        # Prepare state with full session context plus new responses
-        state_update = {
-            'core': {
+        # Load latest session snapshot to get full state including question_strategy
+        session_snapshot = db.get_latest_session_snapshot(session_id)
+        
+        if session_snapshot:
+            # Restore full state from snapshot
+            logger.info(f"🔥 API DEBUG: Loaded session snapshot with state")
+            state_update = session_snapshot.get('full_state', {})
+            logger.info(f"🔥 SNAPSHOT LOADED: asked_questions = {state_update.get('question_strategy', {}).get('asked_questions', [])}")
+            
+            # Update core data with latest from database
+            state_update['core'] = {
+                **state_update.get('core', {}),
                 'session_id': session_id,
-                'form_id': db_session_data.get('form_id'),  # Critical: include form_id
+                'form_id': db_session_data.get('form_id'),
                 'step': db_session_data.get('step', 0),
                 'client_id': db_session_data.get('client_id')
-            },
-            'pending_responses': request.responses
-        }
+            }
+            
+            # Add new responses
+            state_update['pending_responses'] = request.responses
+        else:
+            # First time - create minimal state
+            logger.info(f"🔥 API DEBUG: No session snapshot found, creating new state")
+            state_update = {
+                'core': {
+                    'session_id': session_id,
+                    'form_id': db_session_data.get('form_id'),
+                    'step': db_session_data.get('step', 0),
+                    'client_id': db_session_data.get('client_id')
+                },
+                'question_strategy': {
+                    'asked_questions': [],
+                    'current_questions': [],
+                    'selection_history': []
+                },
+                'lead_intelligence': {
+                    'responses': [],
+                    'current_score': 0,
+                    'lead_status': 'unknown'
+                },
+                'pending_responses': request.responses
+            }
+        
+        logger.info(f"🔥 API DEBUG: state_update keys = {list(state_update.keys())}")
+        logger.info(f"🔥 API DEBUG: asked_questions = {state_update.get('question_strategy', {}).get('asked_questions', [])}")
+        logger.info(f"🔥 API DEBUG: pending_responses = {request.responses}")
         
         # Run the graph starting from response processing
         result = await intelligent_survey_graph.ainvoke(
             state_update,
             {"recursion_limit": 25}
         )
+        
+        # Save session snapshot for state persistence
+        try:
+            current_step = result.get('core', {}).get('step', 0)
+            
+            # Debug: Check what's in the result before creating snapshot
+            result_asked_questions = result.get('question_strategy', {}).get('asked_questions', [])
+            logger.info(f"🔥 RESULT DEBUG: asked_questions in result = {result_asked_questions}")
+            
+            # Create JSON-serializable snapshot of critical state
+            snapshot_state = {
+                'core': result.get('core', {}),
+                'question_strategy': {
+                    'asked_questions': result.get('question_strategy', {}).get('asked_questions', []),
+                    'current_questions': result.get('question_strategy', {}).get('current_questions', []),
+                    'selection_history': result.get('question_strategy', {}).get('selection_history', [])
+                },
+                'lead_intelligence': {
+                    'responses': result.get('lead_intelligence', {}).get('responses', []),
+                    'current_score': result.get('lead_intelligence', {}).get('current_score', 0),
+                    'lead_status': result.get('lead_intelligence', {}).get('lead_status', 'unknown')
+                }
+            }
+            
+            # Convert any remaining non-serializable objects to strings
+            import json
+            snapshot_json = json.dumps(snapshot_state, default=str)  # Test serialization
+            snapshot_state = json.loads(snapshot_json)  # Parse back to ensure clean dict
+            
+            db.save_session_snapshot(
+                session_id=session_id, 
+                full_state=snapshot_state, 
+                step=current_step,
+                recovery_reason="after_step_processing"
+            )
+            logger.info(f"🔥 SNAPSHOT: Saved session snapshot for step {current_step} with {len(snapshot_state.get('question_strategy', {}).get('asked_questions', []))} asked questions")
+        except Exception as e:
+            logger.error(f"Failed to save session snapshot: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
         
         # Check if survey is complete
         core = result.get('core', {})
@@ -353,6 +489,31 @@ async def get_session_status(request: Request):
         logger.error(f"Failed to get session status: {e}")
         return server_error_response("Failed to retrieve session status")
 
+
+@router.get("/debug-session/{session_id}")
+async def debug_session(session_id: str):
+    """Debug endpoint to check if a session exists in the database."""
+    try:
+        from ..database import db
+        
+        # Try to find the session
+        session = db.get_lead_session(session_id)
+        
+        # Also get recent sessions
+        recent = db.client.table('lead_sessions').select('session_id, created_at').order('created_at', desc=True).limit(10).execute()
+        
+        return success_response(
+            data={
+                "requested_session_id": session_id,
+                "session_found": session is not None,
+                "session_data": session,
+                "recent_sessions": recent.data
+            },
+            message=f"Session {'found' if session else 'not found'}"
+        )
+    except Exception as e:
+        logger.error(f"Debug session failed: {e}")
+        return error_response(str(e))
 
 @router.get("/db-health")
 async def database_health_check():

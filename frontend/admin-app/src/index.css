@@ -79,7 +79,169 @@
   }
 }
 
-/* Remove custom components - use standard Tailwind classes instead */
+/* Admin component classes */
+@layer components {
+  .admin-card {
+    @apply bg-white rounded-lg border border-slate-200 shadow-sm p-6;
+  }
+
+  .admin-card-header {
+    @apply -m-6 mb-6 px-6 py-4 border-b border-slate-200;
+  }
+
+  .admin-card-body {
+    @apply -m-6 mt-0 px-6 py-4;
+  }
+
+  /* For cards with only header */
+  .admin-card-header:last-child {
+    @apply mb-0;
+  }
+
+  .admin-btn-primary {
+    @apply bg-admin-600 hover:bg-admin-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-admin-500 focus:ring-offset-2;
+  }
+
+  .admin-btn-secondary {
+    @apply bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-2 px-4 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2;
+  }
+
+  .admin-btn-danger {
+    @apply bg-danger-600 hover:bg-danger-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-danger-500 focus:ring-offset-2;
+  }
+
+  .admin-btn-outline {
+    @apply border border-admin-300 text-admin-700 hover:bg-admin-50 font-medium py-2 px-4 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-admin-500 focus:ring-offset-2;
+  }
+
+  .admin-sidebar {
+    @apply bg-white border-r border-slate-200 relative;
+  }
+
+  .admin-sidebar-nav {
+    @apply px-3 py-4 space-y-1;
+  }
+
+  .admin-sidebar-nav-item-active {
+    @apply flex items-center px-3 py-2 text-sm font-medium text-admin-700 bg-admin-50 border-r-2 border-admin-600 rounded-l-lg;
+  }
+
+  .admin-sidebar-nav-item-inactive {
+    @apply flex items-center px-3 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-lg transition-colors duration-200;
+  }
+
+  .admin-table {
+    @apply w-full divide-y divide-slate-200;
+  }
+
+  .admin-table-header {
+    @apply bg-slate-50;
+  }
+
+  .admin-table-header-cell {
+    @apply px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider;
+  }
+
+  .admin-table-body {
+    @apply bg-white divide-y divide-slate-200;
+  }
+
+  .admin-table-row {
+    @apply hover:bg-slate-50 transition-colors duration-200;
+  }
+
+  .admin-table-cell {
+    @apply px-6 py-4 whitespace-nowrap text-sm text-slate-900;
+  }
+
+  .admin-badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .admin-badge-success {
+    @apply bg-success-100 text-success-800;
+  }
+
+  .admin-badge-warning {
+    @apply bg-warning-100 text-warning-800;
+  }
+
+  .admin-badge-danger {
+    @apply bg-danger-100 text-danger-800;
+  }
+
+  .admin-badge-info {
+    @apply bg-admin-100 text-admin-800;
+  }
+
+  .admin-input {
+    @apply block w-full rounded-lg border border-slate-300 px-3 py-2 shadow-sm focus:border-admin-500 focus:outline-none focus:ring-1 focus:ring-admin-500 sm:text-sm;
+  }
+
+  .admin-input-error {
+    @apply border-danger-300 focus:border-danger-500 focus:ring-danger-500;
+  }
+
+  .admin-label {
+    @apply block text-sm font-medium text-slate-700;
+  }
+
+  .admin-form-group {
+    @apply space-y-1;
+  }
+
+  .admin-error-text {
+    @apply text-sm text-danger-600;
+  }
+
+  .admin-help-text {
+    @apply text-sm text-slate-500;
+  }
+
+  .admin-btn-sm {
+    @apply px-3 py-1.5 text-sm;
+  }
+
+  .admin-select {
+    @apply block rounded-lg border border-slate-300 px-3 py-2 shadow-sm focus:border-admin-500 focus:outline-none focus:ring-1 focus:ring-admin-500 sm:text-sm;
+  }
+
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .shadow-admin-md {
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  }
+
+  /* Metric components */
+  .admin-metric {
+    @apply bg-white rounded-lg border border-slate-200 shadow-sm p-6;
+  }
+
+  .admin-metric-label {
+    @apply text-sm font-medium text-slate-600;
+  }
+
+  .admin-metric-value {
+    @apply text-2xl font-semibold text-slate-900 mt-1;
+  }
+
+  .admin-metric-change-positive {
+    @apply text-sm text-success-600 mt-1;
+  }
+
+  .admin-metric-change-negative {
+    @apply text-sm text-danger-600 mt-1;
+  }
+
+  .admin-metric-change-neutral {
+    @apply text-sm text-slate-500 mt-1;
+  }
+}
 
 /* Simplified utilities using standard Tailwind */
 @layer utilities {

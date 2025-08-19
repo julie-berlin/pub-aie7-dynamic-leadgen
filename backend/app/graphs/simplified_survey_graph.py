@@ -52,8 +52,15 @@ def build_simplified_survey_graph() -> StateGraph:
     # Entry point
     graph.set_entry_point("initialize_with_tracking")
     
-    # After initialization, go to survey administration
-    graph.add_edge("initialize_with_tracking", "survey_administration")
+    # After initialization, conditional routing based on whether we have pending responses
+    graph.add_conditional_edges(
+        "initialize_with_tracking",
+        route_after_initialization,
+        {
+            "survey_administration": "survey_administration",  # New session or no pending responses
+            "lead_intelligence": "lead_intelligence"  # Process pending responses
+        }
+    )
     
     # After survey admin prepares questions, conditional routing
     graph.add_conditional_edges(
@@ -129,11 +136,35 @@ def check_abandonment_node(state: SurveyState) -> Dict[str, Any]:
 
 # === ROUTING FUNCTIONS ===
 
+def route_after_initialization(state: SurveyState) -> str:
+    """Determine routing after initialization - check for pending responses first."""
+    
+    pending_responses = state.get("pending_responses")
+    logger.info(f"🔥 INIT ROUTING: pending_responses = {pending_responses}")
+    
+    # If we have pending responses, go to lead intelligence first
+    if pending_responses and len(pending_responses) > 0:
+        logger.info("🔥 INIT ROUTING: Going to lead_intelligence to process pending responses")
+        return "lead_intelligence"
+    
+    # Otherwise, go to survey administration to get new questions
+    logger.info("🔥 INIT ROUTING: Going to survey_administration for new questions")
+    return "survey_administration"
+
 def route_after_survey_admin(state: SurveyState) -> str:
     """Determine routing after survey administration."""
     
-    # Check if we have pending responses to process
+    logger.info(f"🔥 ROUTING DEBUG: route_to_lead_intelligence = {state.get('route_to_lead_intelligence')}")
+    logger.info(f"🔥 ROUTING DEBUG: pending_responses = {state.get('pending_responses')}")
+    
+    # Check if survey admin indicated to route to lead intelligence
+    if state.get("route_to_lead_intelligence"):
+        logger.info("🔥 ROUTING: Going to lead_intelligence via route_to_lead_intelligence flag")
+        return "lead_intelligence"
+    
+    # Check if we have pending responses to process (legacy check)
     if state.get("pending_responses"):
+        logger.info("🔥 ROUTING: Going to lead_intelligence via pending_responses")
         return "lead_intelligence"
     
     # Check for abandonment flag
@@ -155,15 +186,28 @@ def route_after_lead_intelligence(state: SurveyState) -> str:
     lead_status = state.get("lead_status", "continue")
     completed = state.get("completed", False)
     
+    # Log routing decision
+    logger.info(f"🔥 ROUTING after lead_intelligence: lead_status={lead_status}, completed={completed}")
+    
     # If completed or final status reached
     if completed or lead_status in ["qualified", "maybe", "no"]:
+        logger.info("🔥 ROUTING: Ending survey (completed or final status)")
+        return END
+    
+    # Check for too many iterations to prevent infinite loops
+    core = state.get("core", {})
+    step = core.get("step", 0)
+    if step > 20:  # Prevent more than 20 steps
+        logger.warning(f"🔥 ROUTING: Forcing END due to too many steps ({step})")
         return END
     
     # Continue survey for more questions
     if lead_status == "continue":
+        logger.info("🔥 ROUTING: Continuing to survey_administration")
         return "survey_administration"
     
     # Default to END
+    logger.info("🔥 ROUTING: Default to END")
     return END
 
 
@@ -188,14 +232,9 @@ async def process_survey_step(state_with_responses: dict) -> dict:
     Process user responses in simplified flow.
     Used by POST /api/survey/step
     """
-    # Mark that we have responses to process
-    state_with_responses["pending_responses"] = state_with_responses.get("responses", [])
-    
-    # Continue from survey_administration which will route to lead_intelligence
-    return await simplified_survey_graph.ainvoke(
-        state_with_responses,
-        config={"configurable": {"entry_point": "survey_administration"}}
-    )
+    # When we have pending responses, start from survey_administration 
+    # which will route to lead_intelligence via the routing logic
+    return await simplified_survey_graph.ainvoke(state_with_responses)
 
 
 async def check_abandonment(session_state: dict) -> dict:

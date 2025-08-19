@@ -22,18 +22,16 @@ async def create_survey_session(request: Request, session_data: dict) -> str:
     
     Args:
         request: FastAPI request object
-        session_data: Dictionary containing session information
+        session_data: Dictionary containing session information (must include 'session_id')
         
     Returns:
-        Session ID string
+        Session ID string from session_data
     """
-    session_id = str(uuid.uuid4())
-    
     # Store session data in Starlette's session
-    request.session['survey_session_id'] = session_id
+    # No need for separate survey_session_id - the session_id is in session_data
     request.session['survey_data'] = session_data
     
-    return session_id
+    return session_data.get('session_id', str(uuid.uuid4()))
 
 
 async def get_survey_session(request: Request) -> Optional[dict]:
@@ -46,16 +44,11 @@ async def get_survey_session(request: Request) -> Optional[dict]:
     Returns:
         Session data dictionary or None if no valid session
     """
-    session_id = request.session.get('survey_session_id')
     session_data = request.session.get('survey_data')
     
-    if session_id and session_data:
-        return {
-            'session_id': session_id,
-            **session_data
-        }
-    
-    return None
+    # Simply return the session_data if it exists
+    # The session_id is already inside session_data
+    return session_data if session_data else None
 
 
 async def update_survey_session(request: Request, session_data: dict) -> bool:
@@ -69,7 +62,7 @@ async def update_survey_session(request: Request, session_data: dict) -> bool:
     Returns:
         True if successful, False otherwise
     """
-    if 'survey_session_id' not in request.session:
+    if 'survey_data' not in request.session:
         return False
     
     # Update session data
@@ -88,8 +81,7 @@ async def delete_survey_session(request: Request) -> bool:
     Returns:
         True if successful, False otherwise
     """
-    if 'survey_session_id' in request.session:
-        del request.session['survey_session_id']
+    if 'survey_data' in request.session:
         del request.session['survey_data']
         return True
     

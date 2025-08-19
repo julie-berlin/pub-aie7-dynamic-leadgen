@@ -6,6 +6,9 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
     git \
+    libmagic1 \
+    libmagic-dev \
+    file \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv package manager
@@ -14,8 +17,9 @@ RUN pip install uv
 # Set working directory
 WORKDIR /app
 
-# Copy dependency files
+# Copy dependency files and backend structure first
 COPY pyproject.toml uv.lock ./
+COPY backend/ ./backend/
 
 # Install dependencies
 RUN uv sync --frozen
@@ -25,8 +29,8 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PATH="/app/.venv/bin:${PATH}"
 
-# Copy backend code
-COPY backend/ ./
+# Copy all backend code to the working directory after install
+RUN cp -r backend/* . && rm -rf backend/
 
 # Create necessary directories
 RUN mkdir -p /app/logs /app/data/cache

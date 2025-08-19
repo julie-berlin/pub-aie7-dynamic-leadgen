@@ -4,6 +4,8 @@ export interface FormConfig {
   clientId: string;
   title: string;
   description?: string;
+  businessName?: string;
+  logoUrl?: string;
   questions: Question[];
   theme?: ThemeConfig;
   settings: FormSettings;
@@ -122,6 +124,9 @@ export interface ThemeConfig {
   spacing: {
     section: string;
     element: string;
+    page: string;
+    input: string;
+    button: string;
   };
   borderRadius: string;
   borderRadiusLg: string;
@@ -162,6 +167,8 @@ export interface StartSessionResponse {
     id: string;
     title: string;
     description?: string;
+    businessName?: string;
+    logoUrl?: string;
     theme?: ThemeConfig;
   };
   step: FormStep;
@@ -261,6 +268,7 @@ export interface ThemeStore {
   // Actions
   loadTheme: (formId: string) => Promise<void>;
   applyTheme: (theme: ThemeConfig) => void;
+  validateTheme: (theme: ThemeConfig) => ThemeConfig;
   resetTheme: () => void;
 }
 

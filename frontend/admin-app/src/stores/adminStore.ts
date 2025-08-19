@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { API_ENDPOINTS } from '../config/api';
 
 // Admin user interface
 export interface AdminUser {
@@ -12,12 +13,20 @@ export interface AdminUser {
   avatar?: string;
 }
 
+// Business info interface
+export interface BusinessInfo {
+  name: string;
+  industry?: string;
+  isLoaded: boolean;
+}
+
 // Auth state interface
 interface AuthState {
   user: AdminUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
+  businessInfo: BusinessInfo;
 }
 
 // Auth actions interface
@@ -28,6 +37,7 @@ interface AuthActions {
   setUser: (user: AdminUser | null) => void;
   setError: (error: string | null) => void;
   setLoading: (loading: boolean) => void;
+  loadBusinessInfo: () => Promise<void>;
 }
 
 // Admin store interface
@@ -37,11 +47,23 @@ export interface AdminStore extends AuthState, AuthActions {}
 export const useAdminStore = create<AdminStore>()(
   persist(
     (set, get) => ({
-      // Initial auth state
-      user: null,
-      isAuthenticated: false,
+      // Initial auth state - TEMPORARILY BYPASSING AUTH FOR DEVELOPMENT
+      user: {
+        id: "mock-admin-user-id",
+        email: "admin@example.com",
+        name: "Admin User",
+        role: "admin",
+        clientId: "a1111111-1111-1111-1111-111111111111",
+        permissions: ["forms.view", "forms.edit", "settings.edit", "analytics.view"]
+      },
+      isAuthenticated: true,
       isLoading: false,
       error: null,
+      businessInfo: {
+        name: 'Pawsome Dog Walking',
+        industry: 'Pet Services',
+        isLoaded: true
+      },
 
       // Auth actions
       login: async (email: string, password: string) => {
@@ -121,6 +143,57 @@ export const useAdminStore = create<AdminStore>()(
       setLoading: (isLoading: boolean) => {
         set({ isLoading });
       },
+
+      loadBusinessInfo: async () => {
+        try {
+          const response = await fetch(API_ENDPOINTS.CLIENTS.ME, {
+            headers: {
+              'Content-Type': 'application/json',
+            }
+          });
+
+          if (response.ok) {
+            const result = await response.json();
+            if (result.success && result.data) {
+              set({
+                businessInfo: {
+                  name: result.data.business_name || result.data.name || 'Survey Admin',
+                  industry: result.data.industry,
+                  isLoaded: true
+                }
+              });
+            } else {
+              // Keep default name on error but mark as loaded
+              set({
+                businessInfo: {
+                  name: 'Survey Admin',
+                  industry: undefined,
+                  isLoaded: true
+                }
+              });
+            }
+          } else {
+            // Keep default name on error but mark as loaded
+            set({
+              businessInfo: {
+                name: 'Survey Admin',
+                industry: undefined,
+                isLoaded: true
+              }
+            });
+          }
+        } catch (error) {
+          console.error('Failed to load business info:', error);
+          // Keep default name on error but mark as loaded
+          set({
+            businessInfo: {
+              name: 'Survey Admin',
+              industry: undefined,
+              isLoaded: true
+            }
+          });
+        }
+      },
     }),
     {
       name: 'admin-auth-storage',
@@ -129,6 +202,7 @@ export const useAdminStore = create<AdminStore>()(
       partialize: (state) => ({
         user: state.user,
         isAuthenticated: state.isAuthenticated,
+        businessInfo: state.businessInfo,
       }),
     }
   )

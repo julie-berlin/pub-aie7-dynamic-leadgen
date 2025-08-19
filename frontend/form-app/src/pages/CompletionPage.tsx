@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import type { CompletionData } from '../types';
+import PageLayout from '../components/PageLayout';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
 
@@ -79,8 +80,8 @@ export default function CompletionPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="form-container max-w-2xl w-full p-8 text-center">
+    <PageLayout businessName="Varyq">
+      <div className="form-container max-w-2xl w-full mx-auto text-center">
         <div className="mb-8">
           {completionData?.leadStatus === 'yes' && (
             <div className="w-16 h-16 mx-auto mb-4 bg-success rounded-full flex items-center justify-center">
@@ -137,6 +138,6 @@ export default function CompletionPage() {
           </div>
         )}
       </div>
-    </div>
+    </PageLayout>
   );
 }

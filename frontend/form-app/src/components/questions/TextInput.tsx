@@ -16,14 +16,23 @@ export default function TextInput({ question, register, error, disabled }: TextI
                    question.type === 'number' ? 'number' : 'text';
 
   return (
-    <div className="question-container">
-      <label htmlFor={question.id} className="question-label">
+    <div className="question-container mb-8">
+      <label 
+        htmlFor={question.id} 
+        className="block text-xl font-semibold mb-3"
+        style={{ color: 'var(--color-text)' }}
+      >
         {question.text}
-        {question.required && <span className="text-error ml-1">*</span>}
+        {question.required && <span style={{ color: 'var(--color-error)' }} className="ml-1">*</span>}
       </label>
       
       {question.description && (
-        <p className="question-description">{question.description}</p>
+        <p 
+          className="text-base mb-4 leading-relaxed"
+          style={{ color: 'var(--color-text-light)' }}
+        >
+          {question.description}
+        </p>
       )}
       
       <input
@@ -31,12 +40,37 @@ export default function TextInput({ question, register, error, disabled }: TextI
         type={inputType}
         placeholder={question.placeholder}
         disabled={disabled}
-        className={`input-field ${error ? 'input-error' : ''}`}
-        {...register(question.id)}
+        className={`
+          input-field text-lg 
+          ${disabled ? 'cursor-not-allowed' : ''}
+          ${error ? 'input-error' : ''}
+        `}
+        style={{
+          borderRadius: 'var(--border-radius-lg)',
+        }}
+        onFocus={(e) => {
+          if (!error) {
+            e.target.style.borderColor = 'var(--color-primary)';
+            e.target.style.boxShadow = '0 0 0 4px var(--color-primary-light)';
+          }
+        }}
+        {...register(question.id, {
+          onBlur: (e) => {
+            if (!error) {
+              e.target.style.borderColor = 'var(--color-border)';
+              e.target.style.boxShadow = 'none';
+            }
+          }
+        })}
       />
       
       {error && (
-        <p className="error-message">{error}</p>
+        <p 
+          className="text-base mt-3 px-2 font-medium"
+          style={{ color: 'var(--color-error)' }}
+        >
+          {error}
+        </p>
       )}
     </div>
   );

@@ -23,7 +23,13 @@ export const useFormStore = create<FormStore>()(
 
       // Actions
       initializeForm: async (clientId: string, formId: string, trackingData?: Partial<TrackingData>) => {
-        set({ loading: true, error: null });
+        // Clear any stale state when initializing
+        set({ 
+          loading: true, 
+          error: null,
+          currentStep: null,  // Clear old step data
+          formState: null     // Clear old form state
+        });
         
         try {
           // Check if we have an existing session for this form
@@ -37,19 +43,18 @@ export const useFormStore = create<FormStore>()(
             formId,
             clientId,
             trackingData: {
-              ...trackingData,
-              userAgent: navigator.userAgent,
-              timestamp: new Date()
+              ...trackingData
+              // userAgent and timestamp are not supported by backend API
             }
           });
 
-          // Generate a new session ID for frontend state (backend manages real session via cookies)
-          const frontendSessionId = `frontend_${Date.now()}`;
+          // Note: Backend manages session via HTTP-only cookies, no frontend session ID needed
+          // Frontend state tracks progress independently of backend session management
           
           const newFormState: FormState = {
             formId,
             clientId,
-            sessionId: frontendSessionId,
+            sessionId: '', // Backend session managed via HTTP-only cookies
             currentStep: response.step.stepNumber,
             totalSteps: response.step.totalSteps,
             responses: existingState?.responses || {},
@@ -64,6 +69,8 @@ export const useFormStore = create<FormStore>()(
               clientId,
               title: response.form.title,
               description: response.form.description,
+              businessName: response.form.businessName,
+              logoUrl: response.form.logoUrl,
               questions: [], // Will be populated from steps
               theme: response.form.theme,
               settings: {
@@ -79,10 +86,7 @@ export const useFormStore = create<FormStore>()(
             error: null
           });
 
-          // Apply theme if provided
-          if (response.form.theme) {
-            get().updateTheme(response.form.theme);
-          }
+          // Note: Theme loading is handled by the dedicated theme store
 
         } catch (error) {
           console.error('Failed to initialize form:', error);
@@ -105,8 +109,9 @@ export const useFormStore = create<FormStore>()(
 
         try {
           // Convert responses to the expected API format
+          // CRITICAL FIX: Backend expects numeric question IDs
           const apiResponses = Object.entries(responses).map(([questionId, value]) => ({
-            question_id: parseInt(questionId),
+            question_id: parseInt(questionId, 10),  // Convert to number for backend
             answer: value
           }));
 
@@ -116,8 +121,20 @@ export const useFormStore = create<FormStore>()(
 
           const response: SubmitResponseResponse = await apiClient.submitResponses(submitRequest);
 
-          // Update form state with new responses
-          const updatedResponses = { ...formState.responses };
+          // If we got new questions back, clear responses and only keep current step responses
+          // This prevents old answers from persisting when question IDs are reused
+          let updatedResponses: Record<string, any>;
+          
+          if (response.nextStep && response.nextStep.questions) {
+            // New questions received - start fresh with only current responses
+            updatedResponses = {};
+            console.log('New questions received, clearing old responses');
+          } else {
+            // No new questions, keep existing responses
+            updatedResponses = { ...formState.responses };
+          }
+
+          // Add the current submitted responses
           Object.entries(responses).forEach(([questionId, value]) => {
             updatedResponses[questionId] = {
               questionId,
@@ -142,9 +159,9 @@ export const useFormStore = create<FormStore>()(
 
           // If form is complete, handle completion
           if (response.isComplete && response.completionData) {
-            // Store completion data for the completion page
+            // Store completion data for the completion page (using form ID since session is cookie-managed)
             localStorage.setItem(
-              `completion_${formState.sessionId}`, 
+              `completion_${formState.formId}_${Date.now()}`, 
               JSON.stringify(response.completionData)
             );
           }
@@ -183,35 +200,9 @@ export const useFormStore = create<FormStore>()(
       },
 
       goToStep: async (step: number) => {
-        const { formState } = get();
-        
-        if (!formState) {
-          set({ error: 'No active form session' });
-          return;
-        }
-
-        set({ loading: true, error: null });
-
-        try {
-          const response = await apiClient.getStep(formState.sessionId, step);
-          
-          set({
-            currentStep: response,
-            formState: {
-              ...formState,
-              currentStep: step,
-              lastUpdated: new Date()
-            },
-            loading: false
-          });
-
-        } catch (error) {
-          console.error('Failed to navigate to step:', error);
-          set({ 
-            error: error instanceof Error ? error.message : 'Failed to navigate',
-            loading: false 
-          });
-        }
+        // TODO: Implement step navigation when backend supports it
+        console.warn('Step navigation not yet implemented');
+        set({ error: 'Step navigation not yet supported' });
       },
 
       updateTheme: (theme: ThemeConfig) => {
@@ -243,7 +234,7 @@ export const useFormStore = create<FormStore>()(
         if (!formState) return;
 
         try {
-          await apiClient.saveProgress(formState.sessionId, {
+          await apiClient.saveProgress({
             responses: formState.responses,
             currentStep: formState.currentStep,
             lastUpdated: formState.lastUpdated.toISOString()
@@ -280,10 +271,14 @@ export const useFormStore = create<FormStore>()(
     {
       name: 'form-storage',
       storage: createJSONStorage(() => localStorage),
-      // Only persist form state and current step
+      // Only persist minimal form state (no questions data)
       partialize: (state) => ({
-        formState: state.formState,
-        currentStep: state.currentStep
+        formState: state.formState ? {
+          ...state.formState,
+          // Don't persist responses to avoid stale data
+          responses: {}
+        } : null
+        // Don't persist currentStep - always fetch fresh from backend
       }),
       // Skip hydration for sensitive data
       skipHydration: false,

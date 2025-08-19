@@ -32,14 +32,24 @@ def initialize_session_with_tracking_node(state: Dict[str, Any]) -> Dict[str, An
         Updated state dictionary with validated Pydantic models
     """
     try:
+        logger.info(f"🔥 INIT NODE DEBUG: Input state keys = {list(state.keys())}")
+        logger.info(f"🔥 INIT NODE DEBUG: pending_responses = {state.get('pending_responses')}")
+        
         # Create proper Pydantic state if we have minimal data
         if 'core' not in state and 'metadata' in state:
             # This is likely an initial API call, create proper state
             metadata = state.get('metadata', {})
             
+            # Use session ID from metadata if provided, otherwise create new one
+            session_id = metadata.get('session_id')
+            if not session_id:
+                import uuid
+                session_id = str(uuid.uuid4())
+                logger.warning(f"No session_id provided in metadata for initial state, created new one: {session_id}")
+                
             # Create validated initial state
             survey_state = create_initial_state(
-                session_id=f"session_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                session_id=session_id,
                 form_id=metadata.get('form_id', ''),
                 client_id=metadata.get('client_id'),
                 utm_data={
@@ -95,9 +105,18 @@ def initialize_session_with_tracking_node(state: Dict[str, Any]) -> Dict[str, An
             # Note: session_started removed - not in tracking_data schema, use created_at instead
         }
         
-        # Create session ID
-        import uuid
-        session_id = str(uuid.uuid4())
+        # Use session ID that was already extracted from core data or metadata
+        if not session_id:
+            # Fall back to metadata if session_id wasn't found in core data
+            session_id = metadata.get('session_id')
+            if not session_id:
+                import uuid
+                session_id = str(uuid.uuid4())
+                logger.warning(f"No session_id found in core data or metadata, created new one: {session_id}")
+            else:
+                logger.info(f"Using session_id from metadata: {session_id}")
+        else:
+            logger.info(f"Using session_id from core data: {session_id}")
         
         # Validate form exists in database
         if not form_id:
@@ -128,32 +147,23 @@ def initialize_session_with_tracking_node(state: Dict[str, Any]) -> Dict[str, An
             'landing_page': metadata.get('landing_page')
         }
         
-        # Save session to database immediately
-        session_data = {
-            'session_id': session_id,
-            'form_id': form_id,
-            'client_id': core_state.get('client_id'),
-            'started_at': core_state['started_at'],
-            'last_updated': core_state['last_updated'],
-            'step': core_state['step'],
-            'completed': core_state['completed'],
-            'lead_status': 'unknown',
-            'abandonment_status': 'active',
-            'abandonment_risk': 0.3
-        }
-        
-        # Create lead session in database
-        from ...database import db
-        try:
-            db.create_lead_session(session_data)
-            logger.info(f"Created lead session in database: {session_id}")
-        except Exception as e:
-            logger.error(f"Failed to create lead session: {e}")
+        # Session already created in API endpoint - just log initialization
+        logger.info(f"🔥 SESSION: Using pre-created session {session_id}")
         
         # Save tracking data immediately to database (fire-and-forget)
         async_db.save_tracking_data(session_id, tracking_data)
         
         logger.info(f"Initialized session {session_id} with tracking")
+        
+        # Check if this is a fresh initialization or continuing with existing state
+        existing_question_strategy = state.get('question_strategy', {})
+        existing_lead_intelligence = state.get('lead_intelligence', {})
+        
+        # Only preserve existing state if it has meaningful data
+        preserve_questions = bool(existing_question_strategy.get('asked_questions'))
+        preserve_responses = bool(existing_lead_intelligence.get('responses'))
+        
+        logger.info(f"🔥 INIT: preserve_questions={preserve_questions}, preserve_responses={preserve_responses}")
         
         # Initialize all state sections
         return {
@@ -166,20 +176,20 @@ def initialize_session_with_tracking_node(state: Dict[str, Any]) -> Dict[str, An
             },
             'question_strategy': {
                 'all_questions': [],  # Will be loaded
-                'asked_questions': [],
-                'current_questions': [],
-                'phrased_questions': [],
-                'question_strategy': {},
-                'selection_history': []
+                'asked_questions': existing_question_strategy.get('asked_questions', []) if preserve_questions else [],
+                'current_questions': existing_question_strategy.get('current_questions', []) if preserve_questions else [],
+                'phrased_questions': existing_question_strategy.get('phrased_questions', []) if preserve_questions else [],
+                'question_strategy': existing_question_strategy.get('question_strategy', {}),
+                'selection_history': existing_question_strategy.get('selection_history', []) if preserve_questions else []
             },
             'lead_intelligence': {
-                'responses': [],
-                'current_score': 0,
-                'score_history': [],
-                'lead_status': 'unknown',
-                'qualification_reasoning': [],
-                'risk_factors': [],
-                'positive_indicators': []
+                'responses': existing_lead_intelligence.get('responses', []) if preserve_responses else [],
+                'current_score': existing_lead_intelligence.get('current_score', 0),
+                'score_history': existing_lead_intelligence.get('score_history', []),
+                'lead_status': existing_lead_intelligence.get('lead_status', 'unknown'),
+                'qualification_reasoning': existing_lead_intelligence.get('qualification_reasoning', []),
+                'risk_factors': existing_lead_intelligence.get('risk_factors', []),
+                'positive_indicators': existing_lead_intelligence.get('positive_indicators', [])
             },
             'engagement': {
                 'abandonment_risk': 0.3,
@@ -196,7 +206,7 @@ def initialize_session_with_tracking_node(state: Dict[str, Any]) -> Dict[str, An
             # Communication and API fields
             'supervisor_messages': [],
             'shared_context': {},
-            'pending_responses': [],
+            'pending_responses': state.get('pending_responses', []),
             'frontend_response': None,
             # Session management
             'session_recovery_data': None,

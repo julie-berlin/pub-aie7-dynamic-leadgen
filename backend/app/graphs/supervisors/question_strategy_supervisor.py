@@ -169,7 +169,7 @@ Select 1-3 questions that align with your chosen strategy."""
         # Show available questions by category
         all_questions = state.get('all_questions', [])
         asked_questions = state.get('asked_questions', [])
-        available_questions = [q for q in all_questions if q['id'] not in asked_questions]
+        available_questions = [q for q in all_questions if q.get('question_id', q.get('id')) not in asked_questions]
         
         question_categories = {}
         for q in available_questions:
@@ -250,7 +250,7 @@ Select 1-3 questions that align with your chosen strategy."""
         """Assess remaining opportunities for different strategies."""
         all_questions = state.get('all_questions', [])
         asked_questions = state.get('asked_questions', [])
-        available_questions = [q for q in all_questions if q['id'] not in asked_questions]
+        available_questions = [q for q in all_questions if q.get('question_id', q.get('id')) not in asked_questions]
         
         opportunities = {
             "total_remaining": len(available_questions),
@@ -289,8 +289,8 @@ Select 1-3 questions that align with your chosen strategy."""
         # Select 2 questions using simple logic
         all_questions = state.get('all_questions', [])
         asked_questions = state.get('asked_questions', [])
-        available = [q for q in all_questions if q['id'] not in asked_questions]
-        selected_ids = [q['id'] for q in available[:2]] if available else []
+        available = [q for q in all_questions if q.get('question_id', q.get('id')) not in asked_questions]
+        selected_ids = [q.get('question_id', q.get('id')) for q in available[:2]] if available else []
         
         return self.create_decision(
             decision=strategy,

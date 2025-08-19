@@ -57,7 +57,9 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.session_store import RedisSessionStore
 
 # Import routes
-from app.routes import survey_api, health, theme_api, analytics_api, admin_api, admin_forms_api, admin_analytics_api, admin_themes_api, admin_business_api
+from app.routes import survey_api, health, themes_api, analytics_api, admin_api, files_api
+# Import new RESTful routes
+from app.routes import forms_api, clients_api
 
 # Create FastAPI application with environment-specific settings
 app = FastAPI(
@@ -72,6 +74,14 @@ app = FastAPI(
             "description": "Survey management endpoints for frontend integration"
         },
         {
+            "name": "forms",
+            "description": "RESTful form management endpoints"
+        },
+        {
+            "name": "clients",
+            "description": "RESTful client/business management endpoints"
+        },
+        {
             "name": "themes",
             "description": "Theme management endpoints for form customization"
         },
@@ -81,23 +91,11 @@ app = FastAPI(
         },
         {
             "name": "admin",
-            "description": "Admin user management and client configuration endpoints"
+            "description": "Admin authentication and user management endpoints"
         },
         {
-            "name": "admin-forms",
-            "description": "Admin form management endpoints"
-        },
-        {
-            "name": "admin-analytics",
-            "description": "Admin analytics and reporting endpoints"
-        },
-        {
-            "name": "admin-themes",
-            "description": "Admin theme management endpoints"
-        },
-        {
-            "name": "admin-business",
-            "description": "Admin business information and settings endpoints"
+            "name": "files",
+            "description": "File upload and serving endpoints for logos and assets"
         },
         {
             "name": "health", 
@@ -121,7 +119,7 @@ app.add_middleware(
     SessionMiddleware, 
     secret_key=os.getenv('SESSION_SECRET_KEY', 'dev-secret-key-change-in-production'),
     max_age=1800,  # 30 minutes
-    path='/api/survey',
+    path='/',  # Changed from '/api/survey' to allow all API paths
     same_site='lax',
     https_only=os.getenv('ENVIRONMENT', 'development').lower() != 'development'
 )
@@ -146,13 +144,19 @@ app.add_middleware(LoggingMiddleware)
 
 # Include routers
 app.include_router(survey_api.router, tags=["survey"])
-app.include_router(theme_api.router, tags=["themes"])
+app.include_router(themes_api.router, tags=["themes"])
 app.include_router(analytics_api.router, tags=["analytics"])
+
+# New RESTful routes for admin interface
+app.include_router(forms_api.router, tags=["forms"])
+app.include_router(clients_api.router, tags=["clients"])
+
+# Admin authentication routes
 app.include_router(admin_api.router, tags=["admin"])
-app.include_router(admin_forms_api.router, tags=["admin-forms"])
-app.include_router(admin_analytics_api.router, tags=["admin-analytics"])
-app.include_router(admin_themes_api.router, tags=["admin-themes"])
-app.include_router(admin_business_api.router, tags=["admin-business"])
+
+# File serving routes
+app.include_router(files_api.router, tags=["files"])
+
 app.include_router(health.router, tags=["health"])
 
 @app.get("/")

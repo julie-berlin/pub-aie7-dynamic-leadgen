@@ -7,7 +7,14 @@ export default defineConfig({
   base: '/admin/', // Serve admin app under /admin path
   server: {
     port: 5174, // Different port to avoid clashing with form app
-    host: true
+    host: true,
+    proxy: {
+      '/api': {
+        target: 'http://backend:8000',
+        changeOrigin: true,
+        secure: false,
+      }
+    }
   },
   preview: {
     port: 4174

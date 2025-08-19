@@ -20,13 +20,13 @@ class ConsolidatedLeadIntelligenceAgent(SupervisorAgent):
     def __init__(self, **kwargs):
         super().__init__(
             name="ConsolidatedLeadIntelligenceAgent",
-            model_name="gpt-4o-mini",
+            model_name="gpt-3.5-turbo",
             temperature=0.1,
-            max_tokens=4000,
-            timeout_seconds=60,
+            max_tokens=1500,  # Reduced for faster responses
+            timeout_seconds=10,  # Reduced timeout for faster responses
             **kwargs
         )
-        self.llm = get_chat_model(model_name="gpt-4o-mini", temperature=0.2)
+        self.llm = get_chat_model(model_name="gpt-3.5-turbo", temperature=0.2)
         self.toolbelt = lead_intelligence_toolbelt
     
     def make_decision(self, state: SurveyState, context: Dict[str, Any] = None) -> SupervisorDecision:
@@ -127,11 +127,78 @@ Return comprehensive JSON with all processing results:
             # Step 6: Update database with final status
             self._update_database_status(state, final_classification)
             
-            return final_classification
+            # Step 7: Mark questions as asked (convert question_id to question UUID)
+            asked_question_uuids = self._mark_questions_as_asked(state)
+            
+            # Step 8: Return proper state update with cleared pending responses
+            current_question_strategy = state.get('question_strategy', {})
+            existing_asked = current_question_strategy.get('asked_questions', [])
+            updated_asked = existing_asked + asked_question_uuids
+            
+            return {
+                **final_classification,
+                'pending_responses': [],  # Clear after processing
+                'question_strategy': {
+                    **current_question_strategy,
+                    'asked_questions': updated_asked
+                },
+                'lead_intelligence': {
+                    **state.get('lead_intelligence', {}),
+                    'last_classification': final_classification,
+                    'classification_timestamp': datetime.now().isoformat()
+                }
+            }
             
         except Exception as e:
             logger.error(f"Lead intelligence processing error: {e}")
             return self._create_error_response(str(e))
+    
+    def _mark_questions_as_asked(self, state: SurveyState) -> List[str]:
+        """Convert question_id numbers from responses to question UUIDs for tracking."""
+        try:
+            pending_responses = state.get("pending_responses", [])
+            if not pending_responses:
+                return []
+            
+            # Get form_id to load questions
+            form_id = state.get("core", {}).get("form_id")
+            if not form_id:
+                logger.warning("No form_id found, cannot mark questions as asked")
+                return []
+            
+            # Load all questions for this form to create mapping
+            from ...utils.cached_data_loader import data_loader
+            all_questions = data_loader.get_questions(form_id)
+            if not all_questions:
+                logger.warning(f"No questions found for form {form_id}")
+                return []
+            
+            # Create mapping from question_id (number) to id (UUID)
+            question_id_to_uuid = {}
+            for q in all_questions:
+                question_id = q.get('question_id')
+                question_uuid = q.get('id')
+                if question_id is not None and question_uuid:
+                    question_id_to_uuid[question_id] = question_uuid
+            
+            # Convert response question_ids to UUIDs
+            asked_uuids = []
+            for response in pending_responses:
+                question_id = response.get('question_id')
+                if question_id in question_id_to_uuid:
+                    question_uuid = question_id_to_uuid[question_id]
+                    if question_uuid not in asked_uuids:
+                        asked_uuids.append(question_uuid)
+                        logger.debug(f"Marking question as asked: question_id={question_id} -> uuid={question_uuid}")
+                else:
+                    logger.warning(f"Could not find UUID for question_id {question_id}")
+            
+            logger.info(f"Marked {len(asked_uuids)} questions as asked: {asked_uuids}")
+            return asked_uuids
+            
+        except Exception as e:
+            logger.error(f"Failed to mark questions as asked: {e}")
+            return []
     
     def _save_responses(self, state: SurveyState) -> Dict[str, Any]:
         """Save user responses to database."""
@@ -411,7 +478,8 @@ Make a comprehensive decision including:
             "final_score": 0,
             "confidence": 0,
             "completed": False,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
+            "pending_responses": []  # Clear pending responses even on error
         }
 
 

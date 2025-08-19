@@ -12,6 +12,7 @@ import type {
 
 // Backend API response types
 interface BackendQuestion {
+  question_id?: string | number;  // CRITICAL: Form-specific question ID from backend
   question: string;
   phrased_question: string;
   data_type: string;
@@ -38,13 +39,16 @@ interface BackendStartSessionResponse {
     id?: string;
     title: string;
     description?: string;
+    businessName?: string;
+    logoUrl?: string;
     theme?: ThemeConfig;
   };
   step: BackendFormStep;
 }
 
 // API configuration
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+// In development, use relative URLs to go through Vite proxy
+const API_BASE_URL = import.meta.env.PROD ? (import.meta.env.VITE_API_URL || 'http://localhost:8000') : '';
 
 class APIClient {
   private baseUrl: string;
@@ -57,8 +61,14 @@ class APIClient {
    * Transform backend question data to frontend format
    */
   private transformQuestion(backendQuestion: BackendQuestion, index: number): Question {
+    // CRITICAL FIX: Use actual question_id from backend for proper tracking
+    // Backend now sends question_id - use them instead of generating from index
+    const questionId = backendQuestion.question_id 
+      ? String(backendQuestion.question_id)  // Convert to string (can be UUID or number)
+      : (index + 1).toString();              // Fallback only if no ID provided
+    
     return {
-      id: (index + 1).toString(), // Generate ID from index since backend doesn't provide it
+      id: questionId,
       type: this.mapDataTypeToQuestionType(backendQuestion.data_type),
       text: backendQuestion.phrased_question || backendQuestion.question,
       description: backendQuestion.description,
@@ -198,7 +208,7 @@ class APIClient {
       method: 'POST',
       body: JSON.stringify({
         form_id: params.formId,
-        client_id: params.clientId,
+        // Don't send client_id - backend will extract it from form details
         utm_source: params.trackingData?.utmSource,
         utm_medium: params.trackingData?.utmMedium,
         utm_campaign: params.trackingData?.utmCampaign,
@@ -213,6 +223,8 @@ class APIClient {
         id: response.form.id || 'unknown',
         title: response.form.title,
         description: response.form.description,
+        businessName: response.form.businessName,
+        logoUrl: response.form.logoUrl,
         theme: response.form.theme
       },
       step: this.transformFormStep(response.step)
@@ -244,61 +256,92 @@ class APIClient {
   }
 
   /**
-   * Get a specific form step
+   * Get current form step (not implemented in backend yet)
+   * TODO: Backend should provide a GET /api/survey/step endpoint
    */
-  async getStep(sessionId: string, step: number): Promise<FormStep> {
-    return this.request<FormStep>(`/api/survey/step/${sessionId}/${step}`, {
-      method: 'GET',
-    });
+  async getCurrentStep(): Promise<FormStep> {
+    throw new Error('getCurrentStep not implemented - backend should provide GET /api/survey/step');
   }
 
   /**
-   * Save progress for session recovery
+   * Save progress for session recovery using session cookie
    */
-  async saveProgress(sessionId: string, data: {
+  async saveProgress(data: {
     responses: Record<string, any>;
     currentStep: number;
     lastUpdated: string;
   }): Promise<void> {
     await this.request<void>('/api/survey/save-progress', {
       method: 'POST',
-      body: JSON.stringify({
-        session_id: sessionId,
-        ...data
-      }),
+      body: JSON.stringify(data),
     });
   }
 
   /**
    * Get theme configuration for a form
-   * Note: Theme endpoint not implemented yet, always returns null
+   * Returns the effective theme (form-specific or client default)
    */
   async getTheme(formId: string): Promise<ThemeConfig | null> {
-    // Theme loading not implemented yet - return null to use default theme
-    console.log(`Theme loading skipped for form ${formId} - using default theme`);
-    return null;
+    try {
+      return await this.request<ThemeConfig>(`/api/themes/form/${formId}/theme`, {
+        method: 'GET',
+      });
+    } catch (error) {
+      console.warn(`Failed to load theme for form ${formId}, using default:`, error);
+      return null;
+    }
   }
 
   /**
-   * Resume session from recovery data
+   * Get client information by ID
    */
-  async resumeSession(sessionId: string): Promise<StartSessionResponse> {
-    return this.request<StartSessionResponse>(`/api/survey/resume/${sessionId}`, {
+  async getClient(clientId: string): Promise<{
+    id: string;
+    business_name: string;
+    name: string;
+    industry: string;
+    website?: string;
+  } | null> {
+    try {
+      const response = await this.request<{ 
+        data: {
+          id: string;
+          business_name: string;
+          name: string;
+          industry: string;
+          website?: string;
+        }
+      }>(`/api/clients/${clientId}`, {
+        method: 'GET',
+      });
+      
+      return response.data;
+    } catch (error) {
+      console.warn(`Failed to load client info for ${clientId}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Resume session from recovery data using session cookie
+   */
+  async resumeSession(): Promise<StartSessionResponse> {
+    return this.request<StartSessionResponse>('/api/survey/resume', {
       method: 'POST',
     });
   }
 
   /**
-   * Get form completion data
+   * Get form completion data using session cookie
    */
-  async getCompletionData(sessionId: string): Promise<{
+  async getCompletionData(): Promise<{
     leadStatus: string;
     score: number;
     message: string;
     redirectUrl?: string;
     nextSteps?: string[];
   }> {
-    return this.request(`/api/survey/completion/${sessionId}`, {
+    return this.request('/api/survey/completion', {
       method: 'GET',
     });
   }

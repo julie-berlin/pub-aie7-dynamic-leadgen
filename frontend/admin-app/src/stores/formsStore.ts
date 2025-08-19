@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { API_ENDPOINTS } from '../config/api';
 
 // Form interface for admin management
 export interface AdminForm {
@@ -111,7 +112,6 @@ export const useFormsStore = create<FormsStore>()(
         
         try {
           const { filters, sortBy, sortOrder, currentPage, pageSize } = get();
-          const token = localStorage.getItem('admin_token');
           
           // Build query parameters
           const params = new URLSearchParams({
@@ -129,16 +129,46 @@ export const useFormsStore = create<FormsStore>()(
           if (filters.dateRange.start) params.set('startDate', filters.dateRange.start);
           if (filters.dateRange.end) params.set('endDate', filters.dateRange.end);
           
-          // TODO: Replace with actual API endpoint
-          const response = await fetch(`/api/admin/forms?${params}`, {
-            headers: { Authorization: `Bearer ${token}` },
+          const response = await fetch(API_ENDPOINTS.FORMS.LIST(params), {
+            headers: { 
+              'Content-Type': 'application/json'
+            },
           });
           
           if (!response.ok) {
             throw new Error('Failed to fetch forms');
           }
           
-          const { forms, totalCount } = await response.json();
+          const { data } = await response.json();
+          const rawForms = Array.isArray(data) ? data : data.forms || [];
+          
+          // Transform backend response (snake_case) to frontend format (camelCase)
+          const forms = rawForms.map((form: any): AdminForm => ({
+            id: form.id,
+            clientId: form.client_id,
+            title: form.title,
+            description: form.description,
+            status: form.status,
+            createdAt: form.created_at,
+            updatedAt: form.updated_at,
+            totalResponses: form.total_responses || 0,
+            conversionRate: form.conversion_rate || 0,
+            averageCompletionTime: form.average_completion_time || 0,
+            tags: form.tags || [],
+            settings: {
+              maxResponses: form.max_responses,
+              expiresAt: form.expires_at,
+              requireAuth: form.require_auth || false,
+              allowMultipleSubmissions: form.allow_multiple_submissions || false,
+            },
+            theme: form.theme_config ? {
+              primaryColor: form.theme_config.primary_color || '#3B82F6',
+              fontFamily: form.theme_config.font_family || 'Inter',
+              borderRadius: form.theme_config.border_radius || '0.5rem',
+            } : undefined,
+          }));
+          
+          const totalCount = data.total_count || data.totalCount || data.total || forms.length;
           
           set({ 
             forms, 
@@ -158,18 +188,43 @@ export const useFormsStore = create<FormsStore>()(
         set({ isLoading: true, error: null });
         
         try {
-          const token = localStorage.getItem('admin_token');
-          
-          // TODO: Replace with actual API endpoint
-          const response = await fetch(`/api/admin/forms/${id}`, {
-            headers: { Authorization: `Bearer ${token}` },
+          const response = await fetch(API_ENDPOINTS.FORMS.BY_ID(id), {
+            headers: { 
+              'Content-Type': 'application/json'
+            },
           });
           
           if (!response.ok) {
             throw new Error('Failed to fetch form');
           }
           
-          const form = await response.json();
+          const { data: rawForm } = await response.json();
+          
+          // Transform backend response (snake_case) to frontend format (camelCase)
+          const form: AdminForm = {
+            id: rawForm.id,
+            clientId: rawForm.client_id,
+            title: rawForm.title,
+            description: rawForm.description,
+            status: rawForm.status,
+            createdAt: rawForm.created_at,
+            updatedAt: rawForm.updated_at,
+            totalResponses: rawForm.total_responses || 0,
+            conversionRate: rawForm.conversion_rate || 0,
+            averageCompletionTime: rawForm.average_completion_time || 0,
+            tags: rawForm.tags || [],
+            settings: {
+              maxResponses: rawForm.max_responses,
+              expiresAt: rawForm.expires_at,
+              requireAuth: rawForm.require_auth || false,
+              allowMultipleSubmissions: rawForm.allow_multiple_submissions || false,
+            },
+            theme: rawForm.theme_config ? {
+              primaryColor: rawForm.theme_config.primary_color || '#3B82F6',
+              fontFamily: rawForm.theme_config.font_family || 'Inter',
+              borderRadius: rawForm.theme_config.border_radius || '0.5rem',
+            } : undefined,
+          };
           
           set({ 
             selectedForm: form, 
@@ -189,14 +244,10 @@ export const useFormsStore = create<FormsStore>()(
         set({ isLoading: true, error: null });
         
         try {
-          const token = localStorage.getItem('admin_token');
-          
-          // TODO: Replace with actual API endpoint
-          const response = await fetch('/api/admin/forms', {
+          const response = await fetch(API_ENDPOINTS.FORMS.CREATE, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
             },
             body: JSON.stringify(formData),
           });
@@ -205,7 +256,7 @@ export const useFormsStore = create<FormsStore>()(
             throw new Error('Failed to create form');
           }
           
-          const newForm = await response.json();
+          const { data: newForm } = await response.json();
           
           set(state => ({ 
             forms: [newForm, ...state.forms],
@@ -228,14 +279,10 @@ export const useFormsStore = create<FormsStore>()(
         set({ isLoading: true, error: null });
         
         try {
-          const token = localStorage.getItem('admin_token');
-          
-          // TODO: Replace with actual API endpoint
-          const response = await fetch(`/api/admin/forms/${id}`, {
+          const response = await fetch(API_ENDPOINTS.FORMS.BY_ID(id), {
             method: 'PATCH',
             headers: {
               'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
             },
             body: JSON.stringify(updates),
           });
@@ -244,7 +291,7 @@ export const useFormsStore = create<FormsStore>()(
             throw new Error('Failed to update form');
           }
           
-          const updatedForm = await response.json();
+          const { data: updatedForm } = await response.json();
           
           set(state => ({
             forms: state.forms.map(form => form.id === id ? updatedForm : form),
@@ -264,12 +311,11 @@ export const useFormsStore = create<FormsStore>()(
         set({ isLoading: true, error: null });
         
         try {
-          const token = localStorage.getItem('admin_token');
-          
-          // TODO: Replace with actual API endpoint
-          const response = await fetch(`/api/admin/forms/${id}`, {
+          const response = await fetch(API_ENDPOINTS.FORMS.BY_ID(id), {
             method: 'DELETE',
-            headers: { Authorization: `Bearer ${token}` },
+            headers: { 
+              'Content-Type': 'application/json'
+            },
           });
           
           if (!response.ok) {
@@ -319,14 +365,10 @@ export const useFormsStore = create<FormsStore>()(
         set({ isLoading: true, error: null });
         
         try {
-          const token = localStorage.getItem('admin_token');
-          
-          // TODO: Replace with actual API endpoint
-          const response = await fetch('/api/admin/forms/bulk-update', {
+          const response = await fetch(API_ENDPOINTS.FORMS.BULK_UPDATE, {
             method: 'PATCH',
             headers: {
               'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
             },
             body: JSON.stringify({ formIds, updates: { status } }),
           });
@@ -354,14 +396,10 @@ export const useFormsStore = create<FormsStore>()(
         set({ isLoading: true, error: null });
         
         try {
-          const token = localStorage.getItem('admin_token');
-          
-          // TODO: Replace with actual API endpoint
-          const response = await fetch('/api/admin/forms/bulk-delete', {
+          const response = await fetch(API_ENDPOINTS.FORMS.BULK_DELETE, {
             method: 'DELETE',
             headers: {
               'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
             },
             body: JSON.stringify({ formIds }),
           });

@@ -6,10 +6,14 @@ import { useAnalyticsStore } from './stores/analyticsStore';
 
 // Layout components (placeholder imports for now)
 import AdminLayout from './components/layout/AdminLayout';
+import { BreadcrumbProvider } from './components/common/BreadcrumbContext';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import FormsPage from './pages/FormsPage';
 import AnalyticsPage from './pages/AnalyticsPage';
+import SettingsPage from './pages/SettingsPage';
+import FormDetailPage from './pages/FormDetailPage';
+import LeadsPage from './pages/LeadsPage';
 
 // Create Query Client for data fetching
 const queryClient = new QueryClient({
@@ -51,16 +55,21 @@ function App() {
               <Route path="*" element={<Navigate to="/login" replace />} />
             </Routes>
           ) : (
-            <AdminLayout>
-              <Routes>
-                <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                <Route path="/dashboard" element={<DashboardPage />} />
-                <Route path="/forms" element={<FormsPage />} />
-                <Route path="/analytics" element={<AnalyticsPage />} />
-                <Route path="/login" element={<Navigate to="/dashboard" replace />} />
-                <Route path="*" element={<Navigate to="/dashboard" replace />} />
-              </Routes>
-            </AdminLayout>
+            <BreadcrumbProvider>
+              <AdminLayout>
+                <Routes>
+                  <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                  <Route path="/dashboard" element={<DashboardPage />} />
+                  <Route path="/forms" element={<FormsPage />} />
+                  <Route path="/forms/:id" element={<FormDetailPage />} />
+                  <Route path="/leads" element={<LeadsPage />} />
+                  <Route path="/analytics" element={<AnalyticsPage />} />
+                  <Route path="/settings" element={<SettingsPage />} />
+                  <Route path="/login" element={<Navigate to="/dashboard" replace />} />
+                  <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                </Routes>
+              </AdminLayout>
+            </BreadcrumbProvider>
           )}
         </div>
       </Router>

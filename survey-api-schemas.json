@@ -119,13 +119,8 @@
     "type": "object"
   },
   "SubmitResponsesRequest": {
-    "description": "Request to submit survey responses for a step.",
+    "description": "Request to submit survey responses for a step.\n\nSecurity Note: session_id is now obtained from HTTP-only cookie,\nnot from request body. This prevents XSS session hijacking.",
     "properties": {
-      "session_id": {
-        "description": "Session identifier",
-        "title": "Session Id",
-        "type": "string"
-      },
       "responses": {
         "description": "User responses for current step",
         "items": {
@@ -137,7 +132,6 @@
       }
     },
     "required": [
-      "session_id",
       "responses"
     ],
     "title": "SubmitResponsesRequest",

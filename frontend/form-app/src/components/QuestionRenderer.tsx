@@ -1,7 +1,5 @@
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import type { Question, FormResponse } from '../types';
+import type { UseFormRegister, Control, FieldErrors, UseFormWatch } from 'react-hook-form';
 import TextInput from './questions/TextInput';
 import TextareaInput from './questions/TextareaInput';
 import RadioInput from './questions/RadioInput';
@@ -15,112 +13,21 @@ interface QuestionRendererProps {
   questions: Question[];
   responses: Record<string, FormResponse>;
   disabled?: boolean;
+  register: UseFormRegister<any>;
+  control: Control<any>;
+  errors: FieldErrors<any>;
+  watch: UseFormWatch<any>;
 }
 
-// Create dynamic validation schema based on questions
-function createValidationSchema(questions: Question[]) {
-  const shape: Record<string, z.ZodType> = {};
-  
-  questions.forEach(question => {
-    let schema: z.ZodType;
-    
-    switch (question.type) {
-      case 'email':
-        schema = z.string().email({ message: 'Please enter a valid email address' });
-        break;
-      case 'number':
-        schema = z.coerce.number();
-        break;
-      case 'phone':
-        schema = z.string().min(10, 'Please enter a valid phone number');
-        break;
-      case 'checkbox':
-        schema = z.array(z.string()).min(1, 'Please select at least one option');
-        break;
-      case 'rating':
-        schema = z.number().min(1).max(10);
-        break;
-      case 'date':
-        schema = z.string().min(1, 'Please select a date');
-        break;
-      default:
-        schema = z.string();
-    }
-    
-    // Apply custom validation rules
-    if (question.validation) {
-      question.validation.forEach(rule => {
-        switch (rule.type) {
-          case 'required':
-            if (question.type === 'checkbox') {
-              schema = (schema as z.ZodArray<z.ZodString>).min(1, rule.message);
-            } else {
-              schema = (schema as z.ZodString).min(1, rule.message);
-            }
-            break;
-          case 'minLength':
-            schema = (schema as z.ZodString).min(rule.value, rule.message);
-            break;
-          case 'maxLength':
-            schema = (schema as z.ZodString).max(rule.value, rule.message);
-            break;
-          case 'pattern':
-            schema = (schema as z.ZodString).regex(new RegExp(rule.value), rule.message);
-            break;
-        }
-      });
-    } else if (question.required) {
-      if (question.type === 'checkbox') {
-        schema = (schema as z.ZodArray<z.ZodString>).min(1, 'This field is required');
-      } else {
-        schema = (schema as z.ZodString).min(1, 'This field is required');
-      }
-    } else {
-      schema = schema.optional();
-    }
-    
-    shape[question.id] = schema;
-  });
-  
-  return z.object(shape);
-}
-
-export default function QuestionRenderer({ questions, responses, disabled = false }: QuestionRendererProps) {
-  // Create validation schema
-  const validationSchema = createValidationSchema(questions);
-  
-  // Initialize form with existing responses
-  const defaultValues = questions.reduce((acc, question) => {
-    const response = responses[question.id];
-    if (response) {
-      acc[question.id] = response.value;
-    } else {
-      // Set default values based on question type
-      switch (question.type) {
-        case 'checkbox':
-          acc[question.id] = [];
-          break;
-        case 'rating':
-          acc[question.id] = 0;
-          break;
-        default:
-          acc[question.id] = '';
-      }
-    }
-    return acc;
-  }, {} as Record<string, any>);
-
-  const {
-    register,
-    control,
-    formState: { errors },
-    watch
-  } = useForm({
-    resolver: zodResolver(validationSchema),
-    defaultValues,
-    mode: 'onBlur'
-  });
-
+export default function QuestionRenderer({ 
+  questions, 
+  responses, 
+  disabled = false, 
+  register, 
+  control, 
+  errors, 
+  watch 
+}: QuestionRendererProps) {
   // Watch all form values for conditional logic
   const watchedValues = watch();
 
@@ -148,6 +55,11 @@ export default function QuestionRenderer({ questions, responses, disabled = fals
 
   const renderQuestion = (question: Question) => {
     const error = errors[question.id]?.message as string;
+    const response = responses[question.id];
+    const defaultValue = response ? response.value : (
+      question.type === 'checkbox' ? [] :
+      question.type === 'rating' ? 0 : ''
+    );
     
     const baseProps = {
       question,
@@ -155,7 +67,7 @@ export default function QuestionRenderer({ questions, responses, disabled = fals
       control,
       error,
       disabled,
-      defaultValue: defaultValues[question.id]
+      defaultValue
     };
 
     switch (question.type) {
@@ -200,7 +112,7 @@ export default function QuestionRenderer({ questions, responses, disabled = fals
   };
 
   return (
-    <div className="space-y-6">
+    <div>
       {visibleQuestions.map((question) => renderQuestion(question))}
     </div>
   );
