@@ -24,6 +24,7 @@ import jwt
 
 from app.database import get_database_connection
 from app.utils.file_upload import validate_and_store_logo, remove_logo
+from app.utils.response_helpers import success_response, error_response
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -159,6 +160,39 @@ class TeamMemberResponse(BaseModel):
     last_login_at: Optional[datetime]
     invitation_status: Literal["pending", "accepted", "expired"]
     created_at: datetime
+
+class LeadResponse(BaseModel):
+    """Response model for lead data."""
+    session_id: str
+    form_id: str
+    form_title: str
+    lead_status: Literal["yes", "maybe", "no", "unknown"]
+    completion_type: Optional[str]
+    final_score: int
+    started_at: datetime
+    completed_at: Optional[datetime]
+    last_updated: datetime
+    # Contact info (only for qualified leads)
+    contact_name: Optional[str] = None
+    contact_email: Optional[str] = None
+    contact_phone: Optional[str] = None
+    # Conversion tracking
+    actual_conversion: Optional[bool] = None
+    conversion_date: Optional[datetime] = None
+    conversion_value: Optional[float] = None
+    conversion_type: Optional[str] = None
+    # UTM data
+    utm_source: Optional[str] = None
+    utm_campaign: Optional[str] = None
+    utm_medium: Optional[str] = None
+
+class LeadConversionUpdate(BaseModel):
+    """Request model for updating lead conversion status."""
+    actual_conversion: bool
+    conversion_date: Optional[datetime] = None
+    conversion_value: Optional[float] = Field(None, ge=0)
+    conversion_type: Optional[str] = None
+    notes: Optional[str] = None
 
 # === UTILITY FUNCTIONS ===
 
@@ -753,3 +787,374 @@ async def delete_logo(
     except Exception as e:
         logger.error(f"Failed to delete logo: {e}")
         raise HTTPException(status_code=500, detail="Failed to delete logo")
+
+# === LEADS MANAGEMENT ENDPOINTS ===
+
+@router.get("/leads")
+async def get_leads(
+    form_id: Optional[str] = None,
+    status: Optional[str] = None,
+    converted: Optional[bool] = None,
+    limit: int = 100,
+    offset: int = 0,
+    current_user: AdminUserResponse = Depends(get_current_admin_user)
+):
+    """Get all leads for the client with optional filtering."""
+    try:
+        conn = get_database_connection()
+        with conn.cursor() as cursor:
+            # Build the WHERE clause with filters
+            where_conditions = ["ls.client_id = %s"]
+            query_params = [current_user.client_id]
+            
+            if form_id:
+                where_conditions.append("ls.form_id = %s")
+                query_params.append(form_id)
+            
+            if status:
+                where_conditions.append("ls.lead_status = %s")
+                query_params.append(status)
+            
+            if converted is not None:
+                if converted:
+                    where_conditions.append("lo.actual_conversion = true")
+                else:
+                    where_conditions.append("(lo.actual_conversion = false OR lo.actual_conversion IS NULL)")
+            
+            where_clause = " AND ".join(where_conditions)
+            
+            # Add limit and offset to params
+            query_params.extend([limit, offset])
+            
+            query = f"""
+                SELECT 
+                    ls.session_id,
+                    ls.form_id,
+                    f.title as form_title,
+                    ls.lead_status,
+                    ls.completion_type,
+                    ls.final_score,
+                    ls.started_at,
+                    ls.completed_at,
+                    ls.last_updated,
+                    -- Contact info from responses
+                    MAX(CASE WHEN r.question_text ILIKE '%name%' AND r.question_text NOT ILIKE '%business%' THEN r.answer END) as contact_name,
+                    MAX(CASE WHEN r.question_text ILIKE '%email%' THEN r.answer END) as contact_email,
+                    MAX(CASE WHEN r.question_text ILIKE '%phone%' THEN r.answer END) as contact_phone,
+                    -- Conversion data
+                    lo.actual_conversion,
+                    lo.conversion_date,
+                    lo.conversion_value,
+                    lo.conversion_type,
+                    -- UTM data
+                    td.utm_source,
+                    td.utm_campaign,
+                    td.utm_medium
+                FROM lead_sessions ls
+                LEFT JOIN forms f ON ls.form_id = f.id
+                LEFT JOIN responses r ON ls.session_id = r.session_id
+                LEFT JOIN lead_outcomes lo ON ls.session_id = lo.session_id
+                LEFT JOIN tracking_data td ON ls.session_id = td.session_id
+                WHERE {where_clause}
+                GROUP BY 
+                    ls.session_id, ls.form_id, f.title, ls.lead_status, ls.completion_type,
+                    ls.final_score, ls.started_at, ls.completed_at, ls.last_updated,
+                    lo.actual_conversion, lo.conversion_date, lo.conversion_value, lo.conversion_type,
+                    td.utm_source, td.utm_campaign, td.utm_medium
+                ORDER BY ls.started_at DESC
+                LIMIT %s OFFSET %s
+            """
+            
+            cursor.execute(query, query_params)
+            results = cursor.fetchall()
+            
+            leads = []
+            for row in results:
+                leads.append({
+                    "session_id": row[0],
+                    "form_id": str(row[1]),
+                    "form_title": row[2] or "Unknown Form",
+                    "lead_status": row[3] or "unknown",
+                    "completion_type": row[4],
+                    "final_score": row[5] or 0,
+                    "started_at": row[6],
+                    "completed_at": row[7],
+                    "last_updated": row[8],
+                    "contact_name": row[9],
+                    "contact_email": row[10],
+                    "contact_phone": row[11],
+                    "actual_conversion": row[12],
+                    "conversion_date": row[13],
+                    "conversion_value": float(row[14]) if row[14] else None,
+                    "conversion_type": row[15],
+                    "utm_source": row[16],
+                    "utm_campaign": row[17],
+                    "utm_medium": row[18]
+                })
+            
+            return success_response(
+                data={
+                    "leads": leads,
+                    "pagination": {
+                        "limit": limit,
+                        "offset": offset,
+                        "total": len(leads)
+                    }
+                },
+                message=f"Retrieved {len(leads)} leads"
+            )
+            
+    except Exception as e:
+        logger.error(f"Failed to get leads: {e}")
+        return error_response("Failed to retrieve leads", 500)
+
+@router.get("/leads/{session_id}")
+async def get_lead_detail(
+    session_id: str,
+    current_user: AdminUserResponse = Depends(get_current_admin_user)
+):
+    """Get detailed information about a specific lead."""
+    try:
+        conn = get_database_connection()
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT 
+                    ls.session_id,
+                    ls.form_id,
+                    f.title as form_title,
+                    ls.lead_status,
+                    ls.completion_type,
+                    ls.final_score,
+                    ls.started_at,
+                    ls.completed_at,
+                    ls.last_updated,
+                    -- Contact info from responses
+                    MAX(CASE WHEN r.question_text ILIKE '%name%' AND r.question_text NOT ILIKE '%business%' THEN r.answer END) as contact_name,
+                    MAX(CASE WHEN r.question_text ILIKE '%email%' THEN r.answer END) as contact_email,
+                    MAX(CASE WHEN r.question_text ILIKE '%phone%' THEN r.answer END) as contact_phone,
+                    -- Conversion data
+                    lo.actual_conversion,
+                    lo.conversion_date,
+                    lo.conversion_value,
+                    lo.conversion_type,
+                    -- UTM data
+                    td.utm_source,
+                    td.utm_campaign,
+                    td.utm_medium
+                FROM lead_sessions ls
+                LEFT JOIN forms f ON ls.form_id = f.id
+                LEFT JOIN responses r ON ls.session_id = r.session_id
+                LEFT JOIN lead_outcomes lo ON ls.session_id = lo.session_id
+                LEFT JOIN tracking_data td ON ls.session_id = td.session_id
+                WHERE ls.session_id = %s AND ls.client_id = %s
+                GROUP BY 
+                    ls.session_id, ls.form_id, f.title, ls.lead_status, ls.completion_type,
+                    ls.final_score, ls.started_at, ls.completed_at, ls.last_updated,
+                    lo.actual_conversion, lo.conversion_date, lo.conversion_value, lo.conversion_type,
+                    td.utm_source, td.utm_campaign, td.utm_medium
+            """, (session_id, current_user.client_id))
+            
+            result = cursor.fetchone()
+            if not result:
+                return error_response("Lead not found", 404)
+            
+            lead_data = {
+                "session_id": result[0],
+                "form_id": str(result[1]),
+                "form_title": result[2] or "Unknown Form",
+                "lead_status": result[3] or "unknown",
+                "completion_type": result[4],
+                "final_score": result[5] or 0,
+                "started_at": result[6],
+                "completed_at": result[7],
+                "last_updated": result[8],
+                "contact_name": result[9],
+                "contact_email": result[10],
+                "contact_phone": result[11],
+                "actual_conversion": result[12],
+                "conversion_date": result[13],
+                "conversion_value": float(result[14]) if result[14] else None,
+                "conversion_type": result[15],
+                "utm_source": result[16],
+                "utm_campaign": result[17],
+                "utm_medium": result[18]
+            }
+            
+            return success_response(
+                data={"lead": lead_data},
+                message="Lead details retrieved successfully"
+            )
+            
+    except Exception as e:
+        logger.error(f"Failed to get lead detail: {e}")
+        return error_response("Failed to retrieve lead details", 500)
+
+@router.put("/leads/{session_id}/conversion")
+async def update_lead_conversion(
+    session_id: str,
+    conversion_update: LeadConversionUpdate,
+    current_user: AdminUserResponse = Depends(get_current_admin_user)
+):
+    """Update the conversion status of a lead."""
+    try:
+        conn = get_database_connection()
+        with conn.cursor() as cursor:
+            # Verify the lead belongs to this client
+            cursor.execute("""
+                SELECT ls.id FROM lead_sessions ls 
+                WHERE ls.session_id = %s AND ls.client_id = %s
+            """, (session_id, current_user.client_id))
+            
+            if not cursor.fetchone():
+                raise HTTPException(status_code=404, detail="Lead not found")
+            
+            # Check if lead_outcome record exists
+            cursor.execute("""
+                SELECT id FROM lead_outcomes WHERE session_id = %s
+            """, (session_id,))
+            
+            outcome_exists = cursor.fetchone()
+            
+            if outcome_exists:
+                # Update existing outcome
+                cursor.execute("""
+                    UPDATE lead_outcomes 
+                    SET actual_conversion = %s,
+                        conversion_date = %s,
+                        conversion_value = %s,
+                        conversion_type = %s,
+                        notes = %s
+                    WHERE session_id = %s
+                """, (
+                    conversion_update.actual_conversion,
+                    conversion_update.conversion_date,
+                    conversion_update.conversion_value,
+                    conversion_update.conversion_type,
+                    conversion_update.notes,
+                    session_id
+                ))
+            else:
+                # Create new outcome record
+                # Get form_id for the record
+                cursor.execute("SELECT form_id FROM lead_sessions WHERE session_id = %s", (session_id,))
+                form_id = cursor.fetchone()[0]
+                
+                cursor.execute("""
+                    INSERT INTO lead_outcomes 
+                    (id, session_id, form_id, actual_conversion, conversion_date, 
+                     conversion_value, conversion_type, notes)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    str(uuid.uuid4()),
+                    session_id,
+                    form_id,
+                    conversion_update.actual_conversion,
+                    conversion_update.conversion_date,
+                    conversion_update.conversion_value,
+                    conversion_update.conversion_type,
+                    conversion_update.notes
+                ))
+            
+            conn.commit()
+            
+            return success_response(
+                data={
+                    "session_id": session_id,
+                    "actual_conversion": conversion_update.actual_conversion,
+                    "conversion_date": conversion_update.conversion_date,
+                    "conversion_value": conversion_update.conversion_value,
+                    "conversion_type": conversion_update.conversion_type
+                },
+                message=f"Lead conversion status updated to {'converted' if conversion_update.actual_conversion else 'not converted'}"
+            )
+            
+    except Exception as e:
+        logger.error(f"Failed to update lead conversion: {e}")
+        return error_response("Failed to update lead conversion", 500)
+
+@router.get("/leads/stats/summary")
+async def get_leads_summary(
+    form_id: Optional[str] = None,
+    days: int = 30,
+    current_user: AdminUserResponse = Depends(get_current_admin_user)
+):
+    """Get summary statistics for leads."""
+    try:
+        conn = get_database_connection()
+        with conn.cursor() as cursor:
+            # Build WHERE clause
+            where_conditions = ["ls.client_id = %s", "ls.started_at >= NOW() - INTERVAL '%s days'"]
+            query_params = [current_user.client_id, days]
+            
+            if form_id:
+                where_conditions.append("ls.form_id = %s")
+                query_params.append(form_id)
+            
+            where_clause = " AND ".join(where_conditions)
+            
+            # Get lead status counts
+            cursor.execute(f"""
+                SELECT 
+                    ls.lead_status,
+                    COUNT(*) as count,
+                    AVG(ls.final_score) as avg_score
+                FROM lead_sessions ls
+                WHERE {where_clause}
+                GROUP BY ls.lead_status
+            """, query_params)
+            
+            status_stats = {row[0]: {"count": row[1], "avg_score": float(row[2]) if row[2] else 0} for row in cursor.fetchall()}
+            
+            # Get conversion stats
+            cursor.execute(f"""
+                SELECT 
+                    COUNT(*) as total_leads,
+                    COUNT(lo.actual_conversion) as tracked_conversions,
+                    SUM(CASE WHEN lo.actual_conversion = true THEN 1 ELSE 0 END) as conversions,
+                    SUM(lo.conversion_value) as total_value,
+                    AVG(lo.conversion_value) as avg_value
+                FROM lead_sessions ls
+                LEFT JOIN lead_outcomes lo ON ls.session_id = lo.session_id
+                WHERE {where_clause}
+            """, query_params)
+            
+            conv_result = cursor.fetchone()
+            conversion_stats = {
+                "total_leads": conv_result[0],
+                "tracked_conversions": conv_result[1],
+                "conversions": conv_result[2],
+                "conversion_rate": (conv_result[2] / conv_result[1] * 100) if conv_result[1] > 0 else 0,
+                "total_value": float(conv_result[4]) if conv_result[4] else 0,
+                "avg_value": float(conv_result[5]) if conv_result[5] else 0
+            }
+            
+            # Get UTM source stats
+            cursor.execute(f"""
+                SELECT 
+                    td.utm_source,
+                    COUNT(*) as leads,
+                    SUM(CASE WHEN lo.actual_conversion = true THEN 1 ELSE 0 END) as conversions
+                FROM lead_sessions ls
+                LEFT JOIN tracking_data td ON ls.session_id = td.session_id
+                LEFT JOIN lead_outcomes lo ON ls.session_id = lo.session_id
+                WHERE {where_clause} AND td.utm_source IS NOT NULL
+                GROUP BY td.utm_source
+                ORDER BY leads DESC
+                LIMIT 10
+            """, query_params)
+            
+            utm_stats = [{"source": row[0], "leads": row[1], "conversions": row[2]} for row in cursor.fetchall()]
+            
+            return success_response(
+                data={
+                    "status_breakdown": status_stats,
+                    "conversion_stats": conversion_stats,
+                    "utm_sources": utm_stats,
+                    "period_days": days
+                },
+                message=f"Lead summary for last {days} days"
+            )
+            
+    except Exception as e:
+        logger.error(f"Failed to get leads summary: {e}")
+        return error_response("Failed to retrieve leads summary", 500)

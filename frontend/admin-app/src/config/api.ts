@@ -53,4 +53,14 @@ export const API_ENDPOINTS = {
     DASHBOARD: buildApiUrl('/api/analytics/dashboard'),
     FORMS: (id: string) => buildApiUrl(`/api/analytics/forms/${id}`),
   },
+
+  // Admin endpoints
+  ADMIN: {
+    LEADS: {
+      LIST: (params?: URLSearchParams) => buildApiUrl(`/api/admin/leads${params ? `?${params}` : ''}`),
+      BY_ID: (id: string) => buildApiUrl(`/api/admin/leads/${id}`),
+      UPDATE_CONVERSION: (id: string) => buildApiUrl(`/api/admin/leads/${id}/conversion`),
+      STATS: buildApiUrl('/api/admin/leads/stats/summary'),
+    },
+  },
 } as const;
