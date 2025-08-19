@@ -33,10 +33,12 @@
    This will start:
    - Redis cache (port 6379)
    - FastAPI backend (port 8000) - connected to Supabase
-   - React frontend (port 5173)
+   - React form frontend (port 5173)
+   - React admin frontend (port 5174)
 
 4. **Access the application**
-   - Frontend: http://localhost:5173
+   - Form App: http://localhost:5173
+   - Admin App: http://localhost:5174/admin/
    - Backend API: http://localhost:8000
    - API Documentation: http://localhost:8000/docs
 
@@ -58,7 +60,36 @@ docker-compose down -v
 # Rebuild after code changes
 docker-compose build
 docker-compose up
+
+# Rebuild specific service
+docker-compose build admin
+docker-compose up admin
 ```
+
+### Production Deployment
+
+For production deployment, use the production docker-compose file:
+
+```bash
+# Copy production environment file
+cp .env.example .env.production
+# Edit .env.production with production credentials
+
+# Build and start production services
+docker-compose -f docker-compose.prod.yml up -d
+
+# This will start:
+# - Backend API with production settings
+# - Form frontend served by nginx on port 3000
+# - Admin frontend served by nginx on port 3001  
+# - Redis with persistence
+# - Nginx reverse proxy on ports 80/443
+```
+
+Production URLs (with nginx proxy):
+- Form App: http://your-domain.com/
+- Admin App: http://your-domain.com/admin/
+- API: http://your-domain.com/api/
 
 ### Available Test Forms
 The Supabase database should be populated with 5 example business scenarios. Test with these form IDs:

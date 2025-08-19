@@ -6,9 +6,10 @@ authors = [
     { name = "Julie Berlin", email = "ai@jkwb.mozmail.com" }
 ]
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.116.1",
+    "itsdangerous>=2.0.0",
     "jupyter>=1.1.1",
     "langchain>=0.3.26",
     "langchain-community>=0.3.27",
@@ -16,12 +17,24 @@ dependencies = [
     "langchain-openai>=0.3.28",
     "langchain-tavily>=0.2.11",
     "langgraph>=0.5.4",
+    "langgraph-api==0.2.130",
+    "langgraph-cli[inmem]>=0.3.6",
     "langgraph-sdk>=0.1.74",
     "openai>=1.97.0",
     "pydantic[email]>=2.11.7",
     "pytest>=8.4.1",
     "pytest-asyncio>=1.1.0",
     "python-dotenv>=1.1.1",
+    "redis>=5.0.0",
     "supabase>=2.17.0",
     "uvicorn>=0.35.0",
 ]
+
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["backend"]
+include = ["app*"]
+

@@ -201,7 +201,7 @@ export default function QuestionRenderer({ questions, responses, disabled = fals
 
   return (
     <div className="space-y-6">
-      {visibleQuestions.map(renderQuestion)}
+      {visibleQuestions.map((question) => renderQuestion(question))}
     </div>
   );
 }

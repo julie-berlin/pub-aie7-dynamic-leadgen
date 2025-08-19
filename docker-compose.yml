@@ -10,6 +10,10 @@ services:
     image: dynamic-survey-api:dev
     container_name: survey-backend-dev
 
+    # Load environment variables from .env file
+    env_file:
+      - .env
+
     environment:
       - ENVIRONMENT=development
       - LOG_LEVEL=DEBUG
@@ -24,6 +28,9 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       # Optional for development
       - LANGCHAIN_API_KEY=${LANGCHAIN_API_KEY}
+      - LANGSMITH_API_KEY=${LANGSMITH_API_KEY}
+      - TAVILY_API_KEY=${TAVILY_API_KEY}
+      - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
 
     ports:
       - "${BACKEND_PORT:-8000}:8000"
@@ -81,6 +88,40 @@ services:
     depends_on:
       - backend
 
+  # Admin Frontend (Development with hot reload)
+  admin:
+    build:
+      context: ./frontend/admin-app
+      dockerfile: Dockerfile.dev  # Development Dockerfile
+      args:
+        - VITE_API_URL=http://localhost:8000
+        - VITE_ENVIRONMENT=development
+    image: dynamic-survey-admin:dev
+    container_name: survey-admin-dev
+
+    environment:
+      - NODE_ENV=development
+      - VITE_API_URL=http://backend:8000
+      - WATCHPACK_POLLING=true  # For file watching in Docker
+
+    ports:
+      - "${ADMIN_PORT:-5174}:5174"
+
+    volumes:
+      # Mount source code for hot reload
+      - ./frontend/admin-app/src:/app/src
+      - ./frontend/admin-app/public:/app/public
+      - ./frontend/admin-app/package.json:/app/package.json
+      - ./frontend/admin-app/vite.config.ts:/app/vite.config.ts
+      - ./frontend/admin-app/index.html:/app/index.html
+      - admin_node_modules:/app/node_modules
+
+    networks:
+      - survey_network
+
+    depends_on:
+      - backend
+
   # Redis for development caching
   redis:
     image: redis:7-alpine
@@ -102,6 +143,8 @@ volumes:
   backend_cache:
     driver: local
   frontend_node_modules:
+    driver: local
+  admin_node_modules:
     driver: local
   redis_data:
     driver: local

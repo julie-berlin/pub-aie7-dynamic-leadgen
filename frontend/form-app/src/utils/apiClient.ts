@@ -1,11 +1,47 @@
 import type { 
+  ApiResponse,
   StartSessionResponse,
   SubmitResponseRequest,
   SubmitResponseResponse,
   FormStep,
   ThemeConfig,
-  TrackingData
+  TrackingData,
+  Question,
+  QuestionType
 } from '../types';
+
+// Backend API response types
+interface BackendQuestion {
+  question: string;
+  phrased_question: string;
+  data_type: string;
+  is_required: boolean;
+  options?: string[] | Record<string, any>;
+  description?: string;
+  placeholder?: string;
+  // Note: scoring_rubric deliberately excluded - sensitive backend data
+}
+
+interface BackendFormStep {
+  stepNumber: number;
+  totalSteps: number;
+  questions: BackendQuestion[];
+  headline: string;
+  subheading?: string;
+  isComplete: boolean;
+  canGoBack?: boolean;
+  isLastStep?: boolean;
+}
+
+interface BackendStartSessionResponse {
+  form: {
+    id?: string;
+    title: string;
+    description?: string;
+    theme?: ThemeConfig;
+  };
+  step: BackendFormStep;
+}
 
 // API configuration
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -18,7 +54,102 @@ class APIClient {
   }
 
   /**
-   * Make HTTP request with error handling
+   * Transform backend question data to frontend format
+   */
+  private transformQuestion(backendQuestion: BackendQuestion, index: number): Question {
+    return {
+      id: (index + 1).toString(), // Generate ID from index since backend doesn't provide it
+      type: this.mapDataTypeToQuestionType(backendQuestion.data_type),
+      text: backendQuestion.phrased_question || backendQuestion.question,
+      description: backendQuestion.description,
+      placeholder: backendQuestion.placeholder,
+      required: backendQuestion.is_required || false,
+      options: this.transformQuestionOptions(backendQuestion),
+      validation: this.transformValidationRules(backendQuestion),
+      conditional: undefined // Backend doesn't seem to provide conditional logic yet
+    };
+  }
+
+  /**
+   * Map backend data_type to frontend QuestionType
+   */
+  private mapDataTypeToQuestionType(dataType: string): QuestionType {
+    const typeMap: Record<string, QuestionType> = {
+      'text': 'text',
+      'textarea': 'textarea', 
+      'email': 'email',
+      'phone': 'phone',
+      'number': 'number',
+      'select': 'select',
+      'radio': 'radio',
+      'checkbox': 'checkbox',
+      'multiselect': 'multiselect',
+      'rating': 'rating',
+      'date': 'date',
+      'time': 'time',
+      'datetime': 'datetime',
+      'file': 'file'
+    };
+    
+    return typeMap[dataType] || 'text';
+  }
+
+  /**
+   * Transform backend options to frontend format
+   */
+  private transformQuestionOptions(backendQuestion: BackendQuestion) {
+    if (!backendQuestion.options) return undefined;
+
+    // If options is an array of strings (like for select), convert to choices
+    if (Array.isArray(backendQuestion.options)) {
+      return {
+        choices: backendQuestion.options.map((option: string, index: number) => ({
+          id: (index + 1).toString(),
+          text: option,
+          value: option
+        }))
+      };
+    }
+
+    // If options is an object, return as-is (for complex option structures)
+    return backendQuestion.options;
+  }
+
+  /**
+   * Transform backend validation to frontend format
+   */
+  private transformValidationRules(backendQuestion: BackendQuestion) {
+    const rules = [];
+    
+    if (backendQuestion.is_required) {
+      rules.push({
+        type: 'required' as const,
+        message: 'This field is required'
+      });
+    }
+
+    // Add more validation transformations as needed based on backend schema
+    return rules.length > 0 ? rules : undefined;
+  }
+
+  /**
+   * Transform backend step response to frontend format
+   */
+  private transformFormStep(backendStep: BackendFormStep): FormStep {
+    return {
+      stepNumber: backendStep.stepNumber,
+      totalSteps: backendStep.totalSteps,
+      questions: backendStep.questions.map((q, index) => this.transformQuestion(q, index)),
+      headline: backendStep.headline || '',
+      subheading: backendStep.subheading,
+      isComplete: backendStep.isComplete,
+      canGoBack: backendStep.canGoBack,
+      isLastStep: backendStep.isLastStep
+    };
+  }
+
+  /**
+   * Make HTTP request with error handling and consistent API response format
    */
   private async request<T>(
     endpoint: string, 
@@ -31,22 +162,23 @@ class APIClient {
         'Content-Type': 'application/json',
         ...options.headers,
       },
+      credentials: 'include', // Include HTTP-only cookies for secure session management
       ...options,
     };
 
     try {
       const response = await fetch(url, config);
       
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
+      const result = await response.json().catch(() => ({})) as ApiResponse<T>;
+      
+      if (!response.ok || !result.success) {
         throw new Error(
-          errorData.message || 
-          errorData.detail || 
+          result.message || 
           `HTTP ${response.status}: ${response.statusText}`
         );
       }
 
-      return await response.json();
+      return result.data;
     } catch (error) {
       console.error(`API request failed: ${endpoint}`, error);
       throw error;
@@ -54,38 +186,61 @@ class APIClient {
   }
 
   /**
-   * Start or resume a form session
+   * Start a new survey session with secure HTTP-only cookie
+   * Session ID is automatically managed via secure cookies
    */
   async startSession(params: {
-    clientId: string;
     formId: string;
-    sessionId?: string;
+    clientId?: string;
     trackingData?: Partial<TrackingData>;
   }): Promise<StartSessionResponse> {
-    return this.request<StartSessionResponse>('/api/survey/start', {
+    const response = await this.request<BackendStartSessionResponse>('/api/survey/start', {
       method: 'POST',
       body: JSON.stringify({
-        client_id: params.clientId,
         form_id: params.formId,
-        session_id: params.sessionId,
-        tracking_data: params.trackingData
+        client_id: params.clientId,
+        utm_source: params.trackingData?.utmSource,
+        utm_medium: params.trackingData?.utmMedium,
+        utm_campaign: params.trackingData?.utmCampaign,
+        utm_content: params.trackingData?.utmContent,
+        utm_term: params.trackingData?.utmTerm
       }),
     });
+
+    // Transform the response to match frontend types
+    return {
+      form: {
+        id: response.form.id || 'unknown',
+        title: response.form.title,
+        description: response.form.description,
+        theme: response.form.theme
+      },
+      step: this.transformFormStep(response.step)
+    };
   }
 
   /**
-   * Submit form responses
+   * Submit form responses using secure session cookie
+   * Session ID is automatically included via HTTP-only cookie
    */
   async submitResponses(request: SubmitResponseRequest): Promise<SubmitResponseResponse> {
-    return this.request<SubmitResponseResponse>('/api/survey/submit', {
+    const response = await this.request<{
+      isComplete: boolean;
+      nextStep?: BackendFormStep;
+      completionData?: any;
+    }>('/api/survey/step', {
       method: 'POST',
       body: JSON.stringify({
-        session_id: request.sessionId,
-        responses: request.responses,
-        current_step: request.currentStep,
-        timestamp: request.timestamp
+        responses: request.responses
       }),
     });
+
+    // Transform the response to match frontend types
+    return {
+      isComplete: response.isComplete,
+      nextStep: response.nextStep ? this.transformFormStep(response.nextStep) : undefined,
+      completionData: response.completionData
+    };
   }
 
   /**
@@ -116,17 +271,12 @@ class APIClient {
 
   /**
    * Get theme configuration for a form
+   * Note: Theme endpoint not implemented yet, always returns null
    */
   async getTheme(formId: string): Promise<ThemeConfig | null> {
-    try {
-      return await this.request<ThemeConfig>(`/api/survey/theme/${formId}`, {
-        method: 'GET',
-      });
-    } catch (error) {
-      // Theme is optional, return null if not found
-      console.warn(`Theme not found for form ${formId}:`, error);
-      return null;
-    }
+    // Theme loading not implemented yet - return null to use default theme
+    console.log(`Theme loading skipped for form ${formId} - using default theme`);
+    return null;
   }
 
   /**
@@ -156,7 +306,7 @@ class APIClient {
   /**
    * Validate form access
    */
-  async validateFormAccess(clientId: string, formId: string): Promise<{
+  async validateFormAccess(formId: string): Promise<{
     valid: boolean;
     form?: {
       id: string;
@@ -166,25 +316,42 @@ class APIClient {
     };
     error?: string;
   }> {
-    return this.request(`/api/survey/validate/${clientId}/${formId}`, {
-      method: 'GET',
-    });
+    try {
+      const result = await this.request<{
+        form: {
+          id: string;
+          title: string;
+          description?: string;
+          active: boolean;
+        };
+      }>(`/api/survey/forms/${formId}/validate`, {
+        method: 'GET',
+      });
+      
+      return {
+        valid: true,
+        form: result.form
+      };
+    } catch (error) {
+      return {
+        valid: false,
+        error: error instanceof Error ? error.message : 'Form validation failed'
+      };
+    }
   }
 
   /**
    * Report form abandonment for analytics
+   * Session ID is automatically included via HTTP-only cookie
    */
-  async reportAbandonment(sessionId: string, data: {
-    step: number;
-    timeSpent: number;
+  async reportAbandonment(data?: {
+    step?: number;
+    timeSpent?: number;
     reason?: string;
   }): Promise<void> {
-    await this.request('/api/survey/abandon', {
+    await this.request<void>('/api/survey/abandon', {
       method: 'POST',
-      body: JSON.stringify({
-        session_id: sessionId,
-        ...data
-      }),
+      body: JSON.stringify(data || {}),
     });
   }
 
@@ -192,7 +359,7 @@ class APIClient {
    * Health check endpoint
    */
   async healthCheck(): Promise<{ status: string; timestamp: string }> {
-    return this.request('/health', {
+    return this.request<{ status: string; timestamp: string }>('/health', {
       method: 'GET',
     });
   }

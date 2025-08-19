@@ -62,9 +62,8 @@ class SupervisorAgent(ABC):
         
         # Initialize LLM model
         self.model = get_chat_model(
-            model=model_name,
-            temperature=temperature,
-            max_tokens=max_tokens
+            model_name=model_name,
+            temperature=temperature
         )
         
         # Decision history for this supervisor

@@ -1,0 +1,139 @@
+# Production Docker Compose configuration
+# For production deployment with optimized builds
+
+services:
+  # Backend API (Production)
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: dynamic-survey-api:latest
+    container_name: survey-backend
+
+    # Load environment variables from .env file
+    env_file:
+      - .env.production
+
+    environment:
+      - ENVIRONMENT=production
+      - LOG_LEVEL=INFO
+      # Database config - use Supabase
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_PUBLISHABLE_KEY=${SUPABASE_PUBLISHABLE_KEY}
+      - SUPABASE_SECRET_KEY=${SUPABASE_SECRET_KEY}
+      # Redis config
+      - REDIS_URL=redis://redis:6379
+      # LLM config
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - TAVILY_API_KEY=${TAVILY_API_KEY}
+      - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
+
+    ports:
+      - "8000:8000"
+
+    networks:
+      - survey_network
+
+    depends_on:
+      - redis
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+    restart: unless-stopped
+
+  # Frontend (Production)
+  frontend:
+    build:
+      context: ./frontend/form-app
+      dockerfile: Dockerfile
+    image: dynamic-survey-frontend:latest
+    container_name: survey-frontend
+
+    environment:
+      - NODE_ENV=production
+
+    ports:
+      - "3000:80"
+
+    networks:
+      - survey_network
+
+    depends_on:
+      - backend
+
+    restart: unless-stopped
+
+  # Admin Frontend (Production)
+  admin:
+    build:
+      context: ./frontend/admin-app
+      dockerfile: Dockerfile
+    image: dynamic-survey-admin:latest
+    container_name: survey-admin
+
+    environment:
+      - NODE_ENV=production
+
+    ports:
+      - "3001:80"
+
+    networks:
+      - survey_network
+
+    depends_on:
+      - backend
+
+    restart: unless-stopped
+
+  # Redis for production caching
+  redis:
+    image: redis:7-alpine
+    container_name: survey-redis
+
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+
+    volumes:
+      - redis_data:/data
+
+    networks:
+      - survey_network
+
+    restart: unless-stopped
+
+  # Nginx reverse proxy (optional - for production)
+  nginx:
+    image: nginx:alpine
+    container_name: survey-nginx
+
+    volumes:
+      - ./nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+
+    ports:
+      - "80:80"
+      - "443:443"
+
+    networks:
+      - survey_network
+
+    depends_on:
+      - backend
+      - frontend
+      - admin
+
+    restart: unless-stopped
+
+# Named volumes for production
+volumes:
+  redis_data:
+    driver: local
+
+# Network configuration
+networks:
+  survey_network:
+    driver: bridge

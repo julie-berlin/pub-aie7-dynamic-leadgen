@@ -210,6 +210,9 @@ __marimo__/
 
 # Mac
 .DS_Store
+
+# custom
 .llm/
 .langgraph_api/
+_archive/
 DEVELOPMENT_PLAN.md

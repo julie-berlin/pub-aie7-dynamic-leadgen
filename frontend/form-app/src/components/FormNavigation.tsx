@@ -8,11 +8,7 @@ interface FormNavigationProps {
 }
 
 export default function FormNavigation({ currentStep, canGoBack = false, loading = false }: FormNavigationProps) {
-  const { submitStep, goBack } = useFormStore();
-
-  const handleNext = () => {
-    submitStep(currentStep.stepNumber);
-  };
+  const { goBack } = useFormStore();
 
   const handleBack = () => {
     if (canGoBack) {
@@ -41,22 +37,15 @@ export default function FormNavigation({ currentStep, canGoBack = false, loading
         )}
       </div>
 
-      {/* Step Indicator */}
-      <div className="flex items-center space-x-2 text-sm text-text-muted">
-        <span>Step {currentStep.stepNumber} of {currentStep.totalSteps}</span>
-      </div>
+      {/* Step Indicator removed - dynamic surveys don't show progress */}
+      <div></div>
 
       {/* Next/Submit Button */}
       <div>
         <button
-          type="button"
-          onClick={handleNext}
+          type="submit"
           disabled={loading}
-          className={`px-6 py-2 font-medium ${
-            currentStep.isLastStep 
-              ? 'btn-primary' 
-              : 'btn-primary'
-          } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+          className={`px-6 py-2 font-medium btn-primary ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
         >
           {loading && (
             <svg className="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24">

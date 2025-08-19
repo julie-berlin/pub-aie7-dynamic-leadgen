@@ -56,7 +56,7 @@ export default function SelectInput({ question, control, error, disabled }: Sele
         onChange={handleChange}
         className={`select-field ${isMultiple ? 'min-h-[120px]' : ''} ${error ? 'input-error' : ''}`}
       >
-        {!isMultiple && !question.required && (
+        {!isMultiple && (
           <option value="">
             {question.placeholder || 'Select an option...'}
           </option>

@@ -17,21 +17,26 @@ The system uses AI agents to create intelligent, engaging forms that maximize co
 
 ### Technology Stack
 - **Backend**: Python 3.12+ with LangChain & LangGraph
+- **Session Management**: Starlette SessionMiddleware with Redis backend (OWASP-compliant HTTP-only cookies)
 - **Database**: Supabase for data storage and real-time updates
 - **Frontend**: React.js with Tailwind CSS v4 for theming
+- **Admin Frontend**: React.js admin interface on port 5174 with `/admin` base path
 - **Package Manager**: uv (modern Python package manager)
 - **Configuration**: YAML-based configuration management
+- **Containerization**: Docker & Docker Compose for full-stack development
 
 ### Project Structure
 - **Main application**: `main.py` - Entry point for the application
 - **Backend**: `/backend/app/` - Core application modules
-  - `handlers/` - Request/response handlers
-  - `llm/` - Language model integrations
-  - `ml/` - Machine learning components
-  - `prompt_engineering/` - Prompt templates and engineering
   - `utils/` - Utility functions and configuration loading
   - `routes/` - API endpoints for survey operations
   - `graphs/` - LangGraph implementations for survey flow
+    - `supervisors/` - LLM agents that coordinate survey strategy and validation
+    - `nodes/` - Individual processing nodes (LLM agents and pure logic)
+    - `toolbelts/` - External API integrations (Tavily, Google Maps)
+  - `session_manager.py` - Starlette SessionMiddleware integration
+  - `session_store.py` - Custom Redis session store
+  - `middleware/` - Security, validation, and logging middleware
 - **Database**: `/database/` - Database migrations and population scripts
   - `001_initial_schema.sql` - Complete database schema with all tables
   - `002_populate_example_data.sql` - 5 example business scenarios with 52 questions
@@ -46,29 +51,45 @@ The system uses AI agents to create intelligent, engaging forms that maximize co
   - Embeddings and cached LLM responses
 
 ## Development Setup
-```bash
-# Install dependencies
-uv sync
-
-# Set up database (run in Supabase SQL Editor)
-# 1. Run: database/001_initial_schema.sql
-# 2. Run: database/002_populate_example_data.sql
-
-# Test database setup
-uv run python3 database/test_database_population.py
-
-# Run notebooks
-uv run jupyter notebook
-
-# Run main application
-uv run python3 main.py
 ```
+docker-compose up -d
+```
+
+### Admin Interface Setup
+The admin interface is a separate React application for managing the platform:
+
+```bash
+# Start admin interface (from project root)
+cd frontend/admin-app
+npm install
+npm run dev
+```
+
+**Admin Interface URLs:**
+- **Development**: http://localhost:5174/admin/
+- **Production**: http://your-domain.com/admin/
+
+**Key Features:**
+- Form CRUD operations with question management
+- Real-time analytics dashboard with charts and metrics
+- Theme management with preview capabilities
+- Business information and branding configuration
+- Team member management and role-based access
+- Data export functionality (CSV/JSON)
+
+**API Integration:**
+All admin APIs are available under `/api/admin/*`:
+- `/api/admin/auth/*` - Authentication
+- `/api/admin/forms/*` - Form management
+- `/api/admin/analytics/*` - Analytics and reporting
+- `/api/admin/themes/*` - Theme management
+- `/api/admin/business/*` - Business settings
 
 ## Database Setup
 The system includes comprehensive database population with 5 example business scenarios:
 
 1. **Pawsome Dog Walking** - Pet services (10 questions)
-2. **Metro Realty Group** - Real estate (12 questions)  
+2. **Metro Realty Group** - Real estate (12 questions)
 3. **TechSolve Consulting** - Software consulting (11 questions)
 4. **FitLife Personal Training** - Health & fitness (10 questions)
 5. **Sparkle Clean Solutions** - Home cleaning (9 questions)
@@ -81,43 +102,51 @@ The system includes comprehensive database population with 5 example business sc
 uv run python3 database/setup_and_test.py
 ```
 
-## LangGraph Flow Architecture
+## LangGraph Flow Architecture (Simplified)
 
-### Core Flow Design
-Current focus is on capabilities #2 and #3 (Adaptive Forms and Lead Scoring):
+### Simplified Flow Design
+**RECENTLY SIMPLIFIED**: All child nodes have been consolidated into their parent supervisors for better performance and maintainability.
 
+```mermaid
+graph TB
+    Start([Start: User Arrives with UTM]) --> InitTrack[initialize_session_with_tracking<br/>📊 LOGIC - Database ops + UTM]
+
+    InitTrack --> SA[Consolidated Survey Admin Supervisor<br/>🤖 LLM AGENT - ALL survey functions integrated]
+
+    SA --> Wait{Wait for User Response}
+    Wait --> CheckAndMark[check_abandonment<br/>📊 LOGIC - Abandonment detection]
+    CheckAndMark -->|Abandoned| End([End])
+
+    Wait --> LI[Consolidated Lead Intelligence Agent<br/>🤖 LLM AGENT - ALL lead processing integrated]
+
+    LI --> Route{Lead Status?}
+
+    Route -->|Need More| SA
+    Route -->|Complete| End([End])
 ```
-Start → Question Selection Agent → Question Phrasing Node → Engagement Agent → Present Step
-   ↑                                                                              ↓
-   ←── Continue Flow ←── Engagement Check ←── More Questions? ←── Save State ← Score Lead
-                              ↓
-                        Completion Flow → Message Generation → Save Final State
-```
 
-### Agent & Node Responsibilities
+### Consolidated Architecture Overview
 
-**Question Selection Agent**:
-- Selects 1-3 logically related questions per step (max 3)
-- Avoids repeating previously asked questions
-- Ensures required questions are asked for lead qualification
-- Can add follow-up questions based on previous responses
+| Component | Type | Integrated Functions |
+|-----------|------|---------------------|
+| **initialize_session_with_tracking** | 📊 LOGIC | Database operations, UTM tracking |
+| **Consolidated Survey Admin Supervisor** | 🤖 LLM AGENT | • Question selection (AI-driven)<br/>• Question phrasing & engagement<br/>• Frontend preparation<br/>• Progress tracking |
+| **Consolidated Lead Intelligence Agent** | 🤖 LLM AGENT | • Response saving<br/>• Score calculation<br/>• Tool usage decisions (Tavily/Maps)<br/>• Score validation & adjustment<br/>• Message generation<br/>• Status determination |
+| **check_abandonment** | 📊 LOGIC | Time-based detection + database update |
+| **Lead Intelligence Toolbelt** | 🔧 UTILITY | Database ops, scoring, tools, messaging |
+| **Abandonment Toolbelt** | 🔧 UTILITY | Detection logic, database updates |
 
-**Question Phrasing Node**:
-- Adapts question tone for business context and user type
-- Ensures questions are clear and engaging
-- Not an agent - always executed as part of flow
+### Key Features (Maintained in Simplified Architecture)
 
-**Engagement Agent**:
-- Reviews each step after questions and phrasing
-- Adds compelling headlines and 1-2 motivational sentences
-- Uses expert marketer strategies to prevent abandonment
-- Applies persuasion tactics appropriate to business context
-
-**Lead Scoring Agent**:
-- Recalculates score after every step
-- Uses both JSON scoring rubrics AND historical success data from database
-- Enforces minimum 4-question rule before lead can fail (unless outright failure)
-- Places leads in 3 categories: "yes", "no", "maybe"
+✅ **Intelligent Question Selection**: Consolidated in Survey Admin Supervisor  
+✅ **Question Flow Strategy**: All survey logic consolidated in single supervisor  
+✅ **Score Validation**: Integrated in Lead Intelligence Agent with toolbelt support  
+✅ **Tool Integration**: External validation (Tavily/Maps) managed by consolidated agent  
+✅ **Maybe Handling**: Preserved in database workflow  
+✅ **Non-deterministic Question Flow**: Each survey adapts to user responses  
+✅ **Business Rule Compliance**: AI selection within defined constraints  
+✅ **Simplified Architecture**: Reduced complexity with maintained functionality  
+✅ **Better Performance**: Fewer LLM calls, consolidated processing
 
 ### Lead Classification & Actions
 - **"Yes" leads**: Real-time notification + personalized completion message + email
@@ -146,13 +175,16 @@ Start → Question Selection Agent → Question Phrasing Node → Engagement Age
 ## Current Implementation Status
 - **✅ Core System**: Complete LangGraph flow with all phases implemented
 - **✅ Database Integration**: Full database schema with 5 example business scenarios
-- **✅ API Layer**: REST endpoints for survey start, step, abandon, and status
+- **✅ API Layer**: REST endpoints with consistent `{"success": boolean, "data": object, "message": text}` format
+- **✅ Session Management**: OWASP-compliant HTTP-only cookies with Redis backend via Starlette SessionMiddleware
+- **✅ Security**: Comprehensive middleware stack (rate limiting, input validation, response sanitization)
 - **✅ Data Population**: 52 questions across 5 diverse business types
 - **✅ Testing Suite**: Comprehensive validation with 100% pass rate
 - **✅ UTM Tracking**: Marketing attribution and abandonment detection
 - **✅ Lead Scoring**: Automated qualification with personalized messaging
+- **✅ Docker Environment**: Full containerization with backend, frontend, and Redis services
 - **🚧 Frontend**: React.js + Tailwind v4 (in development)
-- **🚧 Admin Interface**: Web-based form management (planned)
+- **✅ Admin Interface**: Complete React.js admin app with forms, analytics, themes, and business management
 
 ### Available Test Forms
 Ready-to-use form IDs for testing:
@@ -178,12 +210,30 @@ Ready-to-use form IDs for testing:
 - Design for future multilingual support
 - Tailwind v4 configuration required for theming
 
+## Session Management Architecture
+
+### Security Implementation
+- **HTTP-only Cookies**: Session data never exposed to client-side JavaScript
+- **OWASP Compliance**: Follows security best practices for session management
+- **Redis Backend**: Sessions stored in Redis with automatic TTL (30 minutes)
+- **Middleware Integration**: Starlette SessionMiddleware with custom Redis store
+- **Scoped Cookies**: Session cookies limited to `/api/survey` path
+- **Environment-specific HTTPS**: HTTPS-only cookies in production
+
+### Session Files
+- **`session_manager.py`**: Starlette SessionMiddleware integration helpers
+- **`session_store.py`**: Custom Redis session store implementing Starlette interface
+- **`main.py`**: SessionMiddleware configuration with Redis backend
+
 ## API Testing Examples
+
+All APIs return consistent format: `{"success": boolean, "data": object, "message": text}`
 
 ### Start a Survey Session
 ```bash
 curl -X POST http://localhost:8000/api/survey/start \
   -H "Content-Type: application/json" \
+  -c cookies.txt \
   -d '{
     "form_id": "f1111111-1111-1111-1111-111111111111",
     "utm_source": "google",
@@ -191,12 +241,12 @@ curl -X POST http://localhost:8000/api/survey/start \
   }'
 ```
 
-### Submit Responses
+### Submit Responses (using session cookie)
 ```bash
 curl -X POST http://localhost:8000/api/survey/step \
   -H "Content-Type: application/json" \
+  -b cookies.txt \
   -d '{
-    "session_id": "your_session_id",
     "responses": [
       {
         "question_id": 1,
@@ -206,9 +256,64 @@ curl -X POST http://localhost:8000/api/survey/step \
   }'
 ```
 
-## Testing Strategy
+### Check Session Status
+```bash
+curl -X GET http://localhost:8000/api/survey/status \
+  -H "Content-Type: application/json" \
+  -b cookies.txt
+```
+
+### Mark Session as Abandoned
+```bash
+curl -X POST http://localhost:8000/api/survey/abandon \
+  -H "Content-Type: application/json" \
+  -b cookies.txt
+```
+
+### Validate Form Availability
+```bash
+curl -X GET http://localhost:8000/api/survey/forms/f1111111-1111-1111-1111-111111111111/validate
+```
+
+## Recent Implementation Updates (Aug 2025)
+
+### Session Management Migration
+**Migration from fastapi-sessions to Starlette SessionMiddleware:**
+- **Reason**: fastapi-sessions had import issues and didn't include Redis backend out of the box
+- **Solution**: Implemented Starlette's built-in SessionMiddleware with custom Redis store
+- **Result**: More stable, better integrated, simpler codebase
+
+**Key Changes Made:**
+1. Created `RedisSessionStore` class implementing Starlette session interface
+2. Updated `session_manager.py` to use `request.session` directly
+3. Modified all API endpoints to use session cookies instead of explicit session IDs
+4. Fixed `abandon` endpoint to properly load `form_id` from database like other endpoints
+5. Added comprehensive middleware stack in correct order for security
+
+**API Consistency Improvements:**
+- All endpoints now return consistent `{"success": boolean, "data": object, "message": text}` format
+- Created `response_helpers.py` with standardized response functions
+- Added response sanitization middleware with timestamps and sanitization markers
+- Improved error handling with proper HTTP status codes
+
+**Security Enhancements:**
+- HTTP-only cookies prevent XSS attacks on session data
+- Session cookies scoped to `/api/survey` path only
+- Environment-specific HTTPS enforcement
+- 30-minute session timeout with Redis TTL
+- Comprehensive middleware stack: security headers, rate limiting, input validation, response sanitization
+
+**Docker Environment Improvements:**
+- Full containerization with backend, frontend, and Redis services
+- Working Docker Compose setup with proper networking
+- Environment-specific configuration with development vs production settings
+
+### Testing Strategy
 - Test flow with different lead quality scenarios
 - Validate scoring logic against business requirements
 - Test abandonment prevention and re-engagement
 - Verify database state consistency
 - Test real-time vs batch notification systems
+- **New**: End-to-end session management testing with cookie persistence
+- **New**: API consistency validation across all endpoints
+- **New**: Security middleware integration testing
