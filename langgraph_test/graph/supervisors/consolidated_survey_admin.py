@@ -7,7 +7,10 @@ from datetime import datetime
 import random
 
 from .base_supervisor import SupervisorAgent, SupervisorDecision
-from ...models import get_chat_model
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+from models import get_chat_model
 
 logger = logging.getLogger(__name__)
 
@@ -98,7 +101,7 @@ MESSAGE: At Pawsome Dog Walking, we've helped over 500 pet owners. Tell us more 
     
     def _load_available_questions(self, state: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Load questions that haven't been asked yet."""
-        from ...database.sqlite_db import db
+        from database.sqlite_db import db
         
         form_id = state.get("core", {}).get("form_id")
         session_id = state.get("core", {}).get("session_id")

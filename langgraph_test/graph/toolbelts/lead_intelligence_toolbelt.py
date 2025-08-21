@@ -52,7 +52,10 @@ class LeadIntelligenceToolbelt:
     ) -> Dict[str, Any]:
         """Save user responses to database."""
         try:
-            from ...database.sqlite_db import db
+            import sys
+            import os
+            sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+            from database.sqlite_db import db
             
             saved_count = 0
             errors = []
@@ -351,7 +354,10 @@ class LeadIntelligenceToolbelt:
     ) -> Dict[str, Any]:
         """Update lead session with final status."""
         try:
-            from ...database.sqlite_db import db
+            import sys
+            import os
+            sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+            from database.sqlite_db import db
             
             update_data = {
                 "lead_status": lead_status,

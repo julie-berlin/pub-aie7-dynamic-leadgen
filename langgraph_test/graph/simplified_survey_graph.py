@@ -15,7 +15,10 @@ logger = logging.getLogger(__name__)
 def initialize_session_with_tracking_node(state: SurveyState) -> Dict[str, Any]:
     """Initialize session with tracking data."""
     try:
-        from ..database.sqlite_db import db
+        import sys
+        import os
+        sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+        from database.sqlite_db import db
         
         # Generate session ID if not present
         session_id = state.get("core", {}).get("session_id") or str(uuid.uuid4())

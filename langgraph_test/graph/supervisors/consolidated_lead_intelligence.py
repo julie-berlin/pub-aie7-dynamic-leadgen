@@ -7,7 +7,10 @@ from datetime import datetime
 
 from .base_supervisor import SupervisorAgent, SupervisorDecision
 from ..toolbelts.lead_intelligence_toolbelt import lead_intelligence_toolbelt
-from ...models import get_chat_model
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+from models import get_chat_model
 
 logger = logging.getLogger(__name__)
 
@@ -306,7 +309,7 @@ Return comprehensive JSON with all processing results:
         """Generate personalized completion message."""
         
         # Get business name
-        from ...database.sqlite_db import db
+        from database.sqlite_db import db
         form_id = state.get("core", {}).get("form_id")
         form = db.get_form(form_id)
         

@@ -18,7 +18,8 @@ def load_test_data():
         print(f"✅ Removed existing database: {db_path}")
     
     # Create new database and load schema
-    from database.sqlite_db import db
+    from database.sqlite_db import SQLiteDatabase
+    db = SQLiteDatabase(db_path)
     print("✅ Created new database with schema")
     
     # Load test data
