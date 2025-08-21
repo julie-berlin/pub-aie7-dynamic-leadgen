@@ -1,0 +1,158 @@
+{
+  "name": "Survey Flow Test Graph",
+  "description": "Standalone test implementation of the survey lead generation flow with tool integration",
+  "version": "1.0.0",
+  "graph_file": "graph/simplified_survey_graph.py",
+  "graph_variable": "simplified_survey_graph",
+  "entry_point": "initialize_with_tracking",
+  "nodes": [
+    {
+      "id": "initialize_with_tracking",
+      "name": "Initialize Session",
+      "type": "function",
+      "description": "Initialize survey session with tracking data"
+    },
+    {
+      "id": "survey_administration",
+      "name": "Survey Admin Supervisor",
+      "type": "llm",
+      "description": "Selects and phrases questions using AI"
+    },
+    {
+      "id": "lead_intelligence",
+      "name": "Lead Intelligence Agent",
+      "type": "llm",
+      "description": "Processes responses, calculates scores, executes tools"
+    },
+    {
+      "id": "check_abandonment",
+      "name": "Check Abandonment",
+      "type": "function",
+      "description": "Check for session abandonment"
+    }
+  ],
+  "edges": [
+    {
+      "source": "initialize_with_tracking",
+      "target": ["survey_administration", "lead_intelligence"],
+      "type": "conditional",
+      "description": "Routes based on pending responses"
+    },
+    {
+      "source": "survey_administration",
+      "target": ["END", "check_abandonment", "lead_intelligence"],
+      "type": "conditional",
+      "description": "Routes based on survey state"
+    },
+    {
+      "source": "lead_intelligence",
+      "target": ["survey_administration", "END"],
+      "type": "conditional",
+      "description": "Routes based on lead status"
+    },
+    {
+      "source": "check_abandonment",
+      "target": "END",
+      "type": "direct"
+    }
+  ],
+  "tools": [
+    {
+      "name": "tavily_search",
+      "type": "api",
+      "description": "Business verification and reputation check",
+      "score_impact": "+10 to +20 points"
+    },
+    {
+      "name": "google_maps",
+      "type": "api",
+      "description": "Distance and service area validation",
+      "score_impact": "-10 to +20 points based on distance"
+    }
+  ],
+  "state_schema": {
+    "core": {
+      "session_id": "string",
+      "form_id": "string",
+      "step": "number",
+      "completed": "boolean"
+    },
+    "question_strategy": {
+      "all_questions": "array",
+      "asked_questions": "array",
+      "current_questions": "array"
+    },
+    "lead_intelligence": {
+      "responses": "array",
+      "current_score": "number",
+      "lead_status": "string"
+    },
+    "tool_results": "object",
+    "completion_message": "string"
+  },
+  "test_scenarios": [
+    {
+      "name": "High Quality Lead",
+      "description": "Downtown location, immediate need, good budget",
+      "expected_status": "qualified",
+      "expected_score_range": [75, 100]
+    },
+    {
+      "name": "Maybe Lead",
+      "description": "Far location, future timeline, lower budget",
+      "expected_status": "maybe",
+      "expected_score_range": [40, 75]
+    },
+    {
+      "name": "Unqualified Lead",
+      "description": "Wrong location, no immediate need",
+      "expected_status": "no",
+      "expected_score_range": [0, 40]
+    }
+  ],
+  "environment_variables": [
+    {
+      "name": "OPENAI_API_KEY",
+      "required": false,
+      "description": "OpenAI API key for GPT models"
+    },
+    {
+      "name": "ANTHROPIC_API_KEY",
+      "required": false,
+      "description": "Anthropic API key for Claude models"
+    },
+    {
+      "name": "TAVILY_API_KEY",
+      "required": false,
+      "description": "Tavily API key for web search"
+    },
+    {
+      "name": "GOOGLE_MAPS_API_KEY",
+      "required": false,
+      "description": "Google Maps API key for distance validation"
+    },
+    {
+      "name": "LANGCHAIN_TRACING_V2",
+      "required": false,
+      "description": "Enable LangSmith tracing (true/false)"
+    },
+    {
+      "name": "LANGCHAIN_PROJECT",
+      "required": false,
+      "description": "LangSmith project name"
+    }
+  ],
+  "database": {
+    "type": "sqlite",
+    "file": "test_survey.db",
+    "setup_script": "load_test_data.py"
+  },
+  "run_commands": {
+    "setup": "uv run python load_test_data.py",
+    "test_all": "uv run python test_runner.py --load-data",
+    "test_high": "uv run python test_runner.py --scenario high",
+    "test_maybe": "uv run python test_runner.py --scenario maybe",
+    "test_low": "uv run python test_runner.py --scenario low",
+    "test_with_tracing": "LANGCHAIN_TRACING_V2=true uv run python test_runner.py"
+  }
+}
