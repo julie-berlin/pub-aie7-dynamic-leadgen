@@ -142,10 +142,20 @@ def route_after_initialization(state: SurveyState) -> str:
     pending_responses = state.get("pending_responses")
     logger.info(f"🔥 INIT ROUTING: pending_responses = {pending_responses}")
     
+    # Check if this is a continuation (existing session_id with responses)
+    core = state.get("core", {})
+    session_id = core.get("session_id")
+    
     # If we have pending responses, go to lead intelligence first
     if pending_responses and len(pending_responses) > 0:
         logger.info("🔥 INIT ROUTING: Going to lead_intelligence to process pending responses")
         return "lead_intelligence"
+    
+    # Check if we already have questions prepared (continuation scenario)
+    question_strategy = state.get("question_strategy", {})
+    if session_id and question_strategy.get("all_questions"):
+        logger.info("🔥 INIT ROUTING: Going to survey_administration (continuing session)")
+        return "survey_administration"
     
     # Otherwise, go to survey administration to get new questions
     logger.info("🔥 INIT ROUTING: Going to survey_administration for new questions")
@@ -185,13 +195,15 @@ def route_after_lead_intelligence(state: SurveyState) -> str:
     
     lead_status = state.get("lead_status", "continue")
     completed = state.get("completed", False)
+    route_decision = state.get("route_decision", "end")
     
     # Log routing decision
-    logger.info(f"🔥 ROUTING after lead_intelligence: lead_status={lead_status}, completed={completed}")
+    logger.info(f"🔥 ROUTING after lead_intelligence: lead_status={lead_status}, completed={completed}, route_decision={route_decision}")
+    logger.info(f"🔍 Full state keys: {list(state.keys())}")
     
-    # If completed or final status reached
-    if completed or lead_status in ["qualified", "maybe", "no"]:
-        logger.info("🔥 ROUTING: Ending survey (completed or final status)")
+    # Use the route decision from lead intelligence (CRITICAL FIX)
+    if route_decision == "end" or completed:
+        logger.info("🔥 ROUTING: Survey complete!")
         return END
     
     # Check for too many iterations to prevent infinite loops
@@ -201,12 +213,12 @@ def route_after_lead_intelligence(state: SurveyState) -> str:
         logger.warning(f"🔥 ROUTING: Forcing END due to too many steps ({step})")
         return END
     
-    # Continue survey for more questions
-    if lead_status == "continue":
+    # Continue survey if route decision is continue
+    if route_decision == "continue":
         logger.info("🔥 ROUTING: Continuing to survey_administration")
         return "survey_administration"
     
-    # Default to END
+    # Default to end
     logger.info("🔥 ROUTING: Default to END")
     return END
 

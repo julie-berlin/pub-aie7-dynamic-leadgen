@@ -75,9 +75,22 @@ def initialize_session_with_tracking_node(state: Dict[str, Any]) -> Dict[str, An
             logger.warning(f"State validation failed, using raw state: {e}")
             validated_state = None
         
-        # Extract core data (use validated if available)
+        # Check if this is a session continuation (already has session_id)
+        existing_session_id = None
         core_data = validated_state.core if validated_state else state.get('core', {})
-        session_id = core_data.session_id if hasattr(core_data, 'session_id') else core_data.get('session_id')
+        
+        if hasattr(core_data, 'session_id'):
+            existing_session_id = core_data.session_id
+        elif isinstance(core_data, dict):
+            existing_session_id = core_data.get('session_id')
+        
+        if existing_session_id:
+            logger.info(f"🔄 Continuing existing session: {existing_session_id}")
+            # Just pass through existing state for continuation
+            return dict(state)
+        
+        # This is a new session - proceed with initialization
+        session_id = existing_session_id
         
         # Extract tracking data from metadata or core
         metadata = state.get('metadata', {})
