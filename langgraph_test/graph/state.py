@@ -47,6 +47,7 @@ class SurveyState(TypedDict):
     # Routing flags
     route_to_lead_intelligence: Optional[bool]
     check_abandonment: Optional[bool]
+    route_decision: Optional[str]
     
     # Results
     lead_status: Optional[str]

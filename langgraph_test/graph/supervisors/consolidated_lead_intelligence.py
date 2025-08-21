@@ -29,53 +29,58 @@ class ConsolidatedLeadIntelligenceAgent(SupervisorAgent):
         self.llm = get_chat_model(model_name="gpt-3.5-turbo", temperature=0.2)
         self.toolbelt = lead_intelligence_toolbelt
     
-    def get_system_prompt(self) -> str:
-        """Comprehensive system prompt for lead intelligence."""
-        return """You are an advanced Lead Intelligence AI that processes and qualifies leads comprehensively.
+    def _get_tool_recommendation_prompt(self) -> str:
+        """Simple prompt for tool recommendations."""
+        return """You are analyzing customer responses to recommend verification tools.
 
-Your integrated responsibilities include:
-1. RESPONSE PROCESSING: Save and validate user responses
-2. SCORE CALCULATION: Compute mathematical lead scores
-3. TOOL DECISIONS: Determine if external validation is needed (Tavily/Maps)
-4. SCORE VALIDATION: Ensure scores make business sense
-5. LEAD CLASSIFICATION: Decide final lead status (qualified/maybe/no/continue)
-6. MESSAGE GENERATION: Create personalized completion messages
-7. NEXT ACTIONS: Determine appropriate follow-up steps
+Based on the customer responses, should we verify anything externally?
 
-CLASSIFICATION THRESHOLDS:
-- Qualified: 75+ points with high confidence
-- Maybe: 40-75 points OR any score with low confidence
-- Not Qualified: <40 points with high confidence
-- Continue: Insufficient data, need more questions
+AVAILABLE TOOLS:
+- Tavily Search: Check business legitimacy, verify company names, reputation
+- Google Maps: Validate distances, check if location is in service area
 
-TOOL USAGE GUIDELINES:
-- Use Tavily for: Business verification, reputation check, legitimacy validation
-- Use Google Maps for: Distance validation, service area checks
-- Tools can add 10-20 points each if validation is positive
+Respond with ONLY one of these options:
+- "tavily" - if we should verify a business name or check legitimacy
+- "maps" - if we should check distance/location 
+- "both" - if we need both verifications
+- "none" - if no external verification needed
 
-MESSAGE TONE BY STATUS:
-- Qualified: Enthusiastic, welcoming, action-oriented
-- Maybe: Encouraging, helpful, non-pushy
-- No: Kind, respectful, helpful with alternatives
-- Continue: Motivational, progress-focused
+Consider: Do they mention a business name to verify? Do they provide a location that might need distance checking?"""
 
-OUTPUT FORMAT:
-Return comprehensive JSON with all processing results:
-{
-  "lead_status": "yes" | "maybe" | "no" | "continue",
-  "final_score": 85,
-  "confidence": 0.85,
-  "tools_needed": ["tavily_search", "google_maps"] | [],
-  "tool_queries": {
-    "tavily_search": "search query",
-    "google_maps": {"origin": "address", "destination": "address"}
-  },
-  "completion_message": "personalized message based on status",
-  "business_reasoning": "detailed explanation",
-  "key_factors": ["positive1", "positive2"],
-  "red_flags": ["concern1"] | [],
-  "next_actions": ["action1", "action2"]
-}"""
+    def _get_business_weight_prompt(self) -> str:
+        """Simple prompt for business fit weighting."""
+        return """You are analyzing how well a customer fits the business based on their responses.
+
+Rate the overall customer fit:
+
+PERFECT_FIT: Ideal customer (meets all key criteria, strong indicators)
+GOOD_FIT: Solid prospect (meets most criteria, minor concerns)
+OKAY_FIT: Average prospect (meets some criteria, some concerns)
+POOR_FIT: Weak prospect (few criteria met, major concerns)
+BAD_FIT: Wrong customer (major misalignment, clear red flags)
+
+Consider factors like:
+- Location fit for service area
+- Budget alignment
+- Service needs matching offerings
+- Urgency and commitment level
+- Overall engagement quality
+
+Respond with ONLY the fit level: PERFECT_FIT, GOOD_FIT, OKAY_FIT, POOR_FIT, or BAD_FIT"""
+
+    def _get_completion_message_prompt(self, lead_status: str) -> str:
+        """Simple prompt for completion message."""
+        return f"""Write a personalized completion message for a {lead_status.upper()} lead.
+
+STATUS: {lead_status.upper()}
+
+Keep it:
+- {lead_status.upper()} tone: {"Enthusiastic and welcoming" if lead_status == "yes" else "Encouraging but not pushy" if lead_status == "maybe" else "Kind and helpful"}
+- Personal (use customer details from their responses)
+- Professional
+- 2-3 sentences max
+
+Just write the message, no other text."""
     
     def process_lead_responses(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """Main entry point - processes all lead intelligence tasks."""
@@ -113,65 +118,85 @@ Return comprehensive JSON with all processing results:
             initial_score = score_result["calculated_score"]
             logger.info(f"📊 Initial score: {initial_score}")
             
-            # Step 3: Analyze if tools are needed and make comprehensive decision
-            comprehensive_decision = self._make_comprehensive_lead_decision(
-                state, initial_score, pending_responses
-            )
+            # Step 3: Get business context once from database
+            business_context = self._get_business_context_from_db(form_id)
+            logger.info(f"📋 Business context: {business_context}")
             
-            # Step 4: Execute tools if recommended
+            # Step 4: Get tool recommendations from LLM (simple prompt)
+            tool_recommendation = self._get_tool_recommendations(pending_responses)
+            
+            # Step 5: Get business fit weighting from LLM (simple prompt)
+            business_fit = self._get_business_fit_assessment(pending_responses, business_context)
+            logger.info(f"🤖 LLM Business Fit Assessment: {business_fit}")
+            
+            # Step 6: Execute tools if recommended (pure logic)
             tool_results = {}
             total_tool_boost = 0
             
-            if comprehensive_decision.get("tools_needed"):
-                logger.info(f"🔧 Executing tools: {comprehensive_decision['tools_needed']}")
+            if tool_recommendation in ["tavily", "both"]:
+                query = self._generate_tavily_query(pending_responses)
+                tavily_result = self.toolbelt.execute_tavily_search(query)
+                tool_results["tavily"] = tavily_result
+                total_tool_boost += tavily_result.get("score_boost", 0)
+                logger.info(f"🔍 Tavily boost: +{tavily_result.get('score_boost', 0)}")
+            
+            if tool_recommendation in ["maps", "both"]:
+                origin, destination = self._extract_locations(pending_responses)
+                maps_result = self.toolbelt.execute_maps_validation(origin, destination)
+                tool_results["maps"] = maps_result
+                total_tool_boost += maps_result.get("score_boost", 0)
+                logger.info(f"📍 Maps boost: +{maps_result.get('score_boost', 0)}")
+            
+            # Step 7: Calculate business fit adjustment (pure logic based on LLM weight)
+            business_adjustment = self._calculate_business_adjustment(business_fit, initial_score)
+            logger.info(f"🤖 Business Fit Adjustment: {business_adjustment:+d} points (fit: {business_fit})")
+            
+            # Step 8: Calculate final score with all adjustments (pure logic)
+            final_score = initial_score + total_tool_boost + business_adjustment
+            logger.info(f"🎯 Final score: {initial_score} + {total_tool_boost} + {business_adjustment} = {final_score}")
+            
+            # Step 9: Determine final classification based on final score
+            # Get total responses from database
+            from database.sqlite_db import db
+            total_responses = len(db.get_responses(session_id))
+            lead_status = self._determine_lead_status(final_score, total_responses)
+            logger.info(f"🎯 Lead status determined: {lead_status} (score: {final_score}, total responses: {total_responses})")
+            
+            # Step 10: Generate personalized completion message (LLM call)
+            completion_message = ""
+            if lead_status != "unknown":
+                completion_message = self._generate_completion_message_llm(lead_status, pending_responses, business_context)
+            
+            # Step 11: Determine routing based on lead status and available questions
+            from database.sqlite_db import db
+            available_questions = db.get_form_questions(state.get("core", {}).get("form_id"))
+            asked_questions = db.get_asked_questions(session_id)
+            remaining_questions = len(available_questions) - len(asked_questions)
+            
+            # Routing logic: separate from lead classification
+            if lead_status == "unknown" and remaining_questions > 0:
+                route_decision = "continue"  # Need more data
+            elif lead_status == "maybe" and remaining_questions > 0:
+                route_decision = "continue"  # Maybe leads need more information to become yes/no
+            elif lead_status in ["yes", "no"] or remaining_questions == 0:
+                route_decision = "end"  # Definitive classification or no more questions
+            else:
+                route_decision = "end"  # Default to end
                 
-                # Execute Tavily if needed
-                if "tavily_search" in comprehensive_decision["tools_needed"]:
-                    query = comprehensive_decision.get("tool_queries", {}).get("tavily_search")
-                    if query:
-                        tavily_result = self.toolbelt.execute_tavily_search(query)
-                        tool_results["tavily"] = tavily_result
-                        total_tool_boost += tavily_result.get("score_boost", 0)
-                        logger.info(f"🔍 Tavily boost: +{tavily_result.get('score_boost', 0)}")
-                
-                # Execute Maps if needed
-                if "google_maps" in comprehensive_decision["tools_needed"]:
-                    maps_params = comprehensive_decision.get("tool_queries", {}).get("google_maps", {})
-                    if maps_params:
-                        maps_result = self.toolbelt.execute_maps_validation(
-                            maps_params.get("origin", ""),
-                            maps_params.get("destination", "")
-                        )
-                        tool_results["maps"] = maps_result
-                        total_tool_boost += maps_result.get("score_boost", 0)
-                        logger.info(f"📍 Maps boost: +{maps_result.get('score_boost', 0)}")
+            logger.info(f"🔀 Routing decision: {route_decision} (status: {lead_status}, remaining questions: {remaining_questions})")
             
-            # Step 5: Calculate final score with tool boosts
-            final_score = initial_score + total_tool_boost
-            logger.info(f"🎯 Final score: {initial_score} + {total_tool_boost} = {final_score}")
-            
-            # Step 6: Determine final classification
-            lead_status = self._determine_lead_status(final_score, len(pending_responses))
-            
-            # Step 7: Generate personalized completion message
-            completion_message = comprehensive_decision.get("completion_message")
-            if not completion_message and lead_status != "continue":
-                completion_message = self._generate_completion_message(
-                    lead_status, state, tool_results, final_score
-                )
-            
-            # Step 8: Update database with final status
-            if lead_status != "continue":
+            # Step 12: Update database with final status if ending
+            if route_decision == "end":
                 self.toolbelt.update_lead_session_status(
                     session_id, lead_status, final_score, completion_message
                 )
             
-            # Step 9: Return state update
+            # Step 13: Return state update
             logger.info(f"✅ Lead Intelligence complete: {lead_status} (score: {final_score})")
             
             return {
                 "lead_status": lead_status,
-                "completed": lead_status != "continue",
+                "completed": route_decision == "end",
                 "completion_message": completion_message,
                 "pending_responses": [],  # Clear after processing
                 "lead_intelligence": {
@@ -181,14 +206,19 @@ Return comprehensive JSON with all processing results:
                     "last_classification": {
                         "status": lead_status,
                         "score": final_score,
+                        "initial_score": initial_score,
                         "tool_boost": total_tool_boost,
+                        "business_adjustment": business_adjustment,
+                        "business_fit": business_fit,
                         "timestamp": datetime.now().isoformat()
                     }
                 },
                 "tool_results": tool_results,
                 "tool_score_boost": total_tool_boost,
+                "llm_score_adjustment": business_adjustment,
+                "route_decision": route_decision,
                 "frontend_response": {
-                    "step_type": "completion" if lead_status != "continue" else "continue",
+                    "step_type": "completion" if route_decision == "end" else "continue",
                     "lead_status": lead_status,
                     "score": final_score,
                     "message": completion_message
@@ -204,100 +234,187 @@ Return comprehensive JSON with all processing results:
                 "error": str(e)
             }
     
-    def _make_comprehensive_lead_decision(
-        self, 
-        state: Dict[str, Any], 
-        initial_score: int,
-        responses: List[Dict]
-    ) -> Dict[str, Any]:
-        """Use LLM to make comprehensive lead decision."""
+    def _get_tool_recommendations(self, responses: List[Dict]) -> str:
+        """Get tool recommendations from LLM."""
         try:
-            # Build context for LLM
-            context = f"""
-            Current score: {initial_score}
-            Number of responses: {len(responses)}
-            
-            Recent responses:
-            """
-            
+            context = "Recent customer responses:\n"
             for r in responses[-5:]:  # Last 5 responses
-                context += f"\n- Q: {r.get('question_text', '')}"
-                context += f"\n  A: {r.get('answer', '')}"
-            
-            context += f"""
-            
-            Business context: Dog walking service in Austin, TX
-            Service area: 15 mile radius
-            
-            Based on the responses, determine:
-            1. Should we use Tavily to verify business legitimacy?
-            2. Should we use Maps to check distance/location?
-            3. What's the appropriate lead status?
-            4. Generate a personalized completion message if not continuing.
-            """
+                context += f"Q: {r.get('question_text', '')}\n"
+                context += f"A: {r.get('answer', '')}\n\n"
             
             messages = [
-                {"role": "system", "content": self.get_system_prompt()},
+                {"role": "system", "content": self._get_tool_recommendation_prompt()},
                 {"role": "user", "content": context}
             ]
             
             response = self.llm.invoke(messages)
+            result = response.content.strip().lower()
             
-            # Parse LLM response
-            try:
-                decision_data = json.loads(response.content)
-            except:
-                # Fallback if JSON parsing fails
-                decision_data = {
-                    "lead_status": "continue" if initial_score < 40 else "maybe" if initial_score < 75 else "yes",
-                    "tools_needed": [],
-                    "completion_message": ""
-                }
-            
-            # Add tool queries if tools are needed
-            if "tavily_search" in decision_data.get("tools_needed", []):
-                decision_data.setdefault("tool_queries", {})
-                decision_data["tool_queries"]["tavily_search"] = "Pawsome Dog Walking Austin TX legitimate business"
-            
-            if "google_maps" in decision_data.get("tools_needed", []):
-                # Extract location from responses if available
-                location = "Austin, TX"  # Default
-                for r in responses:
-                    if "location" in r.get("question_text", "").lower() or "address" in r.get("question_text", "").lower():
-                        location = r.get("answer", "Austin, TX")
-                        break
+            # Validate response
+            if result in ["tavily", "maps", "both", "none"]:
+                return result
+            else:
+                logger.warning(f"Invalid tool recommendation: {result}, defaulting to 'none'")
+                return "none"
                 
-                decision_data.setdefault("tool_queries", {})
-                decision_data["tool_queries"]["google_maps"] = {
-                    "origin": location,
-                    "destination": "Downtown Austin, TX"  # Business location
-                }
+        except Exception as e:
+            logger.error(f"Tool recommendation error: {e}")
+            return "none"
+    
+    def _get_business_fit_assessment(self, responses: List[Dict], business_context: str) -> str:
+        """Get business fit assessment from LLM."""
+        try:
+            context = f"BUSINESS CONTEXT: {business_context}\n\n"
+            context += "Customer responses to analyze:\n"
+            for r in responses:
+                context += f"Q: {r.get('question_text', '')}\n"
+                context += f"A: {r.get('answer', '')}\n\n"
             
-            return decision_data
+            logger.info(f"🔍 Evaluating responses: {[(r.get('question_text'), r.get('answer')) for r in responses]}")
+            
+            messages = [
+                {"role": "system", "content": self._get_business_weight_prompt()},
+                {"role": "user", "content": context}
+            ]
+            
+            response = self.llm.invoke(messages)
+            result = response.content.strip().upper()
+            
+            # Validate response
+            valid_fits = ["PERFECT_FIT", "GOOD_FIT", "OKAY_FIT", "POOR_FIT", "BAD_FIT"]
+            if result in valid_fits:
+                return result
+            else:
+                logger.warning(f"Invalid business fit: {result}, defaulting to 'OKAY_FIT'")
+                return "OKAY_FIT"
+                
+        except Exception as e:
+            logger.error(f"Business fit assessment error: {e}")
+            return "OKAY_FIT"
+    
+    def _generate_completion_message_llm(self, lead_status: str, responses: List[Dict], business_context: str) -> str:
+        """Generate completion message using LLM."""
+        try:
+            context = f"BUSINESS CONTEXT: {business_context}\n\n"
+            context += "Customer information from their responses:\n"
+            for r in responses:
+                context += f"Q: {r.get('question_text', '')}\n"
+                context += f"A: {r.get('answer', '')}\n\n"
+            
+            messages = [
+                {"role": "system", "content": self._get_completion_message_prompt(lead_status)},
+                {"role": "user", "content": context}
+            ]
+            
+            response = self.llm.invoke(messages)
+            return response.content.strip()
             
         except Exception as e:
-            logger.error(f"LLM decision error: {e}")
-            # Fallback decision
-            return {
-                "lead_status": "continue" if initial_score < 40 else "maybe",
-                "tools_needed": [],
-                "completion_message": "",
-                "error": str(e)
-            }
+            logger.error(f"Completion message generation error: {e}")
+            return f"Thank you for your interest! We'll be in touch soon."
+    
+    def _generate_tavily_query(self, responses: List[Dict]) -> str:
+        """Generate Tavily search query from responses (pure logic)."""
+        # Look for business names or companies mentioned
+        for r in responses:
+            answer = r.get('answer', '').lower()
+            if any(word in answer for word in ['company', 'business', 'corp', 'llc', 'inc']):
+                return f"{r.get('answer', '')} business verification"
+        
+        # Default query
+        return "business verification and reputation check"
+    
+    def _extract_locations(self, responses: List[Dict]) -> tuple:
+        """Extract origin and destination from responses (pure logic)."""
+        customer_location = "Austin, TX"  # Default
+        business_location = "Downtown Austin, TX"  # Default business location
+        
+        # Look for location/address in responses
+        for r in responses:
+            question = r.get('question_text', '').lower()
+            if 'location' in question or 'address' in question or 'where' in question:
+                answer = r.get('answer', '').strip()
+                if answer:
+                    customer_location = answer
+                break
+        
+        return customer_location, business_location
+    
+    def _calculate_business_adjustment(self, business_fit: str, initial_score: int) -> int:
+        """Calculate score adjustment based on business fit (pure logic)."""
+        # Business fit weights (mathematical, not LLM)
+        fit_adjustments = {
+            "PERFECT_FIT": 30,
+            "GOOD_FIT": 15,
+            "OKAY_FIT": 0,
+            "POOR_FIT": -20,
+            "BAD_FIT": -40
+        }
+        
+        base_adjustment = fit_adjustments.get(business_fit, 0)
+        
+        # Scale adjustment based on initial score
+        # If score is already high, don't boost as much
+        # If score is low but great fit, boost more
+        if business_fit in ["PERFECT_FIT", "GOOD_FIT"] and initial_score < 50:
+            base_adjustment += 10  # Extra boost for good fit with low initial score
+        elif business_fit in ["POOR_FIT", "BAD_FIT"] and initial_score > 70:
+            base_adjustment -= 10  # Extra penalty for bad fit with high initial score
+        
+        return base_adjustment
+
+    def _get_business_context_from_db(self, form_id: str) -> str:
+        """Get business context from database for LLM prompts."""
+        try:
+            from database.sqlite_db import db
+            
+            # Get form and client info
+            form = db.get_form(form_id)
+            if not form or not form.get('client_id'):
+                return "General service business"
+            
+            client = db.get_client(form['client_id'])
+            if not client:
+                return "General service business"
+            
+            # Build context string
+            context_parts = []
+            
+            if client.get('business_name'):
+                context_parts.append(f"Business: {client['business_name']}")
+            
+            if client.get('business_type'):
+                context_parts.append(f"Type: {client['business_type']}")
+            
+            if client.get('industry'):
+                context_parts.append(f"Industry: {client['industry']}")
+            
+            if client.get('target_audience'):
+                context_parts.append(f"Target: {client['target_audience']}")
+            
+            if client.get('goals'):
+                context_parts.append(f"Goals: {client['goals']}")
+            
+            return " | ".join(context_parts) if context_parts else "General service business"
+            
+        except Exception as e:
+            logger.error(f"Failed to get business context: {e}")
+            return "General service business"
     
     def _determine_lead_status(self, final_score: int, num_responses: int) -> str:
         """Determine lead status based on score and responses."""
+        # Lead status should be one of: unknown, maybe, yes, no
+        # Routing is handled separately
+        
         if num_responses < 3:
-            return "continue"  # Need more data
+            return "unknown"  # Insufficient data
         
         if final_score >= 75:
             return "yes"  # Qualified
         elif final_score >= 40:
             return "maybe"  # Maybe qualified
-        elif num_responses >= 5:
-            return "no"  # Not qualified (enough data)
         else:
-            return "continue"  # Need more data to be sure
+            return "no"  # Not qualified
     
     def _generate_completion_message(
         self, 

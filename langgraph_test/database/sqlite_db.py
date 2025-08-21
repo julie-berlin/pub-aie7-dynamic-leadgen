@@ -3,11 +3,34 @@
 import sqlite3
 import json
 import logging
+import time
+import random
 from datetime import datetime
 from typing import Dict, List, Any, Optional
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+def retry_db_operation(max_retries=3, delay_range=(0.1, 0.5)):
+    """Decorator to retry database operations on lock/busy errors."""
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            for attempt in range(max_retries):
+                try:
+                    return func(*args, **kwargs)
+                except sqlite3.OperationalError as e:
+                    if "database is locked" in str(e).lower() or "busy" in str(e).lower():
+                        if attempt < max_retries - 1:
+                            delay = random.uniform(*delay_range)
+                            logger.warning(f"Database locked, retrying in {delay:.2f}s (attempt {attempt + 1}/{max_retries})")
+                            time.sleep(delay)
+                            continue
+                    raise e
+                except Exception as e:
+                    raise e
+            return None
+        return wrapper
+    return decorator
 
 class SQLiteDatabase:
     """SQLite implementation matching Supabase schema."""
@@ -16,13 +39,28 @@ class SQLiteDatabase:
         """Initialize SQLite database connection."""
         self.db_path = db_path
         self.conn = None
+        # Ensure we can write to the database
+        import os
+        if os.path.exists(db_path):
+            os.chmod(db_path, 0o666)  # Make writable
         self._connect()
         self._create_schema()
         
     def _connect(self):
-        """Create database connection."""
-        self.conn = sqlite3.connect(self.db_path)
+        """Create database connection with better concurrency handling."""
+        self.conn = sqlite3.connect(
+            self.db_path, 
+            check_same_thread=False,
+            timeout=30.0,  # 30 second timeout for locks
+            isolation_level=None  # Autocommit mode for better concurrency
+        )
         self.conn.row_factory = sqlite3.Row
+        
+        # Enable WAL mode for better concurrent access
+        self.conn.execute("PRAGMA journal_mode=WAL")
+        self.conn.execute("PRAGMA synchronous=NORMAL")
+        self.conn.execute("PRAGMA cache_size=1000")
+        self.conn.execute("PRAGMA temp_store=memory")
         
     def _create_schema(self):
         """Create database schema matching production."""
@@ -159,10 +197,18 @@ class SQLiteDatabase:
         row = cursor.fetchone()
         return dict(row) if row else None
     
+    @retry_db_operation()
     def create_lead_session(self, session_data: Dict[str, Any]) -> bool:
         """Create a new lead session."""
         try:
             cursor = self.conn.cursor()
+            
+            # Check if session already exists
+            cursor.execute("SELECT session_id FROM lead_sessions WHERE session_id = ?", (session_data['session_id'],))
+            if cursor.fetchone():
+                logger.info(f"Session {session_data['session_id']} already exists")
+                return True
+            
             cursor.execute("""
                 INSERT INTO lead_sessions (
                     id, session_id, form_id, client_id, 
@@ -177,10 +223,14 @@ class SQLiteDatabase:
                 datetime.now().isoformat(),
                 0
             ))
-            self.conn.commit()
+            # No need to commit in autocommit mode
+            logger.info(f"Created session: {session_data['session_id']}")
             return True
         except Exception as e:
             logger.error(f"Failed to create session: {e}")
+            logger.error(f"Session data: {session_data}")
+            import traceback
+            logger.error(traceback.format_exc())
             return False
     
     def get_lead_session(self, session_id: str) -> Optional[Dict[str, Any]]:
@@ -190,6 +240,7 @@ class SQLiteDatabase:
         row = cursor.fetchone()
         return dict(row) if row else None
     
+    @retry_db_operation()
     def update_lead_session(self, session_id: str, update_data: Dict[str, Any]) -> bool:
         """Update lead session."""
         try:
@@ -214,23 +265,32 @@ class SQLiteDatabase:
             """
             
             cursor.execute(query, values)
-            self.conn.commit()
+            # No need to commit in autocommit mode
             return True
         except Exception as e:
             logger.error(f"Failed to update session: {e}")
             return False
     
+    @retry_db_operation()
     def save_response(self, session_id: str, response_data: Dict[str, Any]) -> bool:
         """Save a user response."""
         try:
             cursor = self.conn.cursor()
+            
+            # Check if response already exists
+            response_id = f"{session_id}_{response_data['question_id']}"
+            cursor.execute("SELECT id FROM responses WHERE id = ?", (response_id,))
+            if cursor.fetchone():
+                logger.info(f"Response {response_id} already exists")
+                return True
+            
             cursor.execute("""
                 INSERT INTO responses (
                     id, session_id, question_id, question_text,
                     phrased_question, answer, step, score_awarded
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, (
-                f"{session_id}_{response_data['question_id']}",
+                response_id,
                 session_id,
                 response_data['question_id'],
                 response_data.get('question_text', ''),
@@ -239,10 +299,14 @@ class SQLiteDatabase:
                 response_data.get('step', 0),
                 response_data.get('score_awarded', 0)
             ))
-            self.conn.commit()
+            # No need to commit in autocommit mode
+            logger.info(f"Saved response: {response_id}")
             return True
         except Exception as e:
             logger.error(f"Failed to save response: {e}")
+            logger.error(f"Response data: {response_data}")
+            import traceback
+            logger.error(traceback.format_exc())
             return False
     
     def get_responses(self, session_id: str) -> List[Dict[str, Any]]:

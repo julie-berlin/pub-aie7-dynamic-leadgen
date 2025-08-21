@@ -188,15 +188,6 @@ wheels = [
 ]
 
 [[package]]
-name = "googlemaps"
-version = "4.10.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "requests" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/fe/26/bca4d737a9acea25e94c19940a780bbf0be64a691f7caf3a68467d3a5838/googlemaps-4.10.0.tar.gz", hash = "sha256:3055fcbb1aa262a9159b589b5e6af762b10e80634ae11c59495bd44867e47d88", size = 33056, upload_time = "2023-01-26T16:45:02.501Z" }
-
-[[package]]
 name = "greenlet"
 version = "3.2.4"
 source = { registry = "https://pypi.org/simple" }
@@ -608,7 +599,6 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
-    { name = "googlemaps" },
     { name = "langchain" },
     { name = "langchain-anthropic" },
     { name = "langchain-openai" },
@@ -617,6 +607,7 @@ dependencies = [
     { name = "openai" },
     { name = "pydantic" },
     { name = "python-dotenv" },
+    { name = "requests" },
     { name = "tavily-python" },
 ]
 
@@ -630,7 +621,6 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "anthropic", specifier = ">=0.15.0" },
-    { name = "googlemaps", specifier = ">=4.10.0" },
     { name = "langchain", specifier = ">=0.1.0" },
     { name = "langchain-anthropic", specifier = ">=0.1.0" },
     { name = "langchain-openai", specifier = ">=0.0.5" },
@@ -639,6 +629,7 @@ requires-dist = [
     { name = "openai", specifier = ">=1.0.0" },
     { name = "pydantic", specifier = ">=2.0.0" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
+    { name = "requests", specifier = ">=2.28.0" },
     { name = "tavily-python", specifier = ">=0.3.0" },
 ]
 

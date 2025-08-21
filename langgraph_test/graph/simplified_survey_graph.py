@@ -20,11 +20,19 @@ def initialize_session_with_tracking_node(state: SurveyState) -> Dict[str, Any]:
         sys.path.append(os.path.dirname(os.path.dirname(__file__)))
         from database.sqlite_db import db
         
-        # Generate session ID if not present
-        session_id = state.get("core", {}).get("session_id") or str(uuid.uuid4())
+        # Check if this is a continuation (already has session_id)
+        existing_session_id = state.get("core", {}).get("session_id")
+        
+        if existing_session_id:
+            logger.info(f"🔄 Continuing existing session: {existing_session_id}")
+            # Just pass through existing state for continuation
+            return dict(state)
+        
+        # Generate session ID for new session
+        session_id = str(uuid.uuid4())
         form_id = state.get("core", {}).get("form_id")
         
-        logger.info(f"🚀 Initializing session: {session_id} for form: {form_id}")
+        logger.info(f"🚀 Initializing new session: {session_id} for form: {form_id}")
         
         # Create session in database
         session_data = {
@@ -164,9 +172,19 @@ def route_after_initialization(state: SurveyState) -> str:
     """Determine routing after initialization."""
     pending_responses = state.get("pending_responses")
     
+    # Check if this is a continuation (existing session_id with responses)
+    core = state.get("core", {})
+    session_id = core.get("session_id")
+    
     if pending_responses and len(pending_responses) > 0:
         logger.info("🔀 Routing to lead_intelligence (pending responses)")
         return "lead_intelligence"
+    
+    # Check if we already have questions prepared (continuation scenario)
+    question_strategy = state.get("question_strategy", {})
+    if session_id and question_strategy.get("all_questions"):
+        logger.info("🔀 Routing to survey_administration (continuing session)")
+        return "survey_administration"
     
     logger.info("🔀 Routing to survey_administration (new session)")
     return "survey_administration"
@@ -200,29 +218,32 @@ def route_after_survey_admin(state: SurveyState) -> str:
 def route_after_lead_intelligence(state: SurveyState) -> str:
     """Determine routing after lead intelligence processing."""
     
-    lead_status = state.get("lead_status", "continue")
+    lead_status = state.get("lead_status", "unknown")
     completed = state.get("completed", False)
+    route_decision = state.get("route_decision", "end")
     
-    logger.info(f"🔀 Routing after lead_intelligence: status={lead_status}, completed={completed}")
+    logger.info(f"🔀 Routing after lead_intelligence: status={lead_status}, completed={completed}, route={route_decision}")
+    logger.info(f"🔍 Full state keys: {list(state.keys())}")
     
-    # If completed or final status reached
-    if completed or lead_status in ["yes", "maybe", "no"]:
+    # Use the route decision from lead intelligence
+    if route_decision == "end" or completed:
         logger.info("🔀 Survey complete!")
         return END
     
-    # Check for too many iterations
+    # Check for too many iterations (safety check)
     core = state.get("core", {})
     step = core.get("step", 0)
     if step > 20:
         logger.warning(f"🔀 Forcing END (too many steps: {step})")
         return END
     
-    # Continue survey
-    if lead_status == "continue":
+    # Continue survey if route decision is continue
+    if route_decision == "continue":
         logger.info("🔀 Continuing to survey_administration")
         return "survey_administration"
     
-    # Default
+    # Default to end
+    logger.info("🔀 Default to END")
     return END
 
 # === COMPILE GRAPH ===

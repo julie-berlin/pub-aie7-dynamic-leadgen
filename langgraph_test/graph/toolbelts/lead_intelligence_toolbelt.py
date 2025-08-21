@@ -251,53 +251,93 @@ class LeadIntelligenceToolbelt:
         destination: str,
         service_area_radius: float = 25.0
     ) -> Dict[str, Any]:
-        """Execute Google Maps distance validation."""
+        """Execute Google Maps Routes API distance validation."""
         try:
             logger.info(f"📍 Maps validation: {origin} to {destination}")
             
             if self.maps_enabled:
-                # Real Google Maps API call would go here
-                # For now, simulate with realistic data
-                import googlemaps
-                gmaps = googlemaps.Client(key=os.getenv("GOOGLE_MAPS_API_KEY"))
+                # Use new Google Routes API - Compute Route Matrix
+                import requests
+                api_key = os.getenv("GOOGLE_MAPS_API_KEY")
                 
-                result = gmaps.distance_matrix(
-                    origins=[origin],
-                    destinations=[destination],
-                    units="imperial"
-                )
+                url = "https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix"
                 
-                if result['status'] == 'OK':
-                    element = result['rows'][0]['elements'][0]
-                    if element['status'] == 'OK':
-                        distance_text = element['distance']['text']
-                        distance_value = element['distance']['value'] / 1609.34  # Convert to miles
-                        duration_text = element['duration']['text']
-                        
-                        # Calculate score boost based on distance
-                        if distance_value <= 5:
-                            score_boost = 20
-                        elif distance_value <= 10:
-                            score_boost = 15
-                        elif distance_value <= service_area_radius:
-                            score_boost = 10
-                        else:
-                            score_boost = -10
-                        
-                        logger.info(f"✅ Maps validation: {distance_text}, score boost: {score_boost}")
-                        
-                        return {
-                            "success": True,
-                            "origin": origin,
-                            "destination": destination,
-                            "distance": distance_text,
-                            "duration": duration_text,
-                            "distance_miles": distance_value,
-                            "in_service_area": distance_value <= service_area_radius,
-                            "score_boost": score_boost,
-                            "executed_at": datetime.now().isoformat(),
-                            "source": "real_api"
+                headers = {
+                    "Content-Type": "application/json",
+                    "X-Goog-Api-Key": api_key,
+                    "X-Goog-FieldMask": "originIndex,destinationIndex,duration,distanceMeters,status,condition"
+                }
+                
+                # For address strings, we'll use the address field instead of lat/lng
+                request_body = {
+                    "origins": [
+                        {
+                            "waypoint": {
+                                "address": origin
+                            }
                         }
+                    ],
+                    "destinations": [
+                        {
+                            "waypoint": {
+                                "address": destination
+                            }
+                        }
+                    ],
+                    "travelMode": "DRIVE",
+                    "routingPreference": "TRAFFIC_AWARE"
+                }
+                
+                response = requests.post(url, headers=headers, json=request_body)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    
+                    if data and len(data) > 0:
+                        route = data[0]
+                        
+                        if route.get('status') == 'OK':
+                            distance_meters = route.get('distanceMeters', 0)
+                            distance_miles = distance_meters * 0.000621371  # Convert to miles
+                            duration_seconds = route.get('duration', {}).get('seconds', 0)
+                            duration_minutes = duration_seconds / 60
+                            
+                            # Calculate score boost based on distance
+                            if distance_miles <= 5:
+                                score_boost = 20
+                            elif distance_miles <= 10:
+                                score_boost = 15
+                            elif distance_miles <= service_area_radius:
+                                score_boost = 10
+                            else:
+                                score_boost = -10
+                            
+                            logger.info(f"✅ Maps validation: {distance_miles:.1f} miles, score boost: {score_boost}")
+                            
+                            return {
+                                "success": True,
+                                "origin": origin,
+                                "destination": destination,
+                                "distance": f"{distance_miles:.1f} miles",
+                                "duration": f"{duration_minutes:.0f} minutes",
+                                "distance_miles": distance_miles,
+                                "in_service_area": distance_miles <= service_area_radius,
+                                "score_boost": score_boost,
+                                "executed_at": datetime.now().isoformat(),
+                                "source": "google_routes_api",
+                                "raw_response": {
+                                    "distance_meters": distance_meters,
+                                    "duration_seconds": duration_seconds
+                                }
+                            }
+                        else:
+                            logger.warning(f"⚠️ Route status not OK: {route.get('status')}")
+                    else:
+                        logger.warning("⚠️ Empty response from Google Routes API")
+                else:
+                    logger.error(f"❌ Google Routes API error: {response.status_code} - {response.text}")
+                    
+                # Fall through to mock if API call fails
             
             # Mock response
             logger.info("📦 Using mock Maps response")
