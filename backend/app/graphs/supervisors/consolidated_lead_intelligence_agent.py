@@ -29,6 +29,20 @@ class ConsolidatedLeadIntelligenceAgent(SupervisorAgent):
         self.llm = get_chat_model(model_name="gpt-3.5-turbo", temperature=0.2)
         self.toolbelt = lead_intelligence_toolbelt
     
+    def get_system_prompt(self) -> str:
+        """Get the system prompt for lead intelligence processing."""
+        return """You are a Lead Intelligence Agent responsible for processing customer responses and determining lead qualification.
+
+Your responsibilities:
+1. Save customer responses to database
+2. Calculate lead scores based on responses
+3. Determine if external verification tools are needed
+4. Analyze business fit for the customer
+5. Generate completion messages for qualified leads
+6. Make routing decisions for survey continuation
+
+Always provide clear, data-driven assessments and maintain professional communication."""
+    
     def make_decision(self, state: SurveyState, context: Dict[str, Any] = None) -> SupervisorDecision:
         """Make lead intelligence decision - delegates to process_lead_responses."""
         # This method is required by base class but we use process_lead_responses instead
@@ -88,11 +102,22 @@ Respond with ONLY the fit level: PERFECT_FIT, GOOD_FIT, OKAY_FIT, POOR_FIT, or B
 
 STATUS: {lead_status.upper()}
 
+CRITICAL INSTRUCTIONS:
+- Write ONLY for the customer who filled out the form (B2C perspective)
+- Do NOT include business-to-business language like "help your business grow"
+- Focus on the SERVICE being provided TO the customer
+- Use customer details from their responses to personalize
+- The business context describes the SERVICE PROVIDER, not the customer
+
 Keep it:
 - {lead_status.upper()} tone: {"Enthusiastic and welcoming" if lead_status == "yes" else "Encouraging but not pushy" if lead_status == "maybe" else "Kind and helpful"}
-- Personal (use customer details from their responses)
-- Professional
+- Customer-focused (the person who filled out the form)
+- Personal (use their specific responses like names, needs, preferences)
+- Professional but friendly
 - 2-3 sentences max
+
+WRONG: "Let's work together to help your business grow!"
+RIGHT: "We're excited to help you with your dog walking needs!"
 
 Just write the message, no other text."""
     
