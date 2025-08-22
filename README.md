@@ -72,8 +72,8 @@ For production deployment, use the production docker-compose file:
 
 ```bash
 # Copy production environment file
-cp .env.example .env.production
-# Edit .env.production with production credentials
+cp .env .env
+# Edit .env with production credentials
 
 # Build and start production services
 docker-compose -f docker-compose.prod.yml up -d
@@ -81,7 +81,7 @@ docker-compose -f docker-compose.prod.yml up -d
 # This will start:
 # - Backend API with production settings
 # - Form frontend served by nginx on port 3000
-# - Admin frontend served by nginx on port 3001  
+# - Admin frontend served by nginx on port 3001
 # - Redis with persistence
 # - Nginx reverse proxy on ports 80/443
 ```
