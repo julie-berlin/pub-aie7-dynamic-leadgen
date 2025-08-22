@@ -269,6 +269,11 @@ class SurveyGraphState(BaseModel):
     pending_responses: List[Dict[str, Any]] = Field(default_factory=list, description="Pending user responses")
     frontend_response: Optional[Dict[str, Any]] = Field(None, description="Response for frontend")
     
+    # Routing control flags  
+    route_to_lead_intelligence: Optional[bool] = Field(None, description="Flag to route to lead intelligence")
+    check_abandonment: Optional[bool] = Field(None, description="Flag to check abandonment")
+    route_decision: Optional[str] = Field(None, description="'continue' or 'end' - controls flow routing")
+    
     # Completion
     completion_message: Optional[str] = Field(None, description="Final completion message")
     

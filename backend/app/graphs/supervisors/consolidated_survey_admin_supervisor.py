@@ -661,7 +661,8 @@ Use the exact output format specified in your instructions."""
                 "question_id": q_id,  # CRITICAL: Include question_id for tracking
                 "question": q.get("question", q.get("question_text", "")),
                 "phrased_question": q.get("final_text", q.get("phrased_text", q.get("question", q.get("question_text", "")))),
-                "data_type": q.get("data_type", q.get("question_type", "text")),
+                "input_type": q.get("input_type", q.get("question_type", "text")),  # Frontend input type (text, textarea, radio, select, etc.)
+                "data_type": q.get("data_type", "text"),  # Backend data type (text, integer, float, boolean, etc.)
                 "is_required": q.get("is_required", False),
                 "options": q.get("options"),
                 "description": q.get("description"),

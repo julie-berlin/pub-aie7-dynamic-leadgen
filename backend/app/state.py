@@ -122,6 +122,11 @@ class SurveyGraphState(TypedDict):
     pending_responses: List[Dict[str, Any]]  # Responses waiting to be processed
     frontend_response: Optional[Dict[str, Any]]  # Data prepared for frontend
     
+    # Routing control flags
+    route_to_lead_intelligence: Optional[bool]  # Flag to route to lead intelligence
+    check_abandonment: Optional[bool]  # Flag to check abandonment
+    route_decision: Optional[str]  # "continue" or "end" - controls flow routing
+    
     # Session management
     session_recovery_data: Optional[Dict[str, Any]]  # For resuming sessions
     completion_message: Optional[str]  # Generated completion message
