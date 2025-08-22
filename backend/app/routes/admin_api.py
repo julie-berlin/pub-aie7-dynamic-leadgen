@@ -25,6 +25,8 @@ import jwt
 from app.database import get_database_connection
 from app.utils.file_upload import validate_and_store_logo, remove_logo
 from app.utils.response_helpers import success_response, error_response
+# Import working admin auth functions
+from app.routes.admin_auth import get_current_admin_user as get_working_admin_user
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -63,20 +65,8 @@ class AdminUserLogin(BaseModel):
     email: EmailStr
     password: str
 
-class AdminUserResponse(BaseModel):
-    """Response model for admin user data."""
-    id: str
-    client_id: str
-    email: str
-    first_name: str
-    last_name: str
-    role: str
-    permissions: List[str]
-    is_active: bool
-    email_verified: bool
-    last_login_at: Optional[datetime]
-    login_count: int
-    created_at: datetime
+# Import AdminUserResponse from admin_auth.py
+from app.routes.admin_auth import AdminUserResponse
 
 class AdminTokenResponse(BaseModel):
     """Response model for authentication."""
@@ -233,42 +223,8 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)) 
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-def get_current_admin_user(token_payload: dict = Depends(verify_token)) -> AdminUserResponse:
-    """Get current admin user from token."""
-    try:
-        conn = get_database_connection()
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                SELECT id, client_id, email, first_name, last_name, role, permissions,
-                       is_active, email_verified, last_login_at, login_count, created_at
-                FROM admin_users
-                WHERE id = %s AND is_active = true
-            """, (token_payload['user_id'],))
-            
-            result = cursor.fetchone()
-            if not result:
-                raise HTTPException(status_code=401, detail="User not found or inactive")
-            
-            return AdminUserResponse(
-                id=str(result[0]),
-                client_id=str(result[1]),
-                email=result[2],
-                first_name=result[3],
-                last_name=result[4],
-                role=result[5],
-                permissions=result[6] or [],
-                is_active=result[7],
-                email_verified=result[8],
-                last_login_at=result[9],
-                login_count=result[10],
-                created_at=result[11]
-            )
-            
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to get current user: {e}")
-        raise HTTPException(status_code=500, detail="Failed to authenticate user")
+# Use the working admin auth function from admin_auth.py instead of broken psycopg2 version
+get_current_admin_user = get_working_admin_user
 
 # === AUTHENTICATION ENDPOINTS ===
 

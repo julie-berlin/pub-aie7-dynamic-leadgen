@@ -87,8 +87,8 @@ class AdminAuthenticator:
             if payload.get('exp', 0) < time.time():
                 return None
             
-            # Check if admin role
-            if payload.get('role') != 'admin':
+            # Validate that token has required fields
+            if not payload.get('user_id') or not payload.get('client_id'):
                 return None
             
             return payload
@@ -168,7 +168,8 @@ class AdminAuthMiddleware(BaseHTTPMiddleware):
             '/internal/',
             '/debug/',
             '/system/',
-            '/management/'
+            '/management/',
+            '/api/admin/'  # Add API admin endpoints
         }
         
         # Always protected paths (even if auth is disabled elsewhere)

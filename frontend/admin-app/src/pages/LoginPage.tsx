@@ -2,8 +2,8 @@ import { useState, type FormEvent } from 'react';
 import { useAdminStore } from '../stores/adminStore';
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('admin@example.com');
-  const [password, setPassword] = useState('password');
+  const [email, setEmail] = useState('admin@pawsome.test');
+  const [password, setPassword] = useState('secret');
   const { login, isLoading, error } = useAdminStore();
 
   const handleSubmit = async (e: FormEvent) => {
@@ -24,17 +24,17 @@ export default function LoginPage() {
             Sign in to Admin
           </h2>
           <p className="mt-2 text-center text-sm text-slate-600">
-            Lead Generation Platform Administration
+           Varyq Lead Generation Platform
           </p>
         </div>
-        
+
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           {error && (
             <div className="p-4 rounded-md border bg-danger-50 border-danger-200 text-danger-800">
               <p className="text-sm">{error}</p>
             </div>
           )}
-          
+
           <div className="space-y-4">
             <div className="space-y-2">
               <label htmlFor="email" className="block text-sm font-medium text-slate-700">
@@ -52,7 +52,7 @@ export default function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
               />
             </div>
-            
+
             <div className="space-y-2">
               <label htmlFor="password" className="block text-sm font-medium text-slate-700">
                 Password

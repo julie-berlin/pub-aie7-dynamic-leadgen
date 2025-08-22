@@ -186,7 +186,7 @@ class ResponseSanitizationMiddleware(BaseHTTPMiddleware):
         self.sanitizer = ResponseSanitizer(config)
         
         # Endpoints that skip sanitization
-        self.skip_paths = {'/docs', '/redoc', '/openapi.json'}
+        self.skip_paths = {'/docs', '/redoc', '/openapi.json', '/api/admin/auth/login'}
         
         # Admin endpoints (if authentication is enabled)
         self.admin_paths = {

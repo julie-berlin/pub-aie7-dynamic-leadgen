@@ -134,7 +134,7 @@ INSERT INTO lead_sessions (
 
 ('00000020-0000-0000-0000-000000000020'::uuid, 'f1111111-1111-1111-1111-111111111111'::uuid, 'sess_dw_today_002', 'a1111111-1111-1111-1111-111111111111'::uuid, 
  NOW() - INTERVAL '1 hour', NOW() - INTERVAL '15 minutes', NULL, 3, false, 
- 20, 0, 'unknown', 'at_risk', NULL, 
+ 20, 0, 'unknown', NULL, NULL, 
  'at_risk', 0.65, NOW() - INTERVAL '15 minutes', 12, 0, NOW() - INTERVAL '1 hour', NOW() - INTERVAL '15 minutes');
 
 -- ==== LEAD OUTCOMES DATA ====
@@ -202,7 +202,7 @@ INSERT INTO lead_outcomes (
  'Location outside service area as indicated in survey. Referred to local competitor.', 4, NOW() - INTERVAL '1 month 1 week 2 days'),
 
 -- Failed conversions (prediction was wrong - system was too optimistic)
-('10000012-0000-0000-0000-000000000012'::uuid, 'sess_dw_015', 'f1111111-1111-1111-1111-111111111111'::uuid, 
+('10000012-0000-0000-0000-000000000012'::uuid, 'sess_dw_004', 'f1111111-1111-1111-1111-111111111111'::uuid, 
  false, true, NULL, 0.00, 'no_response', false, 
  'Client seemed very interested but never responded to follow-up. May have found another service.', 2, NOW() - INTERVAL '3 hours'),
 
