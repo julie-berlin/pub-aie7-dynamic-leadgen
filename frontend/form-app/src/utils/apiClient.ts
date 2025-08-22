@@ -15,7 +15,8 @@ interface BackendQuestion {
   question_id?: string | number;  // CRITICAL: Form-specific question ID from backend
   question: string;
   phrased_question: string;
-  data_type: string;
+  input_type: string;  // Frontend input type (text, textarea, radio, select, etc.)
+  data_type: string;   // Backend data type (text, integer, float, boolean, etc.)
   is_required: boolean;
   options?: string[] | Record<string, any>;
   description?: string;
@@ -69,7 +70,7 @@ class APIClient {
     
     return {
       id: questionId,
-      type: this.mapDataTypeToQuestionType(backendQuestion.data_type),
+      type: backendQuestion.input_type as QuestionType,  // Use input_type directly for frontend rendering
       text: backendQuestion.phrased_question || backendQuestion.question,
       description: backendQuestion.description,
       placeholder: backendQuestion.placeholder,
@@ -81,7 +82,10 @@ class APIClient {
   }
 
   /**
-   * Map backend data_type to frontend QuestionType
+   * Map backend data_type to frontend QuestionType (DEPRECATED)
+   * 
+   * NOTE: This method is no longer used since we now use input_type directly.
+   * Keeping for backward compatibility in case of rollback.
    */
   private mapDataTypeToQuestionType(dataType: string): QuestionType {
     const typeMap: Record<string, QuestionType> = {
@@ -98,7 +102,8 @@ class APIClient {
       'date': 'date',
       'time': 'time',
       'datetime': 'datetime',
-      'file': 'file'
+      'file': 'file',
+      'boolean': 'radio'  // Boolean questions should be radio buttons (Yes/No)
     };
     
     return typeMap[dataType] || 'text';
@@ -108,6 +113,16 @@ class APIClient {
    * Transform backend options to frontend format
    */
   private transformQuestionOptions(backendQuestion: BackendQuestion) {
+    // Special handling for boolean questions - they need Yes/No options
+    if (backendQuestion.data_type === 'boolean') {
+      return {
+        choices: [
+          { id: '1', text: 'Yes', value: 'yes' },
+          { id: '2', text: 'No', value: 'no' }
+        ]
+      };
+    }
+
     if (!backendQuestion.options) return undefined;
 
     // If options is an array of strings (like for select), convert to choices

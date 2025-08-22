@@ -9,16 +9,16 @@ import logging
 logger = logging.getLogger(__name__)
 
 def get_chat_model(
-    model_name: str = "gpt-3.5-turbo", 
+    model_name: str = "gpt-5-mini",
     temperature: float = 0.3,
     max_tokens: Optional[int] = None
 ):
     """Get configured chat model instance."""
-    
+
     # Check for API keys
     openai_key = os.getenv("OPENAI_API_KEY")
     anthropic_key = os.getenv("ANTHROPIC_API_KEY")
-    
+
     if "gpt" in model_name.lower() and openai_key:
         return ChatOpenAI(
             model=model_name,
@@ -38,7 +38,7 @@ def get_chat_model(
         if openai_key:
             logger.info(f"Model {model_name} not available, defaulting to gpt-3.5-turbo")
             return ChatOpenAI(
-                model="gpt-3.5-turbo",
+                model="gpt-5-mini",
                 temperature=temperature,
                 max_tokens=max_tokens,
                 api_key=openai_key
