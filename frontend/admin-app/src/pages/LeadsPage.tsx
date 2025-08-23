@@ -16,7 +16,7 @@ import {
   ChartBarIcon
 } from '@heroicons/react/24/outline';
 import { CheckCircleIcon as CheckCircleIconSolid, XCircleIcon as XCircleIconSolid } from '@heroicons/react/24/solid';
-import { buildApiUrl } from '../config/api';
+import { buildApiUrl, API_ENDPOINTS } from '../config/api';
 
 interface Lead {
   lead_id: string;  // Safe unique identifier for React keys

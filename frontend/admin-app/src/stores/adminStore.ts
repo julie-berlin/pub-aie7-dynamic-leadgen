@@ -53,9 +53,9 @@ export const useAdminStore = create<AdminStore>()(
       isLoading: false,
       error: null,
       businessInfo: {
-        name: 'Pawsome Dog Walking',
-        industry: 'Pet Services',
-        isLoaded: true
+        name: 'Survey Admin',
+        industry: undefined,
+        isLoaded: false
       },
 
       // Auth actions
@@ -88,6 +88,9 @@ export const useAdminStore = create<AdminStore>()(
             isLoading: false,
             error: null 
           });
+          
+          // Load business info after successful login
+          await get().loadBusinessInfo();
         } catch (error) {
           set({ 
             error: error instanceof Error ? error.message : 'Login failed',
@@ -101,7 +104,12 @@ export const useAdminStore = create<AdminStore>()(
         set({ 
           user: null, 
           isAuthenticated: false, 
-          error: null 
+          error: null,
+          businessInfo: {
+            name: 'Survey Admin',
+            industry: undefined,
+            isLoaded: false
+          }
         });
       },
 
@@ -143,10 +151,17 @@ export const useAdminStore = create<AdminStore>()(
 
       loadBusinessInfo: async () => {
         try {
+          const token = localStorage.getItem('admin_token');
+          const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+          };
+          
+          if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+          }
+          
           const response = await fetch(API_ENDPOINTS.CLIENTS.ME, {
-            headers: {
-              'Content-Type': 'application/json',
-            }
+            headers
           });
 
           if (response.ok) {

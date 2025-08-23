@@ -251,7 +251,7 @@ async def submit_and_continue(
             logger.error(f"🔥 STEP: Session {session_id} NOT FOUND in database!")
             # Try to list recent sessions for debugging
             try:
-                recent = db.client.table('lead_sessions').select('session_id, created_at').order('created_at', desc=True).limit(5).execute()
+                recent = db.client.table('lead_sessions').select('session_id, started_at').order('started_at', desc=True).limit(5).execute()
                 logger.error(f"🔥 STEP: Recent sessions in DB: {recent.data}")
             except:
                 pass
@@ -510,7 +510,7 @@ async def debug_session(session_id: str):
         session = db.get_lead_session(session_id)
         
         # Also get recent sessions
-        recent = db.client.table('lead_sessions').select('session_id, created_at').order('created_at', desc=True).limit(10).execute()
+        recent = db.client.table('lead_sessions').select('session_id, started_at').order('started_at', desc=True).limit(10).execute()
         
         return success_response(
             data={

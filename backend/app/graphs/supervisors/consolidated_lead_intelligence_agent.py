@@ -475,19 +475,109 @@ Just write the message, no other text."""
                 route_decision = "continue"  # Need more data
             elif lead_status == "maybe" and remaining_questions > 0:
                 route_decision = "continue"  # Maybe leads need more information to become yes/no
-            elif lead_status in ["yes", "no"]:
-                route_decision = "end"  # Definitive classification - complete regardless of remaining questions
             else:
-                route_decision = "end"  # Default to end
+                # Handle all lead statuses with clear completion logic
+                route_decision = self._get_completion_decision(state, lead_status)
                 
             logger.info(f"🔀 Routing decision: {route_decision}")
             return route_decision
             
         except Exception as e:
             logger.error(f"Error determining route decision: {e}")
-            import traceback
-            logger.error(f"Traceback: {traceback.format_exc()}")
             return "end"  # Safe default
+    
+    def _get_completion_decision(self, state: SurveyState, lead_status: str) -> str:
+        """Determine if survey should continue or end based on step number and required questions."""
+        try:
+            # Get current step number
+            session_id = state.get("core", {}).get("session_id")
+            if not session_id:
+                logger.warning("No session_id - defaulting to continue")
+                return "continue"
+            
+            db_session = self.toolbelt.get_lead_session(session_id)
+            if not db_session:
+                logger.warning(f"No database session found for {session_id} - defaulting to continue")
+                return "continue"
+            
+            current_step = db_session.get("step", 0)
+            logger.info(f"🔍 Completion decision - step: {current_step}, lead_status: {lead_status}")
+            
+            # Rule 1: If step number is less than 2, always continue
+            if current_step < 2:
+                logger.info("📋 Step < 2 - continue")
+                return "continue"
+            
+            # Rule 2: If step 2+ and lead_status is "no", end and show message
+            if current_step >= 2 and lead_status == "no":
+                logger.info("🏁 Step 2+ and 'no' lead - end")
+                return "end"
+            
+            # Rule 3: If step 2+ and required questions remain, always continue
+            if current_step >= 2:
+                all_required_answered = self._all_required_questions_answered(state)
+                if not all_required_answered:
+                    logger.info("📋 Required questions remain - continue")
+                    return "continue"
+            
+            # Rule 4: If step 2+, all required answered, continue if maybe/unknown
+            if current_step >= 2 and lead_status in ["maybe", "unknown"]:
+                logger.info("🤔 Step 2+, all required done, maybe/unknown - continue")
+                return "continue"
+            
+            # Default: end
+            logger.info("🏁 Default case - end")
+            return "end"
+            
+        except Exception as e:
+            logger.error(f"Error in completion decision: {e}")
+            return "continue"  # Safe default
+    
+    def _all_required_questions_answered(self, state: SurveyState) -> bool:
+        """Check if all required questions have been answered."""
+        try:
+            # Get form_id and load questions
+            form_id = state.get("core", {}).get("form_id")
+            if not form_id:
+                logger.warning("No form_id found - cannot check required questions")
+                return False
+            
+            # Load all questions for this form
+            all_questions = self.toolbelt.load_questions({"form_id": form_id})
+            if not all_questions:
+                logger.warning(f"No questions found for form {form_id}")
+                return True  # If no questions, consider complete
+            
+            # Get questions that have been asked
+            asked_questions = state.get("question_strategy", {}).get("asked_questions", [])
+            asked_question_ids = set()
+            for q_id in asked_questions:
+                if isinstance(q_id, (int, str)):
+                    asked_question_ids.add(int(q_id))
+            
+            # Check required questions
+            required_questions = []
+            for question in all_questions:
+                if question.get("required", False):
+                    required_questions.append(question.get("question_id"))
+            
+            unanswered_required = []
+            for req_id in required_questions:
+                if req_id not in asked_question_ids:
+                    unanswered_required.append(req_id)
+            
+            all_answered = len(unanswered_required) == 0
+            logger.info(f"📋 Required questions check:")
+            logger.info(f"   - Total required: {len(required_questions)}")
+            logger.info(f"   - Asked: {len(required_questions) - len(unanswered_required)}")
+            logger.info(f"   - Unanswered required: {unanswered_required}")
+            logger.info(f"   - All answered: {all_answered}")
+            
+            return all_answered
+            
+        except Exception as e:
+            logger.error(f"Error checking required questions: {e}")
+            return False  # Conservative - don't complete if we can't verify
     
     def _get_tool_recommendations(self, responses: List[Dict]) -> str:
         """Get tool recommendations from LLM."""
