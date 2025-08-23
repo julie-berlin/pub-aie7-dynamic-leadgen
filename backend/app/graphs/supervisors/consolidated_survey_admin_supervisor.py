@@ -103,8 +103,16 @@ MESSAGE: At Pawsome Dog Walking, we've helped over 500 pet owners. Tell us more 
             # Load available questions
             available_questions = self._load_available_questions(state)
             if not available_questions:
-                logger.warning("No available questions found, completing survey")
-                return self._create_completion_response("No more questions available")
+                logger.warning("No available questions found, routing to lead intelligence for completion check")
+                return {
+                    "route_to_lead_intelligence": True,
+                    "pending_responses": [],  # Empty responses to trigger completion check
+                    "supervisor_metadata": {
+                        "supervisor_name": self.name,
+                        "action": "route_to_completion_check",
+                        "decision_timestamp": datetime.now().isoformat()
+                    }
+                }
 
             # Analyze current state
             analysis = self._analyze_survey_state(state, available_questions)

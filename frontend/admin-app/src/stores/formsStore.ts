@@ -129,9 +129,11 @@ export const useFormsStore = create<FormsStore>()(
           if (filters.dateRange.start) params.set('startDate', filters.dateRange.start);
           if (filters.dateRange.end) params.set('endDate', filters.dateRange.end);
           
+          const token = localStorage.getItem('admin_token');
           const response = await fetch(API_ENDPOINTS.FORMS.LIST(params), {
             headers: { 
-              'Content-Type': 'application/json'
+              'Content-Type': 'application/json',
+              ...(token && { 'Authorization': `Bearer ${token}` })
             },
           });
           
@@ -188,9 +190,11 @@ export const useFormsStore = create<FormsStore>()(
         set({ isLoading: true, error: null });
         
         try {
+          const token = localStorage.getItem('admin_token');
           const response = await fetch(API_ENDPOINTS.FORMS.BY_ID(id), {
             headers: { 
-              'Content-Type': 'application/json'
+              'Content-Type': 'application/json',
+              ...(token && { 'Authorization': `Bearer ${token}` })
             },
           });
           
@@ -314,7 +318,8 @@ export const useFormsStore = create<FormsStore>()(
           const response = await fetch(API_ENDPOINTS.FORMS.BY_ID(id), {
             method: 'DELETE',
             headers: { 
-              'Content-Type': 'application/json'
+              'Content-Type': 'application/json',
+              ...(localStorage.getItem('admin_token') && { 'Authorization': `Bearer ${localStorage.getItem('admin_token')}` })
             },
           });
           

@@ -60,9 +60,17 @@ export default function FormDetailPage() {
   const loadFormDetails = async (formId: string) => {
     setLoading(true);
     try {
+      const token = localStorage.getItem('admin_token');
+      if (!token) {
+        console.error('No admin token found');
+        setLoading(false);
+        return;
+      }
+
       const response = await fetch(API_ENDPOINTS.FORMS.BY_ID(formId), {
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
         }
       });
 
@@ -303,10 +311,17 @@ export default function FormDetailPage() {
     }
 
     try {
+      const token = localStorage.getItem('admin_token');
+      if (!token) {
+        alert('Authentication required. Please log in again.');
+        return;
+      }
+
       const response = await fetch(API_ENDPOINTS.FORMS.UPDATE(form.id), {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
           status: newStatus
@@ -354,10 +369,17 @@ export default function FormDetailPage() {
         }
       };
 
+      const token = localStorage.getItem('admin_token');
+      if (!token) {
+        alert('Authentication required. Please log in again.');
+        return;
+      }
+
       const createResponse = await fetch(API_ENDPOINTS.FORMS.CREATE, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify(duplicateData)
       });

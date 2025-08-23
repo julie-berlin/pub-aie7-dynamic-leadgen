@@ -126,11 +126,18 @@ Just write the message, no other text."""
         try:
             logger.info("🤖 Lead Intelligence: Starting processing")
             
-            # Get pending responses - early return if none 
+            # Get pending responses - but always check for completion even if no responses
             pending_responses = state.get("pending_responses", [])
             if not pending_responses:
-                logger.info("No pending responses to process")
-                return {"lead_status": "unknown", "route_decision": "continue"}
+                logger.info("No pending responses to process, checking for completion")
+                # Still need to check if survey should be completed (no more questions)
+                route_decision = self._determine_route_decision(state, "unknown")
+                completed = route_decision == "end"
+                return {
+                    "lead_status": "unknown", 
+                    "route_decision": route_decision,
+                    "completed": completed
+                }
             
             # Step 1: Save responses to database
             save_result = self._save_responses(state)
