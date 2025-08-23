@@ -47,16 +47,9 @@ export interface AdminStore extends AuthState, AuthActions {}
 export const useAdminStore = create<AdminStore>()(
   persist(
     (set, get) => ({
-      // Initial auth state - TEMPORARILY BYPASSING AUTH FOR DEVELOPMENT
-      user: {
-        id: "mock-admin-user-id",
-        email: "admin@example.com",
-        name: "Admin User",
-        role: "admin",
-        clientId: "a1111111-1111-1111-1111-111111111111",
-        permissions: ["forms.view", "forms.edit", "settings.edit", "analytics.view"]
-      },
-      isAuthenticated: true,
+      // Initial auth state
+      user: null,
+      isAuthenticated: false,
       isLoading: false,
       error: null,
       businessInfo: {
@@ -81,10 +74,13 @@ export const useAdminStore = create<AdminStore>()(
             throw new Error('Login failed');
           }
 
-          const { user, token } = await response.json();
+          const data = await response.json();
+          
+          // Backend returns { access_token, token_type, expires_in, user }
+          const { access_token, user } = data;
           
           // Store token in localStorage for API requests
-          localStorage.setItem('admin_token', token);
+          localStorage.setItem('admin_token', access_token);
           
           set({ 
             user, 
@@ -124,8 +120,9 @@ export const useAdminStore = create<AdminStore>()(
             return;
           }
 
-          const { user, token: newToken } = await response.json();
-          localStorage.setItem('admin_token', newToken);
+          const data = await response.json();
+          const { access_token, user } = data;
+          localStorage.setItem('admin_token', access_token);
           set({ user, isAuthenticated: true });
         } catch (error) {
           get().logout();
