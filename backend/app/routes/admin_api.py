@@ -378,54 +378,47 @@ async def get_current_user(current_user: AdminUserResponse = Depends(get_current
 async def get_client_settings(current_user: AdminUserResponse = Depends(get_current_admin_user)):
     """Get client settings and branding configuration."""
     try:
-        conn = get_database_connection()
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                SELECT id, client_id, logo_url, favicon_url, brand_colors, font_preferences,
-                       default_theme_id, default_form_settings, custom_domain, custom_domain_verified,
-                       white_label_enabled, from_email, reply_to_email, webhook_url,
-                       plan_type, monthly_form_limit, monthly_response_limit, created_at, updated_at
-                FROM client_settings
-                WHERE client_id = %s
-            """, (current_user.client_id,))
+        # Query client settings using Supabase
+        result = db.client.table('client_settings').select('*').eq('client_id', current_user.client_id).execute()
+        
+        if not result.data:
+            # Create default settings for client
+            settings_id = str(uuid.uuid4())
+            new_settings = {
+                'id': settings_id,
+                'client_id': current_user.client_id
+            }
             
-            result = cursor.fetchone()
-            if not result:
-                # Create default settings for client
-                settings_id = str(uuid.uuid4())
-                cursor.execute("""
-                    INSERT INTO client_settings (id, client_id)
-                    VALUES (%s, %s)
-                    RETURNING id, client_id, logo_url, favicon_url, brand_colors, font_preferences,
-                             default_theme_id, default_form_settings, custom_domain, custom_domain_verified,
-                             white_label_enabled, from_email, reply_to_email, webhook_url,
-                             plan_type, monthly_form_limit, monthly_response_limit, created_at, updated_at
-                """, (settings_id, current_user.client_id))
-                result = cursor.fetchone()
-                conn.commit()
-            
-            return ClientSettingsResponse(
-                id=str(result[0]),
-                client_id=str(result[1]),
-                logo_url=result[2],
-                favicon_url=result[3],
-                brand_colors=result[4],
-                font_preferences=result[5],
-                default_theme_id=str(result[6]) if result[6] else None,
-                default_form_settings=result[7] or {},
-                custom_domain=result[8],
-                custom_domain_verified=result[9] or False,
-                white_label_enabled=result[10] or False,
-                from_email=result[11],
-                reply_to_email=result[12],
-                webhook_url=result[13],
-                plan_type=result[14] or 'free',
-                monthly_form_limit=result[15] or 1000,
-                monthly_response_limit=result[16] or 10000,
-                created_at=result[17],
-                updated_at=result[18]
-            )
-            
+            insert_result = db.client.table('client_settings').insert(new_settings).execute()
+            if insert_result.data:
+                settings = insert_result.data[0]
+            else:
+                raise HTTPException(status_code=500, detail="Failed to create default settings")
+        else:
+            settings = result.data[0]
+        
+        return ClientSettingsResponse(
+            id=str(settings['id']),
+            client_id=str(settings['client_id']),
+            logo_url=settings.get('logo_url'),
+            favicon_url=settings.get('favicon_url'),
+            brand_colors=settings.get('brand_colors'),
+            font_preferences=settings.get('font_preferences'),
+            default_theme_id=str(settings['default_theme_id']) if settings.get('default_theme_id') else None,
+            default_form_settings=settings.get('default_form_settings') or {},
+            custom_domain=settings.get('custom_domain'),
+            custom_domain_verified=settings.get('custom_domain_verified') or False,
+            white_label_enabled=settings.get('white_label_enabled') or False,
+            from_email=settings.get('from_email'),
+            reply_to_email=settings.get('reply_to_email'),
+            webhook_url=settings.get('webhook_url'),
+            plan_type=settings.get('plan_type') or 'free',
+            monthly_form_limit=settings.get('monthly_form_limit') or 1000,
+            monthly_response_limit=settings.get('monthly_response_limit') or 10000,
+            created_at=datetime.fromisoformat(settings['created_at'].replace('Z', '+00:00')) if settings.get('created_at') else None,
+            updated_at=datetime.fromisoformat(settings['updated_at'].replace('Z', '+00:00')) if settings.get('updated_at') else None
+        )
+        
     except Exception as e:
         logger.error(f"Failed to get client settings: {e}")
         raise HTTPException(status_code=500, detail="Failed to retrieve client settings")
@@ -470,32 +463,24 @@ async def update_client_settings(
                     detail="Logo file does not exist or is not accessible"
                 )
         
-        conn = get_database_connection()
-        with conn.cursor() as cursor:
-            # Build dynamic update query
-            update_fields = []
-            update_values = []
+        # Build update data from non-None fields
+        update_data = {}
+        for field_name, field_value in settings_request.dict(exclude_unset=True).items():
+            if field_value is not None:
+                update_data[field_name] = field_value
+        
+        if update_data:
+            # Add updated_at timestamp
+            update_data['updated_at'] = datetime.utcnow().isoformat()
             
-            for field_name, field_value in settings_request.dict(exclude_unset=True).items():
-                if field_value is not None:
-                    update_fields.append(f"{field_name} = %s")
-                    update_values.append(field_value)
+            # Update using Supabase
+            result = db.client.table('client_settings').update(update_data).eq('client_id', current_user.client_id).execute()
             
-            if update_fields:
-                update_fields.append("updated_at = NOW()")
-                update_values.append(current_user.client_id)
-                
-                query = f"""
-                    UPDATE client_settings 
-                    SET {', '.join(update_fields)}
-                    WHERE client_id = %s
-                    RETURNING updated_at
-                """
-                cursor.execute(query, update_values)
-                conn.commit()
-            
-            # Return updated settings
-            return await get_client_settings(current_user)
+            if not result.data:
+                raise HTTPException(status_code=404, detail="Client settings not found")
+        
+        # Return updated settings
+        return await get_client_settings(current_user)
             
     except HTTPException:
         raise
@@ -509,41 +494,36 @@ async def update_client_settings(
 async def get_team_members(current_user: AdminUserResponse = Depends(get_current_admin_user)):
     """Get all team members for the client."""
     try:
-        conn = get_database_connection()
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                SELECT id, email, first_name, last_name, role, is_active, 
-                       last_login_at, invitation_expires, created_at
-                FROM admin_users
-                WHERE client_id = %s
-                ORDER BY created_at DESC
-            """, (current_user.client_id,))
+        # Query team members using Supabase
+        result = db.client.table('admin_users').select(
+            'id, email, first_name, last_name, role, is_active, last_login_at, invitation_expires, created_at'
+        ).eq('client_id', current_user.client_id).order('created_at', desc=True).execute()
+        
+        team_members = []
+        
+        for user in result.data:
+            invitation_status = "accepted"
+            if user.get('invitation_expires'):
+                expires_at = datetime.fromisoformat(user['invitation_expires'].replace('Z', '+00:00'))
+                if expires_at > datetime.now(expires_at.tzinfo):
+                    invitation_status = "pending"
+                else:
+                    invitation_status = "expired"
             
-            results = cursor.fetchall()
-            team_members = []
-            
-            for row in results:
-                invitation_status = "accepted"
-                if row[7]:  # invitation_expires
-                    if row[7] > datetime.now():
-                        invitation_status = "pending"
-                    else:
-                        invitation_status = "expired"
-                
-                team_members.append(TeamMemberResponse(
-                    id=str(row[0]),
-                    email=row[1],
-                    first_name=row[2],
-                    last_name=row[3],
-                    role=row[4],
-                    is_active=row[5],
-                    last_login_at=row[6],
-                    invitation_status=invitation_status,
-                    created_at=row[8]
-                ))
-            
-            return team_members
-            
+            team_members.append(TeamMemberResponse(
+                id=str(user['id']),
+                email=user['email'],
+                first_name=user['first_name'],
+                last_name=user['last_name'],
+                role=user['role'],
+                is_active=user['is_active'],
+                last_login_at=datetime.fromisoformat(user['last_login_at'].replace('Z', '+00:00')) if user.get('last_login_at') else None,
+                invitation_status=invitation_status,
+                created_at=datetime.fromisoformat(user['created_at'].replace('Z', '+00:00'))
+            ))
+        
+        return team_members
+        
     except Exception as e:
         logger.error(f"Failed to get team members: {e}")
         raise HTTPException(status_code=500, detail="Failed to retrieve team members")
@@ -555,55 +535,61 @@ async def invite_team_member(
 ):
     """Invite a new team member."""
     try:
-        conn = get_database_connection()
-        with conn.cursor() as cursor:
-            # Check if user already exists
-            cursor.execute("SELECT id FROM admin_users WHERE email = %s", (invite_request.email,))
-            if cursor.fetchone():
-                raise HTTPException(status_code=409, detail="User with this email already exists")
-            
-            # Create invitation
-            user_id = str(uuid.uuid4())
-            invitation_token = secrets.token_urlsafe(32)
-            invitation_expires = datetime.now() + timedelta(days=7)
-            
-            # Set permissions based on role
-            permissions = {
-                "admin": ["forms:*", "analytics:*", "team:read", "settings:read"],
-                "editor": ["forms:read", "forms:write", "analytics:read"],
-                "viewer": ["forms:read", "analytics:read"]
-            }.get(invite_request.role, ["forms:read"])
-            
-            cursor.execute("""
-                INSERT INTO admin_users 
-                (id, client_id, email, password_hash, first_name, last_name, role, permissions,
-                 is_active, invitation_token, invitation_expires, created_by_user_id)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                RETURNING created_at
-            """, (
-                user_id, current_user.client_id, invite_request.email, "PENDING",
-                invite_request.first_name, invite_request.last_name, invite_request.role,
-                permissions, False, invitation_token, invitation_expires, current_user.id
-            ))
-            
-            created_at = cursor.fetchone()[0]
-            conn.commit()
-            
-            # TODO: Send invitation email with invitation_token
-            logger.info(f"Team member invited: {invite_request.email} with token: {invitation_token}")
-            
-            return TeamMemberResponse(
-                id=user_id,
-                email=invite_request.email,
-                first_name=invite_request.first_name,
-                last_name=invite_request.last_name,
-                role=invite_request.role,
-                is_active=False,
-                last_login_at=None,
-                invitation_status="pending",
-                created_at=created_at
-            )
-            
+        # Check if user already exists
+        existing_user = db.client.table('admin_users').select('id').eq('email', invite_request.email).execute()
+        if existing_user.data:
+            raise HTTPException(status_code=409, detail="User with this email already exists")
+        
+        # Create invitation
+        user_id = str(uuid.uuid4())
+        invitation_token = secrets.token_urlsafe(32)
+        invitation_expires = (datetime.now() + timedelta(days=7)).isoformat()
+        
+        # Set permissions based on role
+        permissions = {
+            "admin": ["forms:*", "analytics:*", "team:read", "settings:read"],
+            "editor": ["forms:read", "forms:write", "analytics:read"],
+            "viewer": ["forms:read", "analytics:read"]
+        }.get(invite_request.role, ["forms:read"])
+        
+        # Create new team member invitation
+        new_user_data = {
+            'id': user_id,
+            'client_id': current_user.client_id,
+            'email': invite_request.email,
+            'password_hash': "PENDING",
+            'first_name': invite_request.first_name,
+            'last_name': invite_request.last_name,
+            'role': invite_request.role,
+            'permissions': permissions,
+            'is_active': False,
+            'invitation_token': invitation_token,
+            'invitation_expires': invitation_expires,
+            'created_by_user_id': current_user.id
+        }
+        
+        result = db.client.table('admin_users').insert(new_user_data).execute()
+        
+        if not result.data:
+            raise HTTPException(status_code=500, detail="Failed to create team member invitation")
+        
+        created_user = result.data[0]
+        
+        # TODO: Send invitation email with invitation_token
+        logger.info(f"Team member invited: {invite_request.email} with token: {invitation_token}")
+        
+        return TeamMemberResponse(
+            id=user_id,
+            email=invite_request.email,
+            first_name=invite_request.first_name,
+            last_name=invite_request.last_name,
+            role=invite_request.role,
+            is_active=False,
+            last_login_at=None,
+            invitation_status="pending",
+            created_at=datetime.fromisoformat(created_user['created_at'].replace('Z', '+00:00'))
+        )
+        
     except HTTPException:
         raise
     except Exception as e:
