@@ -193,9 +193,9 @@ def route_after_survey_admin(state: SurveyState) -> str:
 def route_after_lead_intelligence(state: SurveyState) -> str:
     """Determine routing after lead intelligence processing."""
     
-    lead_status = state.get("lead_status", "continue")
+    lead_status = state.get("lead_status", "unknown")
     completed = state.get("completed", False)
-    route_decision = state.get("route_decision", "end")
+    route_decision = state.get("route_decision", "continue")  # CRITICAL FIX: Default to continue when Lead Intelligence fails
     
     # Log routing decision
     logger.info(f"🔥 ROUTING after lead_intelligence: lead_status={lead_status}, completed={completed}, route_decision={route_decision}")

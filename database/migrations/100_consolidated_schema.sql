@@ -74,7 +74,6 @@ CREATE TABLE IF NOT EXISTS form_questions (
     question_id INTEGER NOT NULL,
     question_order INTEGER NOT NULL,
     question_text TEXT NOT NULL,
-    question_type TEXT DEFAULT 'text',
     input_type TEXT DEFAULT 'text',
     data_type TEXT DEFAULT 'string' CHECK (data_type IN ('string', 'number', 'boolean', 'date', 'email', 'phone', 'url', 'json')),
     options JSONB,

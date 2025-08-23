@@ -339,7 +339,7 @@ class FormQuestionConfig(BaseModel):
     question_id: int
     question_order: int
     question_text: str
-    question_type: str = Field(default="text")
+    input_type: str = Field(default="text")
     options: Optional[Dict[str, Any]] = None
     validation_rules: Optional[Dict[str, Any]] = None
     scoring_rubric: Optional[Dict[str, Any]] = None

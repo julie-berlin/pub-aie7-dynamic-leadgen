@@ -141,6 +141,15 @@ async def start_session(
         logger.debug(f"Graph result type: {type(result)}")
         logger.debug(f"Graph result keys: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}")
         
+        # Check if graph returned None or invalid result
+        if result is None:
+            logger.error(f"🔥 START: Graph returned None for session: {session_id}")
+            raise HTTPException(status_code=500, detail="Graph processing failed - returned None")
+        
+        if not isinstance(result, dict):
+            logger.error(f"🔥 START: Graph returned non-dict result: {type(result)}")
+            raise HTTPException(status_code=500, detail=f"Graph processing failed - invalid result type: {type(result)}")
+        
         # Extract frontend response
         frontend_data = result.get('frontend_response', {})
         logger.debug(f"Frontend data: {frontend_data}")
@@ -345,6 +354,12 @@ async def submit_and_continue(
         # Check if survey is complete
         core = result.get('core', {})
         completed = core.get('completed', False)
+        
+        # CRITICAL FIX: Also check if Survey Admin indicates completion
+        step_type = result.get('step_type')
+        if step_type == "completion":
+            completed = True
+            logger.info(f"🏁 Survey marked as completed by Survey Admin (step_type: completion)")
         
         # Get frontend response data
         frontend_data = result.get('frontend_response', {})

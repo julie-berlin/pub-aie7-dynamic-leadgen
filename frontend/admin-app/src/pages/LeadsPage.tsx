@@ -19,15 +19,12 @@ import { CheckCircleIcon as CheckCircleIconSolid, XCircleIcon as XCircleIconSoli
 import { buildApiUrl } from '../config/api';
 
 interface Lead {
-  session_id: string;
-  form_id: string;
+  lead_id: string;  // Safe unique identifier for React keys
   form_title: string;
   lead_status: 'yes' | 'maybe' | 'no' | 'unknown';
-  completion_type: string | null;
   final_score: number;
   started_at: string;
   completed_at: string | null;
-  last_updated: string;
   contact_name: string | null;
   contact_email: string | null;
   contact_phone: string | null;
@@ -68,12 +65,14 @@ export default function LeadsPage() {
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [showConversionModal, setShowConversionModal] = useState<string | null>(null);
   const [forms, setForms] = useState<Array<{ id: string; title: string }>>([]);
-  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      // Check if click is outside any dropdown
+      const target = event.target as HTMLElement;
+      const isInsideDropdown = target.closest('.dropdown-container');
+      if (!isInsideDropdown) {
         setOpenDropdown(null);
       }
     };
@@ -93,7 +92,13 @@ export default function LeadsPage() {
       if (filters.converted) params.append('converted', filters.converted);
       if (filters.form_id) params.append('form_id', filters.form_id);
       
-      const response = await fetch(buildApiUrl(`/api/admin/leads?${params}`));
+      const token = localStorage.getItem('admin_token');
+      const response = await fetch(buildApiUrl(`/api/admin/leads/?${params}`), {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
       if (!response.ok) throw new Error('Failed to fetch leads');
       
       const data = await response.json();
@@ -112,7 +117,13 @@ export default function LeadsPage() {
       const params = new URLSearchParams();
       if (filters.form_id) params.append('form_id', filters.form_id);
       
-      const response = await fetch(buildApiUrl(`/api/admin/leads/stats/summary?${params}`));
+      const token = localStorage.getItem('admin_token');
+      const response = await fetch(buildApiUrl(`/api/admin/leads/stats/summary?${params}`), {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
       if (!response.ok) throw new Error('Failed to fetch summary');
       
       const data = await response.json();
@@ -126,7 +137,13 @@ export default function LeadsPage() {
 
   const fetchForms = async () => {
     try {
-      const response = await fetch(buildApiUrl('/api/forms'));
+      const token = localStorage.getItem('admin_token');
+      const response = await fetch(buildApiUrl('/api/forms'), {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
       if (!response.ok) throw new Error('Failed to fetch forms');
       
       const data = await response.json();
@@ -152,9 +169,13 @@ export default function LeadsPage() {
     notes?: string;
   }) => {
     try {
+      const token = localStorage.getItem('admin_token');
       const response = await fetch(buildApiUrl(`/api/admin/leads/${sessionId}/conversion`), {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json' 
+        },
         body: JSON.stringify(conversionData)
       });
       
@@ -363,7 +384,7 @@ export default function LeadsPage() {
           </div>
         ) : (
           leads.map((lead) => (
-            <div key={lead.session_id} className="admin-card hover:shadow-admin-md transition-shadow">
+            <div key={lead.lead_id} className="admin-card hover:shadow-admin-md transition-shadow">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center space-x-3">
@@ -437,14 +458,14 @@ export default function LeadsPage() {
                   {lead.actual_conversion === null && (
                     <>
                       <button
-                        onClick={() => handleQuickConversion(lead.session_id, true)}
+                        onClick={() => handleQuickConversion(lead.lead_id, true)}
                         className="admin-btn-sm bg-success-600 text-white hover:bg-success-700"
                         title="Mark as converted"
                       >
                         <CheckCircleIcon className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => handleQuickConversion(lead.session_id, false)}
+                        onClick={() => handleQuickConversion(lead.lead_id, false)}
                         className="admin-btn-sm bg-red-600 text-white hover:bg-red-700"
                         title="Mark as not converted"
                       >
@@ -453,20 +474,20 @@ export default function LeadsPage() {
                     </>
                   )}
 
-                  <div className="relative" ref={dropdownRef}>
+                  <div className="relative dropdown-container">
                     <button 
                       className="admin-btn-secondary admin-btn-sm"
-                      onClick={() => setOpenDropdown(openDropdown === lead.session_id ? null : lead.session_id)}
+                      onClick={() => setOpenDropdown(openDropdown === lead.lead_id ? null : lead.lead_id)}
                     >
                       <EllipsisVerticalIcon className="w-4 h-4" />
                     </button>
                     
-                    {openDropdown === lead.session_id && (
+                    {openDropdown === lead.lead_id && (
                       <div className="absolute right-0 mt-2 w-48 bg-white border border-slate-200 rounded-lg shadow-lg z-10">
                         <div className="py-1">
                           <button
                             onClick={() => {
-                              setShowConversionModal(lead.session_id);
+                              setShowConversionModal(lead.lead_id);
                               setOpenDropdown(null);
                             }}
                             className="flex items-center w-full px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
@@ -505,7 +526,7 @@ export default function LeadsPage() {
       {showConversionModal && (
         <ConversionModal
           sessionId={showConversionModal}
-          lead={leads.find(l => l.session_id === showConversionModal)!}
+          lead={leads.find(l => l.lead_id === showConversionModal)!}
           onSave={updateConversion}
           onClose={() => setShowConversionModal(null)}
         />
@@ -548,7 +569,7 @@ function ConversionModal({ sessionId, lead, onSave, onClose }: ConversionModalPr
         <div className="px-6 py-4 border-b border-slate-200">
           <h3 className="text-lg font-semibold text-slate-900">Update Conversion Status</h3>
           <p className="text-sm text-slate-600 mt-1">
-            {lead.contact_name || lead.contact_email || `Session ${sessionId.slice(0, 8)}...`}
+            {lead.contact_name || lead.contact_email || `Lead ${sessionId.slice(0, 8)}...`}
           </p>
         </div>
 

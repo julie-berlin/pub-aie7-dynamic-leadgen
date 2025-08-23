@@ -75,7 +75,7 @@ def question_phrasing_node(state: SurveyGraphState) -> Dict[str, Any]:
                 'question_id': question.get('question_id', question.get('id', i+1)),
                 'question_text': question.get('question_text', ''),
                 'phrased_question': phrased_text,
-                'data_type': question.get('question_type', 'text'),
+                'data_type': question.get('input_type', 'text'),
                 'is_required': question.get('is_required', False),
                 'options': question.get('options'),
                 'scoring_rubric': question.get('scoring_rubric'),
@@ -103,7 +103,7 @@ def question_phrasing_node(state: SurveyGraphState) -> Dict[str, Any]:
                 'question_id': question.get('question_id', question.get('id', i+1)),
                 'question_text': question.get('question_text', ''),
                 'phrased_question': question.get('question_text', ''),  # Use original text
-                'data_type': question.get('question_type', 'text'),
+                'data_type': question.get('input_type', 'text'),
                 'is_required': question.get('is_required', False),
                 'options': question.get('options'),
                 'scoring_rubric': question.get('scoring_rubric'),

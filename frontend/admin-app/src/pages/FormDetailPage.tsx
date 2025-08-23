@@ -86,7 +86,7 @@ export default function FormDetailPage() {
           questions: (data.questions || []).map((q: any) => ({
             id: q.question_id || 0,
             questionText: q.question_text || '',
-            questionType: q.question_type || 'text',
+            questionType: q.input_type || 'text',
             required: q.is_required || false,
             scoringRubric: q.scoring_rubric,
             orderIndex: q.question_order || 0,
