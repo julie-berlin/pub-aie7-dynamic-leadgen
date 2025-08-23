@@ -18,7 +18,7 @@ from fastapi.security import HTTPBearer
 
 from app.utils.file_upload import file_upload_handler
 from app.utils.response_helpers import success_response, error_response
-from app.routes.admin_api import AdminUserResponse
+from app.routes.admin_auth import AdminUserResponse
 from app.utils.mock_auth import get_mock_admin_user as get_current_admin_user
 
 logger = logging.getLogger(__name__)

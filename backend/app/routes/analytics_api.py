@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 from collections import defaultdict
 
 from app.database import db
-from app.routes.admin_api import AdminUserResponse
+from app.routes.admin_auth import AdminUserResponse
 from app.utils.mock_auth import get_mock_admin_user as get_current_admin_user
 from app.utils.response_helpers import success_response, error_response
 
