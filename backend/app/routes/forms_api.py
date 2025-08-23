@@ -16,9 +16,8 @@ from typing import Dict, Any, List, Optional, Literal
 import logging
 from datetime import datetime
 import uuid
-import json
 
-from app.database import get_database_connection
+from app.database import db
 from app.routes.admin_api import AdminUserResponse
 # from app.routes.admin_api import get_current_admin_user  # TODO: Re-enable when auth is ready
 from app.utils.mock_auth import get_mock_admin_user as get_current_admin_user
@@ -43,7 +42,7 @@ def verify_form_ownership(form_id: str, client_id: str) -> bool:
     Returns False if form doesn't exist OR belongs to another client.
     """
     try:
-        db = get_database_connection()
+        # Use Supabase client
         result = db.client.table("forms")\
             .select("id")\
             .eq("id", form_id)\
@@ -65,7 +64,7 @@ def get_form_statistics(form_id: str, client_id: str) -> Dict[str, Any]:
                 "average_completion_time": 0
             }
         
-        db = get_database_connection()
+        # Use Supabase client
         
         # Get all sessions for this form
         sessions_result = db.client.table("lead_sessions")\
@@ -119,7 +118,7 @@ def get_form_questions(form_id: str, client_id: str) -> List[FormQuestionConfig]
         if not verify_form_ownership(form_id, client_id):
             return []
         
-        db = get_database_connection()
+        # Use Supabase client
         
         # Get questions for the form
         questions_result = db.client.table("form_questions")\
@@ -172,7 +171,7 @@ def save_form_questions(form_id: str, questions: List[FormQuestionConfig], clien
         if not verify_form_ownership(form_id, client_id):
             raise HTTPException(status_code=404, detail="Form not found")
         
-        db = get_database_connection()
+        # Use Supabase client
         
         # Delete existing questions
         db.client.table("form_questions")\
@@ -226,7 +225,7 @@ async def list_forms(
     Each client can only see their own forms.
     """
     try:
-        db = get_database_connection()
+        # Use Supabase client
         
         # Build query - ALWAYS scoped to client
         query = db.client.table("forms")\
@@ -329,7 +328,7 @@ async def get_form(
     Returns 404 if form doesn't exist OR belongs to another client.
     """
     try:
-        db = get_database_connection()
+        # Use Supabase client
         
         # Client-scoped query
         result = db.client.table("forms")\
@@ -390,7 +389,7 @@ async def create_form(
     Create a new form for the authenticated client.
     """
     try:
-        db = get_database_connection()
+        # Use Supabase client
         form_id = str(uuid.uuid4())
         
         form_data = {
@@ -473,7 +472,7 @@ async def update_form(
         if not verify_form_ownership(form_id, current_user.client_id):
             raise HTTPException(status_code=404, detail="Form not found")
         
-        db = get_database_connection()
+        # Use Supabase client
         
         update_data = {
             "title": form_request.title,
@@ -524,7 +523,7 @@ async def patch_form(
         if not verify_form_ownership(form_id, current_user.client_id):
             raise HTTPException(status_code=404, detail="Form not found")
         
-        db = get_database_connection()
+        # Use Supabase client
         
         # Build dynamic update data
         update_data = {}
@@ -569,7 +568,7 @@ async def delete_form(
         if not verify_form_ownership(form_id, current_user.client_id):
             raise HTTPException(status_code=404, detail="Form not found")
         
-        db = get_database_connection()
+        # Use Supabase client
         
         result = db.client.table("forms")\
             .delete()\

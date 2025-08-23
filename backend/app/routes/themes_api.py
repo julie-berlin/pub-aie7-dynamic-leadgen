@@ -16,9 +16,8 @@ from typing import Dict, Any, List, Optional, Literal
 import logging
 from datetime import datetime
 import uuid
-import json
 
-from app.database import get_database_connection
+from app.database import db
 from app.routes.admin_api import AdminUserResponse
 # from app.routes.admin_api import get_current_admin_user  # TODO: Re-enable when auth is ready
 from app.utils.mock_auth import get_mock_admin_user as get_current_admin_user
@@ -193,7 +192,7 @@ def verify_theme_ownership(theme_id: str, client_id: str) -> bool:
     Returns False if theme doesn't exist OR belongs to another client.
     """
     try:
-        db = get_database_connection()
+        # Use Supabase client
         result = db.client.table("client_themes")\
             .select("id")\
             .eq("id", theme_id)\
@@ -216,7 +215,7 @@ async def list_themes(
 ):
     """List all themes for the authenticated client."""
     try:
-        db = get_database_connection()
+        # Use Supabase client
         
         # Build query based on whether to include system themes
         query = db.client.table("client_themes").select("*")
@@ -282,7 +281,7 @@ async def create_theme(
     """Create a new theme for the authenticated client."""
     try:
         logger.info(f"Creating theme for client {current_user.client_id}: {theme_request}")
-        db = get_database_connection()
+        # Use Supabase client
         
         # If setting as default, unset other default themes for this client
         if theme_request.is_default:
@@ -351,7 +350,7 @@ async def get_theme(
 ):
     """Get a specific theme by ID."""
     try:
-        db = get_database_connection()
+        # Use Supabase client
         
         # Query with client scoping (includes system themes)
         result = db.client.table("client_themes")\
@@ -395,7 +394,7 @@ async def update_theme(
 ):
     """Update an existing theme."""
     try:
-        db = get_database_connection()
+        # Use Supabase client
         
         # Verify ownership (only client's own themes, not system themes)
         if not verify_theme_ownership(theme_id, current_user.client_id):
@@ -476,7 +475,7 @@ async def delete_theme(
 ):
     """Delete a theme."""
     try:
-        db = get_database_connection()
+        # Use Supabase client
         
         # Verify ownership (only client's own themes, not system themes)
         if not verify_theme_ownership(theme_id, current_user.client_id):
@@ -530,7 +529,6 @@ async def get_form_theme(form_id: str):
     No authentication required as this is called by public forms.
     """
     try:
-        from ..database import db
         
         # Get form data including theme_config
         form_data = db.get_form(form_id)

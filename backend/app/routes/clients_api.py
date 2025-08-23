@@ -13,10 +13,8 @@ access and modify their own information. Cross-client access attempts return 404
 from fastapi import APIRouter, HTTPException, Depends, status
 from typing import Dict, Any, Optional
 import logging
-from datetime import datetime
-import json
 
-from app.database import get_database_connection
+from app.database import db
 from app.routes.admin_api import AdminUserResponse
 # from app.routes.admin_api import get_current_admin_user  # TODO: Re-enable when auth is ready
 from app.utils.mock_auth import get_mock_admin_user as get_current_admin_user
@@ -56,7 +54,7 @@ async def get_client(
         if client_id != current_user.client_id:
             raise HTTPException(status_code=404, detail="Client not found")
         
-        db = get_database_connection()
+        # Use Supabase client
         
         result = db.client.table("clients")\
             .select("*")\
@@ -113,7 +111,7 @@ async def update_client(
         if client_id != current_user.client_id:
             raise HTTPException(status_code=404, detail="Client not found")
         
-        db = get_database_connection()
+        # Use Supabase client
         
         # First check if client exists
         existing = db.client.table("clients")\
@@ -170,7 +168,7 @@ async def patch_client(
         if client_id != current_user.client_id:
             raise HTTPException(status_code=404, detail="Client not found")
         
-        db = get_database_connection()
+        # Use Supabase client
         
         # First check if client exists
         existing = db.client.table("clients")\

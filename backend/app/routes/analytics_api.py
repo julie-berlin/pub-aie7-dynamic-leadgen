@@ -10,9 +10,8 @@ from typing import Dict, Any, List, Optional, Literal
 import logging
 from datetime import datetime, timedelta
 from collections import defaultdict
-import json
 
-from app.database import get_database_connection
+from app.database import db
 from app.routes.admin_api import AdminUserResponse
 from app.utils.mock_auth import get_mock_admin_user as get_current_admin_user
 from app.utils.response_helpers import success_response, error_response
@@ -46,7 +45,7 @@ def parse_date_range(start_date: Optional[str], end_date: Optional[str]) -> tupl
 def get_client_forms(client_id: str) -> List[Dict[str, Any]]:
     """Get all forms for a client."""
     try:
-        db = get_database_connection()
+        # Use Supabase client
         result = db.client.table("forms")\
             .select("id, title, status, created_at")\
             .eq("client_id", client_id)\
@@ -59,7 +58,7 @@ def get_client_forms(client_id: str) -> List[Dict[str, Any]]:
 def calculate_dashboard_metrics(client_id: str, start_date: datetime, end_date: datetime) -> Dict[str, Any]:
     """Calculate dashboard metrics for a client within date range."""
     try:
-        db = get_database_connection()
+        # Use Supabase client
         
         # Get all forms for this client
         forms = get_client_forms(client_id)
@@ -160,7 +159,7 @@ def calculate_dashboard_metrics(client_id: str, start_date: datetime, end_date: 
 def calculate_form_analytics(form_id: str, client_id: str, start_date: datetime, end_date: datetime) -> Dict[str, Any]:
     """Calculate detailed analytics for a specific form."""
     try:
-        db = get_database_connection()
+        # Use Supabase client
         
         # Verify form ownership
         form_result = db.client.table("forms")\
@@ -312,7 +311,7 @@ async def get_realtime_metrics(
 ):
     """Get real-time metrics for the authenticated client."""
     try:
-        db = get_database_connection()
+        # Use Supabase client
         
         # Get client forms
         forms = get_client_forms(current_user.client_id)
