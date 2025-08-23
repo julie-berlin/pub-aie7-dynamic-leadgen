@@ -20,7 +20,7 @@ class ConsolidatedLeadIntelligenceAgent(SupervisorAgent):
     def __init__(self, **kwargs):
         super().__init__(
             name="ConsolidatedLeadIntelligenceAgent",
-            model_name="gpt-5-mini",
+            model_name="o4-mini",
             temperature=0.1,
             max_tokens=1500,
             timeout_seconds=10,

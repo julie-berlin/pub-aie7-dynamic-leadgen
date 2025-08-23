@@ -9,6 +9,33 @@ import EngagementHeader from '../components/EngagementHeader';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
 
+// Helper function to derive business name from clientId
+function getBusinessNameFromClientId(clientId: string): string | undefined {
+  // Common patterns for client IDs that might contain business names
+  const patterns = [
+    // Remove common prefixes/suffixes
+    /^(client_|user_|biz_)/i,
+    /(_client|_user|_biz)$/i,
+  ];
+  
+  if (!clientId) return undefined;
+  
+  let name = clientId;
+  patterns.forEach(pattern => {
+    name = name.replace(pattern, '');
+  });
+  
+  // Convert from various formats to readable name
+  name = name
+    .replace(/[_-]/g, ' ')  // Replace underscores/dashes with spaces
+    .replace(/([a-z])([A-Z])/g, '$1 $2')  // Add spaces before capital letters
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+  
+  return name !== clientId ? name : undefined;
+}
+
 export default function FormPage() {
   const { clientId, formId } = useParams<{ clientId: string; formId: string }>();
   const [searchParams] = useSearchParams();
@@ -36,27 +63,33 @@ export default function FormPage() {
       return;
     }
 
-    // Extract tracking data from URL
-    const trackingData = extractUTMParams();
+    // Only initialize if we don't already have a form for this clientId/formId combination
+    // This prevents unnecessary re-initialization during step transitions
+    if (!currentForm || currentForm.clientId !== clientId || currentForm.id !== formId) {
+      // Extract tracking data from URL
+      const trackingData = extractUTMParams();
 
-    // Add session ID if resuming
-    const sessionId = searchParams.get('session');
+      // Add session ID if resuming
+      const sessionId = searchParams.get('session');
 
-    if (sessionId) {
-      trackingData.sessionId = sessionId;
+      if (sessionId) {
+        trackingData.sessionId = sessionId;
+      }
+
+      // Initialize form only when needed
+      initializeForm(clientId, formId, trackingData).catch(err => {
+        console.error('Failed to initialize form:', err);
+      });
     }
 
-    // Initialize form
-    initializeForm(clientId, formId, trackingData).catch(err => {
-      console.error('Failed to initialize form:', err);
-    });
-
-    // Load theme separately with fallback (theme API is slow)
-    loadTheme(formId).catch(err => {
-      console.warn('Theme loading failed, using default:', err);
-      // Theme store will automatically fall back to default theme
-    });
-  }, [clientId, formId, searchParams, initializeForm, loadTheme, navigate]);
+    // Load theme separately with fallback (theme API is slow) - but only if not already loaded
+    if (!currentTheme || currentTheme.formId !== formId) {
+      loadTheme(formId).catch(err => {
+        console.warn('Theme loading failed, using default:', err);
+        // Theme store will automatically fall back to default theme
+      });
+    }
+  }, [clientId, formId, searchParams, initializeForm, loadTheme, navigate, currentForm, currentTheme]);
 
   // Update page title with business name
   useEffect(() => {
@@ -67,33 +100,40 @@ export default function FormPage() {
     }
   }, [businessName]);
 
-  // Redirect to completion page if form is complete
+  // Navigate to completion page if form is complete (using React Router for SPA navigation)
   useEffect(() => {
     if (formState?.isComplete) {
       navigate(`/form/${clientId}/${formId}/complete`, {
-        state: { sessionId: formState.sessionId }
+        state: { sessionId: formState.sessionId },
+        replace: true // Use replace to avoid back button issues
       });
     }
   }, [formState?.isComplete, clientId, formId, formState?.sessionId, navigate]);
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <ErrorMessage
-          title="Form Not Available"
-          message={error}
-          showRetry
-          onRetry={() => window.location.reload()}
-        />
-      </div>
+      <PageLayout businessName="Loading...">
+        <div className="flex items-center justify-center min-h-[400px] p-4">
+          <ErrorMessage
+            title="Form Not Available"
+            message={error}
+            showRetry
+            onRetry={() => window.location.reload()}
+          />
+        </div>
+      </PageLayout>
     );
   }
 
   if (loading || !currentForm || !currentStep) {
     return (
-      <div className="grid h-screen place-items-center max-w-2xl">
-        <LoadingSpinner message="Loading..." />
-      </div>
+      <PageLayout businessName={businessName || "Loading..."} logoUrl={logoUrl}>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <LoadingSpinner 
+            message={businessName ? `Loading ${businessName}...` : "Loading form..."}
+          />
+        </div>
+      </PageLayout>
     );
   }
 

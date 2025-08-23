@@ -19,13 +19,13 @@ class ConsolidatedSurveyAdminSupervisor(SupervisorAgent):
     def __init__(self, **kwargs):
         super().__init__(
             name="ConsolidatedSurveyAdminSupervisor",
-            model_name="gpt-5-mini",
+            model_name="o4-mini",
             temperature=0.3,
             max_tokens=2000,  # Reduced for faster responses
             timeout_seconds=15,  # Reduced timeout for faster responses
             **kwargs
         )
-        self.llm = get_chat_model(model_name="gpt-5-mini")
+        self.llm = get_chat_model(model_name="o4-mini")
 
     def make_decision(self, state: SurveyState, context: Dict[str, Any] = None) -> SupervisorDecision:
         """Make strategic survey administration decision - delegates to process_survey_step."""
@@ -180,15 +180,15 @@ MESSAGE: At Pawsome Dog Walking, we've helped over 500 pet owners. Tell us more 
             # CRITICAL FIX: Get already asked questions from TWO sources (like langgraph_test)
             # 1. Database tracking (persistent)
             asked_ids_db = db.get_asked_questions(session_id) if session_id else []
-            
-            # 2. State-based tracking (current session)  
+
+            # 2. State-based tracking (current session)
             asked_ids_state = state.get("question_strategy", {}).get("asked_questions", [])
-            
+
             # Combine both sources (this is what makes langgraph_test work!)
             asked_ids = list(set(asked_ids_db + asked_ids_state))
 
             logger.info(f"🔥 DUAL TRACKING: DB asked questions: {asked_ids_db}")
-            logger.info(f"🔥 DUAL TRACKING: State asked questions: {asked_ids_state}") 
+            logger.info(f"🔥 DUAL TRACKING: State asked questions: {asked_ids_state}")
             logger.info(f"🔥 DUAL TRACKING: Combined asked questions: {asked_ids}")
 
             # Filter to available questions using question_id (not database id)
@@ -621,12 +621,12 @@ Use the exact output format specified in your instructions."""
         # CRITICAL FIX: Update state asked_questions (like langgraph_test does)
         question_strategy = state.get('question_strategy', {})
         current_asked = question_strategy.get('asked_questions', [])
-        
+
         # Add newly selected questions to asked_questions (prevents repetition!)
         selected_questions = decision.get("selected_questions", [])
         new_question_ids = [q.get('question_id') for q in selected_questions if q.get('question_id') is not None]
         updated_asked = current_asked + new_question_ids
-        
+
         logger.info(f"🔥 STATE UPDATE: Adding {new_question_ids} to asked_questions")
         logger.info(f"🔥 STATE UPDATE: {current_asked} -> {updated_asked}")
 

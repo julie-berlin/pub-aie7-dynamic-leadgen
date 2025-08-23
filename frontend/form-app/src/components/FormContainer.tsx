@@ -1,3 +1,4 @@
+import { useMemo, useEffect } from 'react';
 import type { FormConfig, FormStep, FormState } from '../types';
 import QuestionRenderer from './QuestionRenderer';
 import FormNavigation from './FormNavigation';
@@ -83,29 +84,35 @@ function createValidationSchema(questions: any[]) {
 export default function FormContainer({ form, currentStep, formState }: FormContainerProps) {
   const { loading, error, submitResponses } = useFormStore();
 
-  // Create validation schema
-  const validationSchema = createValidationSchema(currentStep.questions || []);
+  // Memoize validation schema to prevent unnecessary recalculations
+  const validationSchema = useMemo(() => 
+    createValidationSchema(currentStep.questions || []), 
+    [currentStep.questions]
+  );
 
-  // Initialize form with existing responses
-  const defaultValues = (currentStep.questions || []).reduce((acc: any, question: any) => {
-    const response = formState?.responses[question.id];
-    if (response) {
-      acc[question.id] = response.value;
-    } else {
-      // Set default values based on question type
-      switch (question.type) {
-        case 'checkbox':
-          acc[question.id] = [];
-          break;
-        case 'rating':
-          acc[question.id] = 0;
-          break;
-        default:
-          acc[question.id] = '';
+  // Memoize default values to prevent unnecessary recalculations
+  const defaultValues = useMemo(() => 
+    (currentStep.questions || []).reduce((acc: any, question: any) => {
+      const response = formState?.responses[question.id];
+      if (response) {
+        acc[question.id] = response.value;
+      } else {
+        // Set default values based on question type
+        switch (question.type) {
+          case 'checkbox':
+            acc[question.id] = [];
+            break;
+          case 'rating':
+            acc[question.id] = 0;
+            break;
+          default:
+            acc[question.id] = '';
+        }
       }
-    }
-    return acc;
-  }, {} as Record<string, any>);
+      return acc;
+    }, {} as Record<string, any>),
+    [currentStep.questions, formState?.responses]
+  );
 
   // Initialize React Hook Form for this step
   const formMethods = useForm({
@@ -114,7 +121,12 @@ export default function FormContainer({ form, currentStep, formState }: FormCont
     mode: 'onBlur'
   });
 
-  const { handleSubmit, register, control, formState: { errors }, watch } = formMethods;
+  const { handleSubmit, register, control, formState: { errors }, watch, reset } = formMethods;
+
+  // Reset form when step changes to update with new questions
+  useEffect(() => {
+    reset(defaultValues);
+  }, [reset, defaultValues]);
 
   if (!formState) {
     return <div>No form state available</div>;

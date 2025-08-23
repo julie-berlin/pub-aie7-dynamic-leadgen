@@ -14,15 +14,15 @@ def get_chat_model(model_name: str | None = None, *, temperature: float = 0) -> 
     """Return a configured LangChain ChatOpenAI client.
 
     - model_name: optional override. If not provided, uses OPENAI_MODEL env var,
-      falling back to "gpt-5-mini".
-    - temperature: sampling temperature for the chat model (ignored for gpt-5-mini).
+      falling back to "o4-mini".
+    - temperature: sampling temperature for the chat model (ignored for o4-mini).
 
     Returns: a LangChain-compatible chat model instance.
     """
-    name = model_name or os.environ.get("OPENAI_MODEL", "gpt-5-mini")
-    
-    # gpt-5-mini doesn't support temperature parameter
-    if name == "gpt-5-mini":
+    name = model_name or os.environ.get("OPENAI_MODEL", "o4-mini")
+
+    # o4-mini doesn't support temperature parameter
+    if name == "o4-mini":
         return ChatOpenAI(
             model=name,
             timeout=30,  # 30 second timeout to prevent hanging

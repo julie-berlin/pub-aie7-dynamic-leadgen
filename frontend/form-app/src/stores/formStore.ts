@@ -23,13 +23,25 @@ export const useFormStore = create<FormStore>()(
 
       // Actions
       initializeForm: async (clientId: string, formId: string, trackingData?: Partial<TrackingData>) => {
-        // Clear any stale state when initializing
-        set({ 
-          loading: true, 
-          error: null,
-          currentStep: null,  // Clear old step data
-          formState: null     // Clear old form state
-        });
+        const currentState = get();
+        
+        // Only clear state if we're switching to a different form
+        // This prevents unnecessary clearing during step navigation
+        const isSameForm = currentState.currentForm?.id === formId && 
+                          currentState.currentForm?.clientId === clientId;
+        
+        if (isSameForm) {
+          // Just update loading state, preserve existing form data
+          set({ loading: true, error: null });
+        } else {
+          // Clear state only when switching to a new form
+          set({ 
+            loading: true, 
+            error: null,
+            currentStep: null,  // Clear old step data
+            formState: null     // Clear old form state
+          });
+        }
         
         try {
           // Check if we have an existing session for this form
@@ -90,8 +102,24 @@ export const useFormStore = create<FormStore>()(
 
         } catch (error) {
           console.error('Failed to initialize form:', error);
+          
+          // Provide user-friendly error messages
+          let errorMessage = 'Failed to load form';
+          
+          if (error instanceof Error) {
+            if (error.message.includes('404') || error.message.includes('Not Found')) {
+              errorMessage = 'This form is not available or may have expired.';
+            } else if (error.message.includes('500') || error.message.includes('Internal Server Error')) {
+              errorMessage = 'Our service is temporarily unavailable. Please try again later.';
+            } else if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+              errorMessage = 'Unable to connect. Please check your internet connection and try again.';
+            } else {
+              errorMessage = error.message;
+            }
+          }
+          
           set({ 
-            error: error instanceof Error ? error.message : 'Failed to load form',
+            error: errorMessage,
             loading: false 
           });
         }
