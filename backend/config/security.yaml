@@ -18,7 +18,7 @@ validation:
 # Authentication settings
 auth:
   development:
-    enabled: false
+    enabled: true
     jwt_expire_minutes: 60
   staging:
     enabled: true

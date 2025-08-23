@@ -1,8 +1,6 @@
-import { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAdminStore } from './stores/adminStore';
-import { useAnalyticsStore } from './stores/analyticsStore';
 
 // Layout components (placeholder imports for now)
 import AdminLayout from './components/layout/AdminLayout';
@@ -30,22 +28,7 @@ const queryClient = new QueryClient({
 });
 
 function App() {
-  const { isAuthenticated, refreshToken } = useAdminStore();
-  const { startRealTimeUpdates: startAnalyticsUpdates } = useAnalyticsStore();
-
-  useEffect(() => {
-    // Check authentication on app load
-    if (localStorage.getItem('admin_token')) {
-      refreshToken();
-    }
-  }, [refreshToken]);
-
-  useEffect(() => {
-    // Start real-time updates when authenticated
-    if (isAuthenticated) {
-      startAnalyticsUpdates();
-    }
-  }, [isAuthenticated, startAnalyticsUpdates]);
+  const { isAuthenticated } = useAdminStore();
 
   return (
     <QueryClientProvider client={queryClient}>

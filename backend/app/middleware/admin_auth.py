@@ -169,7 +169,16 @@ class AdminAuthMiddleware(BaseHTTPMiddleware):
             '/debug/',
             '/system/',
             '/management/',
-            '/api/admin/'  # Add API admin endpoints
+            '/api/admin/',  # Admin authentication endpoints
+            '/api/clients/',  # Client management endpoints
+            '/api/analytics/',  # Analytics endpoints
+            '/api/forms/'  # Form management endpoints
+        }
+        
+        # Exclude authentication endpoints from middleware protection
+        self.auth_endpoints = {
+            '/api/admin/auth/login',
+            '/api/admin/auth/refresh'
         }
         
         # Always protected paths (even if auth is disabled elsewhere)
@@ -200,8 +209,12 @@ class AdminAuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         """Apply admin authentication to protected endpoints"""
         
+        # Always allow OPTIONS requests for CORS preflight
+        if request.method == "OPTIONS":
+            return await call_next(request)
+        
         # Check if this path requires authentication
-        if not self._is_protected_path(request.url.path):
+        if not self._is_protected_path(request.url.path) or request.url.path in self.auth_endpoints:
             return await call_next(request)
         
         # If auth is disabled but this is a critical path, block access

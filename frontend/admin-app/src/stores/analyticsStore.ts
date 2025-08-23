@@ -2,6 +2,15 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { API_CONFIG, buildApiUrl } from '../config/api';
 
+// Helper function to get authenticated headers
+const getAuthHeaders = () => {
+  const token = localStorage.getItem('admin_token');
+  return {
+    ...API_CONFIG.DEFAULT_HEADERS,
+    ...(token && { Authorization: `Bearer ${token}` })
+  };
+};
+
 // Analytics data interfaces
 export interface DashboardMetrics {
   totalForms: number;
@@ -185,7 +194,7 @@ export const useAnalyticsStore = create<AnalyticsStore>()(
           });
           
           const response = await fetch(buildApiUrl(`/api/analytics/dashboard?${params}`), {
-            headers: API_CONFIG.DEFAULT_HEADERS,
+            headers: getAuthHeaders(),
           });
           
           if (!response.ok) {
@@ -236,7 +245,7 @@ export const useAnalyticsStore = create<AnalyticsStore>()(
           });
           
           const response = await fetch(buildApiUrl(`/api/analytics/forms/${formId}?${params}`), {
-            headers: API_CONFIG.DEFAULT_HEADERS,
+            headers: getAuthHeaders(),
           });
           
           if (!response.ok) {
@@ -294,7 +303,7 @@ export const useAnalyticsStore = create<AnalyticsStore>()(
         try {
           
           const response = await fetch(buildApiUrl('/api/analytics/realtime'), {
-            headers: API_CONFIG.DEFAULT_HEADERS,
+            headers: getAuthHeaders(),
           });
           
           if (!response.ok) {
@@ -435,7 +444,7 @@ export const useAnalyticsStore = create<AnalyticsStore>()(
           });
           
           const response = await fetch(buildApiUrl(`/api/analytics/export?${params}`), {
-            headers: API_CONFIG.DEFAULT_HEADERS,
+            headers: getAuthHeaders(),
           });
           
           if (!response.ok) {

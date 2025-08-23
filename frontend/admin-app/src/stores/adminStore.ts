@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { API_ENDPOINTS } from '../config/api';
+import { API_ENDPOINTS, API_CONFIG } from '../config/api';
 
 // Admin user interface
 export interface AdminUser {
@@ -11,6 +11,7 @@ export interface AdminUser {
   clientId: string;
   permissions: string[];
   avatar?: string;
+  businessName?: string;
 }
 
 // Business info interface
@@ -63,8 +64,7 @@ export const useAdminStore = create<AdminStore>()(
         set({ isLoading: true, error: null });
         
         try {
-          // TODO: Replace with actual API call
-          const response = await fetch('/api/admin/auth/login', {
+          const response = await fetch(`${API_CONFIG.BASE_URL}/api/admin/auth/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, password }),
@@ -118,8 +118,7 @@ export const useAdminStore = create<AdminStore>()(
         if (!token) return;
 
         try {
-          // TODO: Replace with actual API call
-          const response = await fetch('/api/admin/auth/refresh', {
+          const response = await fetch(`${API_CONFIG.BASE_URL}/api/admin/auth/refresh`, {
             headers: { Authorization: `Bearer ${token}` },
           });
 
