@@ -6,7 +6,8 @@ import {
   ChartBarIcon, 
   CogIcon,
   UserIcon,
-  UsersIcon
+  UsersIcon,
+  PaintBrushIcon
 } from '@heroicons/react/24/outline';
 import { useAdminStore } from '../../stores/adminStore';
 import Breadcrumb, { useBreadcrumbs } from '../common/Breadcrumb';
@@ -21,6 +22,7 @@ const navigation = [
   { name: 'Forms', href: '/forms', icon: DocumentTextIcon },
   { name: 'Leads', href: '/leads', icon: UsersIcon },
   { name: 'Analytics', href: '/analytics', icon: ChartBarIcon },
+  { name: 'Themes', href: '/themes', icon: PaintBrushIcon },
   { name: 'Settings', href: '/settings', icon: CogIcon },
 ];
 

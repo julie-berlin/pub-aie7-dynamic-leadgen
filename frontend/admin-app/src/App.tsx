@@ -14,6 +14,8 @@ import AnalyticsPage from './pages/AnalyticsPage';
 import SettingsPage from './pages/SettingsPage';
 import FormDetailPage from './pages/FormDetailPage';
 import LeadsPage from './pages/LeadsPage';
+import ThemesPage from './pages/ThemesPage';
+import ThemeEditorPage from './pages/ThemeEditorPage';
 
 // Create Query Client for data fetching
 const queryClient = new QueryClient({
@@ -64,6 +66,9 @@ function App() {
                   <Route path="/forms/:id" element={<FormDetailPage />} />
                   <Route path="/leads" element={<LeadsPage />} />
                   <Route path="/analytics" element={<AnalyticsPage />} />
+                  <Route path="/themes" element={<ThemesPage />} />
+                  <Route path="/themes/new" element={<ThemeEditorPage />} />
+                  <Route path="/themes/:id/edit" element={<ThemeEditorPage />} />
                   <Route path="/settings" element={<SettingsPage />} />
                   <Route path="/login" element={<Navigate to="/dashboard" replace />} />
                   <Route path="*" element={<Navigate to="/dashboard" replace />} />
