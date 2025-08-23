@@ -38,16 +38,19 @@ async def upload_logo(
         # Process the logo upload
         upload_result = await validate_and_store_logo(file, current_user.client_id)
         
-        # Update the client_settings table with the new logo URL
+        # Update the client_settings table with the new logo URL and file_id
         # Check if client_settings record exists
         settings_result = db.client.table('client_settings').select('id').eq('client_id', current_user.client_id).execute()
         
+        settings_update = {
+            'logo_url': upload_result['url'],
+            'logo_file_id': upload_result.get('file_id'),
+            'updated_at': datetime.utcnow().isoformat()
+        }
+        
         if settings_result.data:
             # Update existing record
-            update_result = db.client.table('client_settings').update({
-                'logo_url': upload_result['url'],
-                'updated_at': datetime.utcnow().isoformat()
-            }).eq('client_id', current_user.client_id).execute()
+            update_result = db.client.table('client_settings').update(settings_update).eq('client_id', current_user.client_id).execute()
             
             if not update_result.data:
                 raise HTTPException(status_code=500, detail="Failed to update client settings with logo URL")
@@ -56,7 +59,7 @@ async def upload_logo(
             new_settings = {
                 'id': str(uuid.uuid4()),
                 'client_id': current_user.client_id,
-                'logo_url': upload_result['url']
+                **settings_update
             }
             
             insert_result = db.client.table('client_settings').insert(new_settings).execute()
@@ -67,7 +70,8 @@ async def upload_logo(
             "logo_url": upload_result['url'],
             "filename": upload_result['filename'],
             "size": upload_result['size'],
-            "uploaded_at": upload_result['uploaded_at']
+            "uploaded_at": upload_result['uploaded_at'],
+            "file_id": upload_result.get('file_id')
         }, "Logo uploaded successfully")
         
     except HTTPException:
@@ -87,11 +91,20 @@ async def delete_logo(
         success = remove_logo(filename, current_user.client_id)
         
         if success:
-            # Update client_settings to remove logo_url
+            # Update client_settings to remove logo_url and logo_file_id
             update_result = db.client.table('client_settings').update({
                 'logo_url': None,
+                'logo_file_id': None,
                 'updated_at': datetime.utcnow().isoformat()
             }).eq('client_id', current_user.client_id).execute()
+            
+            # Also clear clients.company_logo_url for backward compatibility
+            try:
+                client_update = db.client.table('clients').update({
+                    'company_logo_url': None
+                }).eq('id', current_user.client_id).execute()
+            except Exception as client_error:
+                logger.warning(f"Failed to clear client company_logo_url: {client_error}")
             
             # Note: We don't fail if the update doesn't work since the file is already deleted
             # This handles cases where client_settings record might not exist

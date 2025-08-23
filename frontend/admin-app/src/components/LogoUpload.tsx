@@ -37,7 +37,7 @@ export default function LogoUpload({ currentLogoUrl, onLogoChange, disabled = fa
       const formData = new FormData();
       formData.append('logo', file);
 
-      const response = await fetch('/api/files/upload/logo', {
+      const response = await fetch('/api/admin/upload/logo', {
         method: 'POST',
         headers: {
           Authorization: 'Bearer mock-token'
@@ -47,7 +47,7 @@ export default function LogoUpload({ currentLogoUrl, onLogoChange, disabled = fa
 
       if (response.ok) {
         const { data } = await response.json();
-        onLogoChange(data.url);
+        onLogoChange(data.logo_url);
       } else {
         let errorMessage = 'Upload failed';
         try {

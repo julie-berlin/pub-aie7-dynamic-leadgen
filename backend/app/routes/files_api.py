@@ -17,9 +17,6 @@ from fastapi.responses import FileResponse
 from fastapi.security import HTTPBearer
 
 from app.utils.file_upload import file_upload_handler
-from app.utils.response_helpers import success_response, error_response
-from app.routes.admin_auth import AdminUserResponse
-from app.utils.mock_auth import get_mock_admin_user as get_current_admin_user
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/files", tags=["files"])
@@ -36,73 +33,7 @@ upload_config = {
     }
 }
 
-@router.post("/upload/logo")
-async def upload_logo(
-    logo: UploadFile = File(...),
-    current_user: AdminUserResponse = Depends(get_current_admin_user)
-):
-    """
-    Upload a logo file for the authenticated client
-    
-    - **logo**: Logo file to upload (JPG, PNG, GIF, max 5MB)
-    - Returns the file URL and metadata
-    """
-    try:
-        # Validate file type
-        if not logo.content_type or not logo.content_type.startswith('image/'):
-            return error_response("Invalid file type. Please upload an image file.", status_code=400)
-        
-        # Validate file size (5MB max)
-        file_size = 0
-        logo_content = await logo.read()
-        file_size = len(logo_content)
-        
-        if file_size > 5 * 1024 * 1024:  # 5MB
-            return error_response("File size too large. Maximum size is 5MB.", status_code=400)
-        
-        # Reset file position
-        await logo.seek(0)
-        
-        # Upload the file
-        upload_result = await file_upload_handler.process_logo_upload(
-            file=logo,
-            client_id=current_user.client_id
-        )
-        
-        # Update client settings with new logo URL
-        try:
-            from app.database import db
-            
-            # Update client company_logo_url
-            update_result = db.client.table("clients")\
-                .update({"company_logo_url": upload_result["url"]})\
-                .eq("id", current_user.client_id)\
-                .execute()
-            
-            if not update_result.data:
-                logger.warning(f"Failed to update client company_logo_url for client {current_user.client_id}")
-            else:
-                logger.info(f"Successfully updated client company_logo_url for client {current_user.client_id}")
-            
-        except Exception as db_error:
-            logger.error(f"Failed to update client company_logo_url: {db_error}")
-            # Don't fail the upload, just log the error
-        
-        return success_response(
-            data={
-                "url": upload_result["url"],
-                "filename": upload_result["filename"],
-                "size": upload_result["size"],
-                "content_type": upload_result["mime_type"]
-            },
-            message="Logo uploaded successfully"
-        )
-        
-    except Exception as e:
-        import traceback
-        logger.error(f"Logo upload failed: {e}")
-        logger.error(f"Full traceback: {traceback.format_exc()}")
-        return error_response(f"Upload failed: {str(e)}", status_code=500)
+# Upload endpoint removed - use /api/admin/upload/logo instead
 
 @router.get("/clients/{client_id}/logos/{filename}")
 async def serve_logo(

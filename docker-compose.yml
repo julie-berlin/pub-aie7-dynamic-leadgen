@@ -42,6 +42,7 @@ services:
       - ./backend/config:/app/config
       - ./backend/logging_config.py:/app/logging_config.py
       - backend_cache:/app/data/cache
+      - uploads_data:/app/uploads
 
     networks:
       - survey_network
@@ -147,6 +148,8 @@ volumes:
   admin_node_modules:
     driver: local
   redis_data:
+    driver: local
+  uploads_data:
     driver: local
 
 # Network configuration
