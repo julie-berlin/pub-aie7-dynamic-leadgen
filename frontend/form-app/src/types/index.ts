@@ -132,6 +132,8 @@ export interface ThemeConfig {
   borderRadiusLg: string;
   shadow: string;
   shadowLg: string;
+  logo_url?: string;
+  custom_css?: string;
 }
 
 // Form state and responses

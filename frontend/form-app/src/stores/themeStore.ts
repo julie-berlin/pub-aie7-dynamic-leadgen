@@ -113,9 +113,24 @@ export const useThemeStore = create<ThemeStore>()(
         root.style.setProperty('--shadow', theme.shadow);
         root.style.setProperty('--shadow-lg', theme.shadowLg);
         
+        // Apply custom CSS if provided
+        if (theme.custom_css) {
+          const existingCustomStyles = document.getElementById('theme-custom-css');
+          if (existingCustomStyles) {
+            existingCustomStyles.remove();
+          }
+          
+          const styleElement = document.createElement('style');
+          styleElement.id = 'theme-custom-css';
+          styleElement.textContent = theme.custom_css;
+          document.head.appendChild(styleElement);
+        }
+        
         console.log('✅ Applied theme:', theme.name);
         console.log('🎨 Primary color:', theme.colors.primary);
         console.log('🟠 Secondary color:', theme.colors.secondary);
+        if (theme.logo_url) console.log('🖼️ Logo URL:', theme.logo_url);
+        if (theme.custom_css) console.log('📝 Custom CSS applied');
       },
 
       validateTheme: (theme: ThemeConfig): ThemeConfig => {
@@ -137,7 +152,9 @@ export const useThemeStore = create<ThemeStore>()(
           borderRadius: theme.borderRadius || defaultTheme.borderRadius,
           borderRadiusLg: theme.borderRadiusLg || defaultTheme.borderRadiusLg,
           shadow: theme.shadow || defaultTheme.shadow,
-          shadowLg: theme.shadowLg || defaultTheme.shadowLg
+          shadowLg: theme.shadowLg || defaultTheme.shadowLg,
+          logo_url: theme.logo_url,
+          custom_css: theme.custom_css
         };
       },
 

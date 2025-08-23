@@ -35,21 +35,21 @@ export default function RadioInput({ question, register, error, disabled }: Radi
           {question.options!.choices!.map((choice, index) => (
             <label
               key={choice.value || index}
-              className="flex items-start space-x-3 cursor-pointer group"
+              className="flex items-start space-x-3 cursor-pointer group hover:bg-background-light p-3 rounded-theme transition-colors"
             >
               <input
                 type="radio"
                 value={choice.value}
                 disabled={disabled}
-                className="radio-input mt-0.5 group-hover:border-primary-hover focus:ring-primary"
+                className="mt-1 h-4 w-4 text-primary border-border focus:ring-primary focus:ring-2 focus:ring-offset-0 disabled:opacity-50"
                 {...register(question.id)}
               />
-              <div className="flex-1">
-                <span className="text-text group-hover:text-primary-hover">
+              <div className="flex-1 min-w-0">
+                <span className="text-text font-medium group-hover:text-primary transition-colors leading-relaxed">
                   {choice.text}
                 </span>
                 {choice.description && (
-                  <p className="text-sm text-text-muted mt-1">
+                  <p className="text-sm text-text-muted mt-1 leading-relaxed">
                     {choice.description}
                   </p>
                 )}

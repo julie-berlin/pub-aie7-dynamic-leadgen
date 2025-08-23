@@ -57,13 +57,19 @@ class ThemeService {
       ...options,
     };
 
-    const response = await fetch(`${this.baseUrl}${endpoint}`, config);
+    const url = `${this.baseUrl}${endpoint}`;
+    console.log('themeService: Making request to:', url, 'with token:', !!token);
+
+    const response = await fetch(url, config);
     
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error('themeService: Request failed:', response.status, response.statusText, errorText);
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
     const result: ApiResponse<T> = await response.json();
+    console.log('themeService: API response:', result);
     
     if (!result.success) {
       throw new Error(result.message || 'API request failed');
@@ -140,7 +146,9 @@ class ThemeService {
 
   // Get all themes for authenticated client
   async getThemes(): Promise<ThemeResponse[]> {
+    console.log('themeService: Getting themes from', `${this.baseUrl}/api/themes/`);
     const response = await this.request<{ themes: ThemeResponse[] }>('/api/themes/');
+    console.log('themeService: Raw response:', response);
     return response.themes;
   }
 

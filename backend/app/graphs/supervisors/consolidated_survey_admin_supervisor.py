@@ -19,13 +19,13 @@ class ConsolidatedSurveyAdminSupervisor(SupervisorAgent):
     def __init__(self, **kwargs):
         super().__init__(
             name="ConsolidatedSurveyAdminSupervisor",
-            model_name="gpt-3.5-turbo",
+            model_name="gpt-5-mini",
             temperature=0.3,
             max_tokens=2000,  # Reduced for faster responses
             timeout_seconds=15,  # Reduced timeout for faster responses
             **kwargs
         )
-        self.llm = get_chat_model(model_name="gpt-3.5-turbo", temperature=0.3)
+        self.llm = get_chat_model(model_name="gpt-5-mini")
 
     def make_decision(self, state: SurveyState, context: Dict[str, Any] = None) -> SupervisorDecision:
         """Make strategic survey administration decision - delegates to process_survey_step."""
@@ -351,7 +351,7 @@ BUSINESS PROVIDING SERVICE: {business_name} ({industry})
 - Target: {target_audience[:150]}
 
 USER FILLING OUT FORM:
-- Name: {user_name or 'not provided yet'}
+- Name: {user_name if user_name else 'not provided yet'}
 - Questions answered: {analysis['questions_asked']}
 - Engagement risk: {analysis['risk_level']}
 - Recent responses: {json.dumps(responses[-2:] if responses else [], indent=1)}
@@ -362,7 +362,7 @@ AVAILABLE QUESTIONS:
 CRITICAL INSTRUCTIONS:
 1. Select 1-4 questions (vary the count - don't always pick same number)
 2. Rephrase questions FOR THE USER (person filling out form)
-3. Use user's name ({user_name}) if known - NOT business owner info
+3. Use user's name ({user_name if user_name else ''}) ONLY if known - NOT business owner info
 4. Questions ask about USER'S needs/info - NOT business owner's info
 5. ENGAGEMENT MESSAGES (HEADLINE + MESSAGE): Use business info to entice user
    - Mention {business_name}'s background, qualifications, experience
@@ -373,7 +373,9 @@ CRITICAL INSTRUCTIONS:
 
 QUESTION PHRASING:
 WRONG: "What should we call you, the dog-loving recent Psychology graduate?"
-RIGHT: "What should we call you?" or "Hi {user_name}, what should we call you?"
+WRONG: "How well-behaved is your dog on walks, None?"
+RIGHT: "What should we call you?" or "Hi {user_name if user_name else ''}, what should we call you?"
+RIGHT: "How well-behaved is your dog on walks?" (without name if not known)
 
 ENGAGEMENT MESSAGING:
 GOOD: "As a Psychology graduate who loves dogs, [Business] provides expert care..."

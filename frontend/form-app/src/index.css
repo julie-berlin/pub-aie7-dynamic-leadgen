@@ -185,23 +185,7 @@ body {
     box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
 }
 
-/* Radio and checkbox styles */
-.radio-input,
-.checkbox-input {
-    width: 1rem;
-    height: 1rem;
-    border: 1px solid var(--color-border);
-    transition: border-color 0.15s ease-in-out;
-}
-
-.radio-input {
-    border-radius: 50%;
-}
-
-.checkbox-input {
-    border-radius: 0.25rem;
-}
-
+/* Radio and checkbox styles - Tailwind Forms plugin handles the base styling */
 .radio-input:checked,
 .checkbox-input:checked {
     background-color: var(--color-primary);

@@ -138,20 +138,31 @@ export default function LeadsPage() {
   const fetchForms = async () => {
     try {
       const token = localStorage.getItem('admin_token');
-      const response = await fetch(buildApiUrl('/api/forms'), {
+      const response = await fetch(API_ENDPOINTS.FORMS.LIST(), {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
       });
-      if (!response.ok) throw new Error('Failed to fetch forms');
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Forms fetch error:', response.status, errorText);
+        throw new Error(`Failed to fetch forms: ${response.status} ${response.statusText}`);
+      }
       
       const data = await response.json();
-      if (data.success) {
+      console.log('Forms API response:', data);
+      
+      if (data.success && data.data.forms) {
         setForms(data.data.forms.map((form: any) => ({ id: form.id, title: form.title })));
+      } else {
+        console.error('Forms API returned unsuccessful response:', data);
+        setForms([]);
       }
     } catch (error) {
       console.error('Error fetching forms:', error);
+      setForms([]);
     }
   };
 

@@ -25,8 +25,10 @@ export default function FormPage() {
 
   // Business name and logo from form data
   const businessName = currentForm?.businessName;
-  const logoUrl = currentForm?.logoUrl;
-  const { loadTheme } = useThemeStore();
+  const { loadTheme, currentTheme } = useThemeStore();
+  
+  // Priority: theme logo > form logo
+  const logoUrl = currentTheme?.logo_url || currentForm?.logoUrl;
 
   useEffect(() => {
     if (!clientId || !formId) {
