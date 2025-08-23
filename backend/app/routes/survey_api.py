@@ -43,6 +43,7 @@ from app.session_manager import (
     delete_survey_session,
     set_session_cookie
 )
+from app.database import db
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/survey", tags=["survey"])
@@ -90,7 +91,6 @@ async def start_session(
         }
         
         # Create session in database first
-        from ..database import db
         try:
             db_session_data = {
                 'session_id': session_id,
@@ -161,7 +161,6 @@ async def start_session(
         logger.info(f"🏢 Loading business info for client_id: {client_id}")
         if client_id:
             try:
-                from ..database import db
                 client_data = db.client.table('clients').select('business_name', 'company_logo_url').eq('id', client_id).execute()
                 logger.info(f"🏢 Client query result: {client_data.data}")
                 if client_data.data and len(client_data.data) > 0:
@@ -237,7 +236,6 @@ async def submit_and_continue(
         logger.info(f"🔥 STEP: Full session_data from cookie: {session_data}")
         
         # Load existing session data from database to get form_id and other state
-        from ..database import db
         logger.info(f"🔥 STEP: Looking for session {session_id} in database...")
         db_session_data = db.get_lead_session(session_id)
         if not db_session_data:
@@ -408,7 +406,6 @@ async def mark_abandoned(request: Request):
         logger.info(f"Marking session as abandoned: {session_id}")
         
         # Load existing session data from database to get form_id and other state
-        from ..database import db
         db_session_data = db.get_lead_session(session_id)
         if not db_session_data:
             return not_found_response("Session", session_id)
@@ -459,7 +456,6 @@ async def get_session_status(request: Request):
         session_id = session_data.get('session_id')
         
         # Load session from database
-        from ..database import db
         
         db_session_data = db.get_lead_session(session_id)
         if not db_session_data:
@@ -494,7 +490,6 @@ async def get_session_status(request: Request):
 async def debug_session(session_id: str):
     """Debug endpoint to check if a session exists in the database."""
     try:
-        from ..database import db
         
         # Try to find the session
         session = db.get_lead_session(session_id)
@@ -523,7 +518,6 @@ async def database_health_check():
     Returns database connectivity and survey-specific table status.
     """
     try:
-        from ..database import db
         import json
         
         # Test basic database connection
@@ -574,7 +568,6 @@ async def validate_form(form_id: str):
     Useful for frontend validation before starting a survey.
     """
     try:
-        from ..database import db
         from ..tools import load_questions, load_client_info
         import json
         
