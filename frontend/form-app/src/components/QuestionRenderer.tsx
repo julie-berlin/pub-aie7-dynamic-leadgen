@@ -73,7 +73,7 @@ export default function QuestionRenderer({
     switch (question.type) {
       case 'text':
       case 'email':
-      case 'phone':
+      case 'tel':
       case 'number':
         return <TextInput {...baseProps} />;
       

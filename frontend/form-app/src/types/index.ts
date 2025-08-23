@@ -28,7 +28,7 @@ export type QuestionType =
   | 'text' 
   | 'textarea' 
   | 'email' 
-  | 'phone'
+  | 'tel'
   | 'number'
   | 'radio' 
   | 'checkbox' 

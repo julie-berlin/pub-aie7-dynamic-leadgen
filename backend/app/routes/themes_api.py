@@ -69,6 +69,7 @@ class ThemeConfig(BaseModel):
     borderRadiusLg: str = Field("0.75rem", description="Large border radius")
     shadow: str = Field("0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)", description="Default shadow")
     shadowLg: str = Field("0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)", description="Large shadow")
+    logo_url: Optional[str] = Field(None, description="Logo URL for branded forms")
 
 class ThemeCreateRequest(BaseModel):
     """Request to create a new theme."""
