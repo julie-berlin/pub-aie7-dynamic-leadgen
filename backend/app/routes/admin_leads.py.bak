@@ -12,7 +12,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel
 from typing import List, Optional, Literal
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 
 from app.database import db
 from app.utils.response_helpers import success_response, error_response

@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field, EmailStr, validator
 from urllib.parse import urlparse
 from typing import Dict, Any, Optional
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 import uuid
 
 from app.database import db
@@ -200,7 +200,7 @@ async def update_client_settings(
         
         # Build update data from non-None fields
         update_data = {}
-        for field_name, field_value in settings_request.model_dump(exclude_unset=True).items():
+        for field_name, field_value in settings_request.dict(exclude_unset=True).items():
             if field_value is not None:
                 update_data[field_name] = field_value
         

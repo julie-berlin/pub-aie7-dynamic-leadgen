@@ -64,7 +64,7 @@ def get_current_admin_user(token_payload: dict = Depends(verify_token_from_crede
     """Get current admin user from token."""
     try:
         # Get user by ID using Supabase client
-        result = db.client.table('admin_users').select('*').eq('id', token_payload['user_id']).eq('is_active', True).execute()
+        result = db.client.table('admin_users').select('*').eq('id', token_payload['user_id']).execute()
         
         if not result.data:
             raise HTTPException(status_code=401, detail="User not found or inactive")
@@ -79,17 +79,17 @@ def get_current_admin_user(token_payload: dict = Depends(verify_token_from_crede
         
         return AdminUserResponse(
             id=str(user_data['id']),
-            client_id=str(user_data['client_id']),
+            client_id=str(token_payload['client_id']),  # Get client_id from JWT, not database
             email=user_data['email'],
-            first_name=user_data['first_name'],
-            last_name=user_data['last_name'],
-            role=user_data['role'],
+            first_name=user_data.get('first_name') or '',
+            last_name=user_data.get('last_name') or '',
+            role=user_data.get('role') or 'admin',
             permissions=permissions,
-            is_active=user_data['is_active'],
+            is_active=user_data.get('is_active', True),
             email_verified=user_data.get('email_verified', False),
             last_login_at=user_data.get('last_login_at'),
             login_count=0,  # Default to 0 since column doesn't exist
-            created_at=user_data['created_at']
+            created_at=user_data.get('created_at')
         )
         
     except HTTPException:
@@ -120,8 +120,8 @@ async def login_admin_user(login_request: AdminUserLogin):
             raise HTTPException(status_code=401, detail="Invalid email or password")
         
         # Update login tracking (only update last_login_at since login_count column doesn't exist)
-        from datetime import datetime
-        current_time = datetime.utcnow().isoformat()
+        from datetime import datetime, timezone
+        current_time = datetime.now(timezone.utc).isoformat()
         update_result = db.client.table('admin_users').update({
             'last_login_at': current_time
         }).eq('id', user_data['id']).execute()
@@ -157,7 +157,7 @@ async def login_admin_user(login_request: AdminUserLogin):
         )
         
         # Convert to dict with proper datetime serialization
-        response_data = token_response.dict()
+        response_data = token_response.model_dump()
         # Convert datetime fields to ISO strings
         if 'user' in response_data and response_data['user']:
             user_data = response_data['user']
@@ -181,7 +181,7 @@ async def login_admin_user(login_request: AdminUserLogin):
 async def get_current_user(current_user: AdminUserResponse = Depends(get_current_admin_user)):
     """Get current authenticated user."""
     # Convert to dict with proper datetime serialization
-    user_data = current_user.dict()
+    user_data = current_user.model_dump()
     if 'last_login_at' in user_data and user_data['last_login_at']:
         user_data['last_login_at'] = user_data['last_login_at'].isoformat() if hasattr(user_data['last_login_at'], 'isoformat') else str(user_data['last_login_at'])
     if 'created_at' in user_data and user_data['created_at']:
@@ -206,7 +206,7 @@ async def refresh_token(current_user: AdminUserResponse = Depends(get_current_ad
         )
         
         # Convert to dict with proper datetime serialization
-        response_data = token_response.dict()
+        response_data = token_response.model_dump()
         if 'user' in response_data and response_data['user']:
             user_data = response_data['user']
             if 'last_login_at' in user_data and user_data['last_login_at']:

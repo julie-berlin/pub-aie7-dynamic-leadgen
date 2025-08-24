@@ -11,7 +11,7 @@ This module provides API endpoints for:
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
 from typing import Dict, Any
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 import uuid
 
 from app.database import db
