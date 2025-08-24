@@ -1,9 +1,9 @@
 import { type ReactNode, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { 
-  HomeIcon, 
-  DocumentTextIcon, 
-  ChartBarIcon, 
+import {
+  HomeIcon,
+  DocumentTextIcon,
+  ChartBarIcon,
   CogIcon,
   UserIcon,
   UsersIcon,
@@ -45,10 +45,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         {/* Logo */}
         <div className="px-6 py-8">
           <h1 className="text-xl font-bold text-slate-900">
-            {!businessInfo.isLoaded ? 'Loading...' : businessInfo.name}
+            Varyq
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Varyq - Intelligent Leads
+            {!businessInfo.isLoaded ? 'Loading...' : (businessInfo.name || 'Business Admin')}
           </p>
         </div>
 
@@ -113,7 +113,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               </h2>
               <Breadcrumb items={breadcrumbs} />
             </div>
-            
+
             {/* Header actions */}
             <div className="flex items-center space-x-4">
               <div className="text-sm text-slate-500">

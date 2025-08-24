@@ -8,7 +8,7 @@ INSERT INTO
     clients (
         id,
         name,
-        business_name,
+        legal_name,
         email,
         owner_name,
         business_type,
@@ -42,7 +42,7 @@ INSERT INTO
     clients (
         id,
         name,
-        business_name,
+        legal_name,
         email,
         owner_name,
         business_type,
@@ -76,7 +76,7 @@ INSERT INTO
     clients (
         id,
         name,
-        business_name,
+        legal_name,
         email,
         owner_name,
         business_type,
@@ -110,7 +110,7 @@ INSERT INTO
     clients (
         id,
         name,
-        business_name,
+        legal_name,
         email,
         owner_name,
         business_type,
@@ -144,7 +144,7 @@ INSERT INTO
     clients (
         id,
         name,
-        business_name,
+        legal_name,
         email,
         owner_name,
         business_type,

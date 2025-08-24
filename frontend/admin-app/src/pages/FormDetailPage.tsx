@@ -111,6 +111,7 @@ export default function FormDetailPage() {
             primaryColor: data.theme_config.primary_color || '#3B82F6',
             fontFamily: data.theme_config.font_family || 'Inter',
             borderRadius: data.theme_config.border_radius || '0.5rem',
+            themeName: data.theme_config.theme_name || 'Custom Theme',
           } : undefined,
         };
         
@@ -130,9 +131,7 @@ export default function FormDetailPage() {
 
   const loadAvailableThemes = async () => {
     try {
-      console.log('Loading available themes...');
       const themes = await themeService.getThemes();
-      console.log('Loaded themes:', themes.length, themes);
       setAvailableThemes(themes);
     } catch (error) {
       console.error('Error loading themes:', error);
@@ -172,12 +171,11 @@ export default function FormDetailPage() {
         return;
       }
 
-      console.log('Applying theme:', selectedTheme.name, 'to form:', form.id);
 
       // Apply theme to form by updating form's theme_config
       const token = localStorage.getItem('admin_token');
       const response = await fetch(API_ENDPOINTS.FORMS.BY_ID(form.id), {
-        method: 'PUT',
+        method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           ...(token && { 'Authorization': `Bearer ${token}` }),
@@ -193,7 +191,6 @@ export default function FormDetailPage() {
       });
 
       const responseData = await response.json();
-      console.log('Theme apply response:', response.status, responseData);
 
       if (response.ok) {
         // Update local form state
@@ -202,7 +199,8 @@ export default function FormDetailPage() {
           theme: {
             primaryColor: selectedTheme.primary_color,
             fontFamily: selectedTheme.font_family,
-            borderRadius: '0.5rem' // Default value
+            borderRadius: '0.5rem', // Default value
+            themeName: selectedTheme.name
           }
         } : null);
         
@@ -826,7 +824,7 @@ export default function FormDetailPage() {
                   <div>
                     <dt className="text-sm font-medium text-slate-500">Applied Theme</dt>
                     <dd className="text-sm text-slate-900 mt-1">
-                      Custom Theme
+                      {form.theme.themeName || 'Custom Theme'}
                     </dd>
                   </div>
                 </div>

@@ -168,7 +168,7 @@ export const useAdminStore = create<AdminStore>()(
             if (result.success && result.data) {
               set({
                 businessInfo: {
-                  name: result.data.business_name || result.data.name || 'Survey Admin',
+                  name: result.data.name || 'Survey Admin',
                   industry: result.data.industry,
                   isLoaded: true
                 }

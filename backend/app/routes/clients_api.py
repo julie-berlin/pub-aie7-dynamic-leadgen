@@ -69,7 +69,7 @@ async def get_client(
         client_response = ClientResponse(
             id=str(row["id"]),
             name=row["name"],
-            business_name=row.get("business_name"),
+            legal_name=row.get("legal_name"),
             email=row["email"],
             owner_name=row["owner_name"],
             contact_name=row.get("contact_name"),
@@ -124,7 +124,8 @@ async def update_client(
         
         # Update client with all fields
         update_data = {
-            "business_name": client_request.business_name,
+            "name": client_request.name,
+            "legal_name": client_request.legal_name,
             "background": client_request.business_description,  # Maps to background field
             "industry": client_request.industry,
             "website": client_request.website_url,
@@ -184,7 +185,8 @@ async def patch_client(
         
         # Map request fields to database columns
         field_mapping = {
-            'business_name': 'business_name',
+            'name': 'name',
+            'legal_name': 'legal_name',
             'business_description': 'background',
             'industry': 'industry',
             'website_url': 'website',

@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS clients (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
     -- Basic info
     name TEXT NOT NULL,
-    business_name TEXT,
+    legal_name TEXT,
     email TEXT NOT NULL UNIQUE,
     owner_name TEXT NOT NULL,
     contact_name TEXT,

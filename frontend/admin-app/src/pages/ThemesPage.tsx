@@ -18,10 +18,8 @@ export default function ThemesPage() {
 
   const loadThemes = async () => {
     try {
-      console.log('ThemesPage: Loading themes...');
       setLoading(true);
       const themesData = await themeService.getThemes();
-      console.log('ThemesPage: Themes loaded:', themesData);
       setThemes(themesData);
       setError(null);
     } catch (err) {

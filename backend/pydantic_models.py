@@ -299,8 +299,8 @@ class SurveyGraphState(BaseModel):
 class ClientModel(BaseModel):
     """Client/business model."""
     id: Optional[str] = Field(None, description="Client UUID")
-    name: str = Field(..., description="Client name")
-    business_name: Optional[str] = Field(None, description="Business name")
+    name: str = Field(..., description="Display name for the business")
+    legal_name: Optional[str] = Field(None, description="Legal business name")
     email: str = Field(..., description="Client email")
     owner_name: str = Field(..., description="Owner name")
     contact_name: Optional[str] = Field(None, description="Alternative contact")
@@ -481,7 +481,8 @@ class FormListResponse(BaseModel):
 
 class ClientUpdateRequest(BaseModel):
     """Request to update client information (PUT - full update)."""
-    business_name: str = Field(..., min_length=1, max_length=200)
+    name: str = Field(..., min_length=1, max_length=200, description="Display name for the business")
+    legal_name: Optional[str] = Field(None, max_length=200, description="Legal business name")
     business_description: str = Field(..., max_length=1000)
     industry: str = Field(..., max_length=100)
     website_url: Optional[str] = None
@@ -494,7 +495,8 @@ class ClientUpdateRequest(BaseModel):
 
 class ClientPatchRequest(BaseModel):
     """Request to partially update client information (PATCH)."""
-    business_name: Optional[str] = Field(None, min_length=1, max_length=200)
+    name: Optional[str] = Field(None, min_length=1, max_length=200, description="Display name for the business")
+    legal_name: Optional[str] = Field(None, max_length=200, description="Legal business name")
     business_description: Optional[str] = Field(None, max_length=1000)
     industry: Optional[str] = Field(None, max_length=100)
     website_url: Optional[str] = None
@@ -509,7 +511,7 @@ class ClientResponse(BaseModel):
     """Response model for client data."""
     id: str
     name: str
-    business_name: Optional[str]
+    legal_name: Optional[str]
     email: str
     owner_name: str
     contact_name: Optional[str]
