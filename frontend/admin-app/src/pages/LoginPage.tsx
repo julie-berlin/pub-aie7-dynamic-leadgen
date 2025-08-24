@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { useAdminStore } from '../stores/adminStore';
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('admin@pawsome.test');
+  const [email, setEmail] = useState('admin@pawsomedogwalking.com');
   const [password, setPassword] = useState('secret');
   const { login, isLoading, error } = useAdminStore();
 
@@ -96,8 +96,8 @@ export default function LoginPage() {
           <div className="p-4 rounded-md border bg-admin-50 border-admin-200 text-admin-800">
             <p className="text-xs">
               <strong>Demo Credentials:</strong><br />
-              Email: admin@example.com<br />
-              Password: password
+              Email: admin@pawsomedogwalking.com<br />
+              Password: secret
             </p>
           </div>
         </div>
