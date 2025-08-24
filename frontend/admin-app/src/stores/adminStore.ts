@@ -183,18 +183,14 @@ export const useAdminStore = create<AdminStore>()(
           // Store token in localStorage for API requests
           localStorage.setItem('admin_token', access_token);
           
-          // Map backend user format to frontend format
-          const mappedUser: AdminUser = {
-            id: user.id,
-            email: user.email,
-            name: `${user.first_name} ${user.last_name}`,
-            role: user.role as 'admin' | 'manager' | 'viewer',
-            clientId: user.client_id, // Map client_id to clientId
-            permissions: user.permissions || ['read', 'write', 'delete']
+          // Fix client_id mapping for frontend compatibility
+          const userWithClientId = {
+            ...user,
+            clientId: user.client_id
           };
           
           set({ 
-            user: mappedUser, 
+            user: userWithClientId, 
             isAuthenticated: true,
             isInitialized: true,
             isLoading: false,
@@ -248,17 +244,13 @@ export const useAdminStore = create<AdminStore>()(
             const { access_token, user } = result.data;
             localStorage.setItem('admin_token', access_token);
             
-            // Map backend user format to frontend format
-            const mappedUser: AdminUser = {
-              id: user.id,
-              email: user.email,
-              name: `${user.first_name} ${user.last_name}`,
-              role: user.role as 'admin' | 'manager' | 'viewer',
-              clientId: user.client_id, // Map client_id to clientId
-              permissions: user.permissions || ['read', 'write', 'delete']
+            // Fix client_id mapping for frontend compatibility
+            const userWithClientId = {
+              ...user,
+              clientId: user.client_id
             };
             
-            set({ user: mappedUser, isAuthenticated: true });
+            set({ user: userWithClientId, isAuthenticated: true });
           } else {
             throw new Error(result.message || 'Token refresh failed');
           }
