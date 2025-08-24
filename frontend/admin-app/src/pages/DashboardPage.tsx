@@ -19,9 +19,19 @@ export default function DashboardPage() {
   } = useAnalyticsStore();
 
   useEffect(() => {
-    // Fetch initial data
-    fetchDashboardMetrics();
-    fetchRealTimeMetrics();
+    // Add delay to ensure token is fully stored after login
+    const timer = setTimeout(() => {
+      // Only fetch if we have a token
+      const token = localStorage.getItem('admin_token');
+      if (token) {
+        fetchDashboardMetrics().catch(console.error);
+        fetchRealTimeMetrics().catch(console.error);
+      } else {
+        console.warn('No auth token found, skipping dashboard data fetch');
+      }
+    }, 500); // Increased delay to 500ms
+
+    return () => clearTimeout(timer);
   }, [fetchDashboardMetrics, fetchRealTimeMetrics]);
 
   const metrics = dashboardMetrics ? [

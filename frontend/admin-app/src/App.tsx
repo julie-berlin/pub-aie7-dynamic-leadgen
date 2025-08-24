@@ -1,19 +1,25 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Suspense, lazy } from 'react';
 import { useAdminStore } from './stores/adminStore';
+import { LoadingSpinner } from './components/ui';
 
 // Layout components (placeholder imports for now)
 import AdminLayout from './components/layout/AdminLayout';
 import { BreadcrumbProvider } from './components/common/BreadcrumbContext';
+
+// Always load LoginPage immediately since it's needed for unauthenticated users
 import LoginPage from './pages/LoginPage';
-import DashboardPage from './pages/DashboardPage';
-import FormsPage from './pages/FormsPage';
-import AnalyticsPage from './pages/AnalyticsPage';
-import SettingsPage from './pages/SettingsPage';
-import FormDetailPage from './pages/FormDetailPage';
-import LeadsPage from './pages/LeadsPage';
-import ThemesPage from './pages/ThemesPage';
-import ThemeEditorPage from './pages/ThemeEditorPage';
+
+// Lazy load authenticated pages to prevent loading on login page
+const DashboardPage = lazy(() => import('./pages/DashboardPage'));
+const FormsPage = lazy(() => import('./pages/FormsPage'));
+const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'));
+const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+const FormDetailPage = lazy(() => import('./pages/FormDetailPage'));
+const LeadsPage = lazy(() => import('./pages/LeadsPage'));
+const ThemesPage = lazy(() => import('./pages/ThemesPage'));
+const ThemeEditorPage = lazy(() => import('./pages/ThemeEditorPage'));
 
 // Create Query Client for data fetching
 const queryClient = new QueryClient({
@@ -42,20 +48,22 @@ function App() {
           ) : (
             <BreadcrumbProvider>
               <AdminLayout>
-                <Routes>
-                  <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                  <Route path="/dashboard" element={<DashboardPage />} />
-                  <Route path="/forms" element={<FormsPage />} />
-                  <Route path="/forms/:id" element={<FormDetailPage />} />
-                  <Route path="/leads" element={<LeadsPage />} />
-                  <Route path="/analytics" element={<AnalyticsPage />} />
-                  <Route path="/themes" element={<ThemesPage />} />
-                  <Route path="/themes/new" element={<ThemeEditorPage />} />
-                  <Route path="/themes/:id/edit" element={<ThemeEditorPage />} />
-                  <Route path="/settings" element={<SettingsPage />} />
-                  <Route path="/login" element={<Navigate to="/dashboard" replace />} />
-                  <Route path="*" element={<Navigate to="/dashboard" replace />} />
-                </Routes>
+                <Suspense fallback={<div className="flex justify-center items-center min-h-64"><LoadingSpinner /></div>}>
+                  <Routes>
+                    <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                    <Route path="/dashboard" element={<DashboardPage />} />
+                    <Route path="/forms" element={<FormsPage />} />
+                    <Route path="/forms/:id" element={<FormDetailPage />} />
+                    <Route path="/leads" element={<LeadsPage />} />
+                    <Route path="/analytics" element={<AnalyticsPage />} />
+                    <Route path="/themes" element={<ThemesPage />} />
+                    <Route path="/themes/new" element={<ThemeEditorPage />} />
+                    <Route path="/themes/:id/edit" element={<ThemeEditorPage />} />
+                    <Route path="/settings" element={<SettingsPage />} />
+                    <Route path="/login" element={<Navigate to="/dashboard" replace />} />
+                    <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                  </Routes>
+                </Suspense>
               </AdminLayout>
             </BreadcrumbProvider>
           )}

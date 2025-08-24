@@ -151,58 +151,33 @@ export const useAdminStore = create<AdminStore>()(
       loadBusinessInfo: async () => {
         try {
           const token = localStorage.getItem('admin_token');
-          const headers: Record<string, string> = {
-            'Content-Type': 'application/json',
-          };
-          
-          if (token) {
-            headers['Authorization'] = `Bearer ${token}`;
+          if (!token) {
+            set({ businessInfo: { name: 'Survey Admin', isLoaded: true } });
+            return;
           }
-          
+
           const response = await fetch(API_ENDPOINTS.CLIENTS.ME, {
-            headers
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`,
+            }
           });
 
           if (response.ok) {
             const result = await response.json();
-            if (result.success && result.data) {
-              set({
-                businessInfo: {
-                  name: result.data.name || 'Survey Admin',
-                  industry: result.data.industry,
-                  isLoaded: true
-                }
-              });
-            } else {
-              // Keep default name on error but mark as loaded
-              set({
-                businessInfo: {
-                  name: 'Survey Admin',
-                  industry: undefined,
-                  isLoaded: true
-                }
-              });
-            }
-          } else {
-            // Keep default name on error but mark as loaded
             set({
               businessInfo: {
-                name: 'Survey Admin',
-                industry: undefined,
+                name: result.data?.name || 'Survey Admin',
+                industry: result.data?.industry,
                 isLoaded: true
               }
             });
+          } else {
+            set({ businessInfo: { name: 'Survey Admin', isLoaded: true } });
           }
         } catch (error) {
           console.error('Failed to load business info:', error);
-          // Keep default name on error but mark as loaded
-          set({
-            businessInfo: {
-              name: 'Survey Admin',
-              industry: undefined,
-              isLoaded: true
-            }
-          });
+          set({ businessInfo: { name: 'Survey Admin', isLoaded: true } });
         }
       },
     }),

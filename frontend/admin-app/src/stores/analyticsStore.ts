@@ -5,10 +5,41 @@ import { API_CONFIG, buildApiUrl } from '../config/api';
 // Helper function to get authenticated headers
 const getAuthHeaders = () => {
   const token = localStorage.getItem('admin_token');
+  if (!token) {
+    throw new Error('No authentication token found');
+  }
   return {
     ...API_CONFIG.DEFAULT_HEADERS,
-    ...(token && { Authorization: `Bearer ${token}` })
+    Authorization: `Bearer ${token}`
   };
+};
+
+// Helper function to retry failed requests
+const retryRequest = async <T>(
+  requestFn: () => Promise<T>, 
+  maxRetries: number = 2, 
+  delayMs: number = 1000
+): Promise<T> => {
+  for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
+    try {
+      return await requestFn();
+    } catch (error) {
+      const isAuthError = error instanceof Error && 
+        (error.message.includes('401') || error.message.includes('authentication'));
+      
+      // If it's an auth error and we have retries left, wait and try again
+      if (isAuthError && attempt <= maxRetries) {
+        console.warn(`Auth request failed, retrying in ${delayMs}ms... (attempt ${attempt}/${maxRetries + 1})`);
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+        continue;
+      }
+      
+      // If not an auth error or no retries left, throw the error
+      throw error;
+    }
+  }
+  
+  throw new Error('Max retries exceeded');
 };
 
 // Analytics data interfaces
@@ -193,15 +224,17 @@ export const useAnalyticsStore = create<AnalyticsStore>()(
             endDate: dateRange.end,
           });
           
-          const response = await fetch(buildApiUrl(`/api/analytics/dashboard?${params}`), {
-            headers: getAuthHeaders(),
+          const { data: rawMetrics } = await retryRequest(async () => {
+            const response = await fetch(buildApiUrl(`/api/analytics/dashboard?${params}`), {
+              headers: getAuthHeaders(),
+            });
+            
+            if (!response.ok) {
+              throw new Error(`Failed to fetch dashboard metrics: ${response.status} ${response.statusText}`);
+            }
+            
+            return response.json();
           });
-          
-          if (!response.ok) {
-            throw new Error('Failed to fetch dashboard metrics');
-          }
-          
-          const { data: rawMetrics } = await response.json();
           
           // Transform backend response (snake_case) to frontend format (camelCase)
           const dashboardMetrics: DashboardMetrics = {
@@ -300,17 +333,20 @@ export const useAnalyticsStore = create<AnalyticsStore>()(
       },
 
       fetchRealTimeMetrics: async () => {
+        set({ error: null });
+        
         try {
-          
-          const response = await fetch(buildApiUrl('/api/analytics/realtime'), {
-            headers: getAuthHeaders(),
+          const { data: rawMetrics } = await retryRequest(async () => {
+            const response = await fetch(buildApiUrl('/api/analytics/realtime'), {
+              headers: getAuthHeaders(),
+            });
+            
+            if (!response.ok) {
+              throw new Error(`Failed to fetch real-time metrics: ${response.status} ${response.statusText}`);
+            }
+            
+            return response.json();
           });
-          
-          if (!response.ok) {
-            throw new Error('Failed to fetch real-time metrics');
-          }
-          
-          const { data: rawMetrics } = await response.json();
           
           // Transform backend response (snake_case) to frontend format (camelCase)
           const realTimeMetrics: RealTimeMetrics = {

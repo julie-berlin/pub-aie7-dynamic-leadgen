@@ -7,7 +7,9 @@
 
 export const API_CONFIG = {
   // Base URL for the backend API
-  BASE_URL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000',
+  // In development, use empty string to go through Vite proxy
+  // In production, use environment variable or fallback to localhost
+  BASE_URL: import.meta.env.PROD ? (import.meta.env.VITE_API_URL || 'http://localhost:8000') : '',
   
   // Timeout for API requests (in milliseconds)  
   TIMEOUT: 30000,
@@ -22,6 +24,11 @@ export const API_CONFIG = {
  * Helper function to build full API URLs
  */
 export function buildApiUrl(endpoint: string): string {
+  // In development with empty BASE_URL, just return the endpoint
+  if (!API_CONFIG.BASE_URL) {
+    return endpoint;
+  }
+  
   // Remove leading slash if present to avoid double slashes
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint.slice(1) : endpoint;
   return `${API_CONFIG.BASE_URL}/${cleanEndpoint}`;

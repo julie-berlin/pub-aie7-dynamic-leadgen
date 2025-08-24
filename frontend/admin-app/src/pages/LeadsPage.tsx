@@ -1,6 +1,5 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { 
-  FunnelIcon,
   MagnifyingGlassIcon,
   UsersIcon,
   EnvelopeIcon,
@@ -53,6 +52,7 @@ interface LeadsSummary {
 
 export default function LeadsPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [allLeads, setAllLeads] = useState<Lead[]>([]);
   const [summary, setSummary] = useState<LeadsSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [filters, setFilters] = useState({
@@ -61,7 +61,6 @@ export default function LeadsPage() {
     converted: '',
     form_id: ''
   });
-  const [selectedLeads, setSelectedLeads] = useState<string[]>([]);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [showConversionModal, setShowConversionModal] = useState<string | null>(null);
   const [forms, setForms] = useState<Array<{ id: string; title: string }>>([]);
@@ -103,7 +102,7 @@ export default function LeadsPage() {
       
       const data = await response.json();
       if (data.success) {
-        setLeads(data.data.leads);
+        setAllLeads(data.data.leads);
       }
     } catch (error) {
       console.error('Error fetching leads:', error);
@@ -166,11 +165,29 @@ export default function LeadsPage() {
     }
   };
 
+  // Filter leads based on search term
+  useEffect(() => {
+    if (!filters.search) {
+      setLeads(allLeads);
+      return;
+    }
+
+    const searchTerm = filters.search.toLowerCase();
+    const filtered = allLeads.filter(lead => 
+      (lead.contact_name && lead.contact_name.toLowerCase().includes(searchTerm)) ||
+      (lead.contact_email && lead.contact_email.toLowerCase().includes(searchTerm)) ||
+      (lead.lead_id && lead.lead_id.toLowerCase().includes(searchTerm)) ||
+      (lead.form_title && lead.form_title.toLowerCase().includes(searchTerm))
+    );
+    
+    setLeads(filtered);
+  }, [allLeads, filters.search]);
+
   useEffect(() => {
     fetchLeads();
     fetchSummary();
     fetchForms();
-  }, [filters]);
+  }, [filters.status, filters.converted, filters.form_id]);
 
   const updateConversion = async (sessionId: string, conversionData: {
     actual_conversion: boolean;
@@ -195,8 +212,8 @@ export default function LeadsPage() {
       const data = await response.json();
       if (data.success) {
         // Refresh leads and summary
-        fetchLeads();
-        fetchSummary();
+        await fetchLeads();
+        await fetchSummary();
         setShowConversionModal(null);
       }
     } catch (error) {
