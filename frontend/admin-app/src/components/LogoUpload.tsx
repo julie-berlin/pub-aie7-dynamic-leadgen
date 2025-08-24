@@ -34,13 +34,18 @@ export default function LogoUpload({ currentLogoUrl, onLogoChange, disabled = fa
     setUploading(true);
     
     try {
+      const token = localStorage.getItem('admin_token');
+      if (!token) {
+        throw new Error('No admin token found');
+      }
+
       const formData = new FormData();
-      formData.append('logo', file);
+      formData.append('file', file);
 
       const response = await fetch('/api/admin/upload/logo', {
         method: 'POST',
         headers: {
-          Authorization: 'Bearer mock-token'
+          Authorization: `Bearer ${token}`
         },
         body: formData,
       });
@@ -113,15 +118,22 @@ export default function LogoUpload({ currentLogoUrl, onLogoChange, disabled = fa
     if (!confirmed) return;
 
     try {
-      // Update client settings to remove logo
-      const response = await fetch('/api/clients/me', {
-        method: 'PATCH',
+      const token = localStorage.getItem('admin_token');
+      if (!token) {
+        throw new Error('No admin token found');
+      }
+
+      // Extract filename from URL
+      const urlParts = currentLogoUrl.split('/');
+      const filename = urlParts[urlParts.length - 1];
+
+      // Delete logo via admin API
+      const response = await fetch(`/api/admin/upload/logo/${filename}`, {
+        method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          company_logo_url: null
-        })
+          'Authorization': `Bearer ${token}`
+        }
       });
 
       if (response.ok) {

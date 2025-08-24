@@ -13,6 +13,7 @@ from fastapi import Request, HTTPException
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from app.utils.config_loader import get_security_config, SecurityConfig
+from app.utils.admin_auth_unified import verify_token, create_access_token
 
 logger = logging.getLogger(__name__)
 
@@ -79,32 +80,8 @@ class AdminAuthenticator:
                hashlib.sha256(self.admin_api_key.encode()).hexdigest()
     
     def _verify_jwt_token(self, token: str) -> Optional[Dict[str, Any]]:
-        """Verify JWT token"""
-        try:
-            payload = jwt.decode(token, self.jwt_secret, algorithms=['HS256'])
-            
-            # Check expiration
-            if payload.get('exp', 0) < time.time():
-                return None
-            
-            # Validate that token has required fields
-            if not payload.get('user_id') or not payload.get('client_id'):
-                return None
-            
-            return payload
-        
-        except jwt.InvalidTokenError:
-            return None
-    
-    def _generate_jwt_token(self, user_id: str, role: str = 'admin') -> str:
-        """Generate JWT token for admin user"""
-        payload = {
-            'user_id': user_id,
-            'role': role,
-            'iat': time.time(),
-            'exp': time.time() + (self.config.jwt_expire_minutes * 60)
-        }
-        return jwt.encode(payload, self.jwt_secret, algorithm='HS256')
+        """Verify JWT token using unified auth system"""
+        return verify_token(token)
     
     def authenticate_request(self, request: Request) -> tuple[bool, Optional[str], Optional[Dict[str, Any]]]:
         """
@@ -189,6 +166,12 @@ class AdminAuthMiddleware(BaseHTTPMiddleware):
             '/api/admin/auth/refresh'
         }
         
+        # Public endpoints that don't require authentication
+        self.public_endpoints = {
+            '/api/themes/form/',  # For form theme loading by public forms
+            '/api/files/clients/'  # For serving uploaded client files like logos
+        }
+        
         # Always protected paths (even if auth is disabled elsewhere)
         self.critical_paths = {
             '/admin/users',
@@ -204,6 +187,10 @@ class AdminAuthMiddleware(BaseHTTPMiddleware):
     
     def _is_protected_path(self, path: str) -> bool:
         """Check if path requires admin authentication"""
+        # Check for public endpoints first
+        if any(public_path in path for public_path in self.public_endpoints):
+            return False
+        
         if not self.config.auth_enabled:
             # Even if auth is disabled, protect critical paths
             return any(critical_path in path for critical_path in self.critical_paths)
@@ -303,10 +290,7 @@ def get_admin_user(request: Request) -> Optional[Dict[str, Any]]:
 
 
 # Helper function to generate admin JWT token (for login endpoints)
-def generate_admin_token(user_id: str, config: Optional[SecurityConfig] = None) -> str:
-    """Generate JWT token for admin user"""
-    if config is None:
-        config = get_security_config()
-    
-    authenticator = AdminAuthenticator(config)
-    return authenticator._generate_jwt_token(user_id)
+def generate_admin_token(user_id: str, client_id: str, config: Optional[SecurityConfig] = None) -> tuple[str, int]:
+    """Generate JWT token for admin user using unified auth system"""
+    # config parameter kept for backwards compatibility but not used
+    return create_access_token(user_id, client_id)

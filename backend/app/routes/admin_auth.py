@@ -16,16 +16,11 @@ import jwt
 
 from app.database import db
 from app.utils.response_helpers import success_response, error_response
+from app.utils.admin_auth_unified import create_access_token, verify_token, hash_password, verify_password
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/admin/auth", tags=["admin-auth"])
 security = HTTPBearer()
-
-# JWT Configuration (should be in environment variables)
-import os
-JWT_SECRET = os.getenv('JWT_SECRET', 'dev-secret-key-change-in-production')
-JWT_ALGORITHM = "HS256"
-JWT_EXPIRATION_HOURS = 1
 
 # === PYDANTIC MODELS ===
 
@@ -58,44 +53,14 @@ class AdminTokenResponse(BaseModel):
 
 # === UTILITY FUNCTIONS ===
 
-def hash_password(password: str) -> str:
-    """Hash a password with salt."""
-    salt = secrets.token_hex(16)
-    password_hash = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000)
-    return f"{salt}:{password_hash.hex()}"
+def verify_token_from_credentials(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict:
+    """Verify JWT token from HTTP Authorization header."""
+    token_payload = verify_token(credentials.credentials)
+    if not token_payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    return token_payload
 
-def verify_password(password: str, hashed_password: str) -> bool:
-    """Verify a password against its hash."""
-    try:
-        salt, stored_hash = hashed_password.split(':')
-        password_hash = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000)
-        return password_hash.hex() == stored_hash
-    except ValueError:
-        return False
-
-def create_access_token(user_id: str, client_id: str) -> tuple[str, int]:
-    """Create a JWT access token."""
-    expiration = datetime.utcnow() + timedelta(hours=JWT_EXPIRATION_HOURS)
-    payload = {
-        'user_id': user_id,
-        'client_id': client_id,
-        'exp': expiration,
-        'iat': datetime.utcnow()
-    }
-    token = jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
-    return token, int(JWT_EXPIRATION_HOURS * 3600)
-
-def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict:
-    """Verify JWT token."""
-    try:
-        payload = jwt.decode(credentials.credentials, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        return payload
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token has expired")
-    except jwt.InvalidTokenError:
-        raise HTTPException(status_code=401, detail="Invalid token")
-
-def get_current_admin_user(token_payload: dict = Depends(verify_token)) -> AdminUserResponse:
+def get_current_admin_user(token_payload: dict = Depends(verify_token_from_credentials)) -> AdminUserResponse:
     """Get current admin user from token."""
     try:
         # Get user by ID using Supabase client

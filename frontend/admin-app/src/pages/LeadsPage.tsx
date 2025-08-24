@@ -137,7 +137,7 @@ export default function LeadsPage() {
   const fetchForms = async () => {
     try {
       const token = localStorage.getItem('admin_token');
-      const response = await fetch(API_ENDPOINTS.FORMS.LIST(), {
+      const response = await fetch(API_ENDPOINTS.ADMIN.FORMS.LIST(), {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',

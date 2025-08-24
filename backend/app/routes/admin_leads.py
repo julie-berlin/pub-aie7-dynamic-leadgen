@@ -70,6 +70,7 @@ class ConversionUpdate(BaseModel):
 async def get_leads(
     form_id: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
+    converted: Optional[str] = Query(None),
     utm_source: Optional[str] = Query(None),
     limit: int = Query(50, le=1000),
     offset: int = Query(0, ge=0),
@@ -77,7 +78,7 @@ async def get_leads(
 ):
     """Get leads with filtering and pagination."""
     try:
-        # Base query for lead sessions
+        # Base query for lead sessions with all needed fields
         query = db.client.table('lead_sessions').select(
             'id, session_id, form_id, lead_status, final_score, started_at, completed_at'
         ).eq('client_id', current_user.client_id)
@@ -92,39 +93,71 @@ async def get_leads(
         lead_sessions = query.order('started_at', desc=True).range(offset, offset + limit - 1).execute()
         
         if not lead_sessions.data:
-            return []
+            return success_response({"leads": []}, "No leads found")
+        
+        session_ids = [session['session_id'] for session in lead_sessions.data]
         
         # Get form titles for each unique form_id
         form_ids = list(set(session['form_id'] for session in lead_sessions.data))
         forms_result = db.client.table('forms').select('id, title').in_('id', form_ids).execute()
         form_titles = {form['id']: form['title'] for form in forms_result.data}
         
-        # Get tracking data if utm_source filter is needed
-        tracking_data = {}
-        if utm_source or any(session.get('utm_source') for session in lead_sessions.data):
-            session_ids = [session['session_id'] for session in lead_sessions.data]
-            tracking_result = db.client.table('tracking_data').select(
-                'session_id, utm_source, utm_campaign'
-            ).in_('session_id', session_ids).execute()
-            tracking_data = {track['session_id']: track for track in tracking_result.data}
+        # Get tracking data
+        tracking_result = db.client.table('tracking_data').select(
+            'session_id, utm_source, utm_campaign, utm_medium'
+        ).in_('session_id', session_ids).execute()
+        tracking_data = {track['session_id']: track for track in tracking_result.data}
         
-        # TODO: Get contact information (name, email, phone) from responses
-        # Temporarily disabled due to session ID format issues
+        # Get conversion data from lead_outcomes
+        outcomes_result = db.client.table('lead_outcomes').select(
+            'session_id, converted, conversion_value, conversion_date, conversion_type'
+        ).in_('session_id', session_ids).execute()
+        outcomes_data = {outcome['session_id']: outcome for outcome in outcomes_result.data}
+        
+        # Get contact information from responses
         contact_data = {}
+        # Look for name, email, phone in responses
+        responses_result = db.client.table('responses').select(
+            'session_id, question_id, answer, form_questions!inner(question_text)'
+        ).in_('session_id', session_ids).execute()
         
-        # Build response
+        for response in responses_result.data:
+            session_id = response['session_id']
+            if session_id not in contact_data:
+                contact_data[session_id] = {}
+            
+            question_text = response['form_questions']['question_text'].lower()
+            answer = response['answer']
+            
+            if 'name' in question_text and not contact_data[session_id].get('name'):
+                contact_data[session_id]['name'] = answer
+            elif 'email' in question_text and not contact_data[session_id].get('email'):
+                contact_data[session_id]['email'] = answer
+            elif 'phone' in question_text and not contact_data[session_id].get('phone'):
+                contact_data[session_id]['phone'] = answer
+        
+        # Build response and apply filters
         leads = []
-        for idx, session in enumerate(lead_sessions.data):
-            # Apply utm_source filter if specified
+        for session in lead_sessions.data:
             session_tracking = tracking_data.get(session['session_id'], {})
+            session_outcome = outcomes_data.get(session['session_id'], {})
+            session_contact = contact_data.get(session['session_id'], {})
+            
+            # Apply utm_source filter if specified
             if utm_source and session_tracking.get('utm_source') != utm_source:
                 continue
-                
-            # Get contact info for this session
-            session_contact = contact_data.get(session['session_id'], {})
+            
+            # Apply converted filter if specified
+            if converted:
+                is_converted = session_outcome.get('converted', False)
+                if converted == 'true' and not is_converted:
+                    continue
+                elif converted == 'false' and is_converted:
+                    continue
             
             lead_data = {
                 "lead_id": session['id'],  # Proper lead UUID from database
+                "form_id": session['form_id'],  # Add form_id for filtering
                 "form_title": form_titles.get(session['form_id'], 'Unknown Form'),
                 "lead_status": session['lead_status'],
                 "final_score": session.get('final_score'),
@@ -132,9 +165,14 @@ async def get_leads(
                 "completed_at": session.get('completed_at'),
                 "utm_source": session_tracking.get('utm_source'),
                 "utm_campaign": session_tracking.get('utm_campaign'),
+                "utm_medium": session_tracking.get('utm_medium'),
                 "contact_name": session_contact.get('name'),
                 "contact_email": session_contact.get('email'),
-                "contact_phone": session_contact.get('phone')
+                "contact_phone": session_contact.get('phone'),
+                "actual_conversion": session_outcome.get('converted'),
+                "conversion_date": session_outcome.get('conversion_date'),
+                "conversion_value": session_outcome.get('conversion_value'),
+                "conversion_type": session_outcome.get('conversion_type')
             }
             leads.append(lead_data)
         

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { API_ENDPOINTS, API_CONFIG } from '../config/api';
+import { API_ENDPOINTS, API_CONFIG, buildApiUrl } from '../config/api';
 
 // Helper function to validate JWT token
 const isTokenValid = (token: string): boolean => {
@@ -90,7 +90,7 @@ export const useAdminStore = create<AdminStore>()(
           }
           
           // Token exists and is valid - try to get user info
-          const response = await fetch(`${API_CONFIG.BASE_URL}/api/admin/auth/me`, {
+          const response = await fetch(buildApiUrl('/api/admin/auth/me'), {
             headers: {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${token}`
@@ -158,7 +158,7 @@ export const useAdminStore = create<AdminStore>()(
         set({ isLoading: true, error: null });
         
         try {
-          const response = await fetch(`${API_CONFIG.BASE_URL}/api/admin/auth/login`, {
+          const response = await fetch(buildApiUrl('/api/admin/auth/login'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, password }),
@@ -188,8 +188,8 @@ export const useAdminStore = create<AdminStore>()(
             error: null 
           });
           
-          // Load business info after successful login
-          await get().loadBusinessInfo();
+          // Load business info after successful login (non-blocking)
+          get().loadBusinessInfo().catch(console.warn);
         } catch (error) {
           set({ 
             error: error instanceof Error ? error.message : 'Login failed',
@@ -218,7 +218,7 @@ export const useAdminStore = create<AdminStore>()(
         if (!token) return;
 
         try {
-          const response = await fetch(`${API_CONFIG.BASE_URL}/api/admin/auth/refresh`, {
+          const response = await fetch(buildApiUrl('/api/admin/auth/refresh'), {
             headers: { Authorization: `Bearer ${token}` },
           });
 
@@ -260,25 +260,15 @@ export const useAdminStore = create<AdminStore>()(
             return;
           }
 
-          const response = await fetch(API_ENDPOINTS.CLIENTS.ME, {
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`,
+          // For now, just set default business info since we have user info from login
+          // TODO: Implement proper business info endpoint later
+          set({
+            businessInfo: {
+              name: 'Survey Admin',
+              industry: undefined,
+              isLoaded: true
             }
           });
-
-          if (response.ok) {
-            const result = await response.json();
-            set({
-              businessInfo: {
-                name: result.data?.name || 'Survey Admin',
-                industry: result.data?.industry,
-                isLoaded: true
-              }
-            });
-          } else {
-            set({ businessInfo: { name: 'Survey Admin', isLoaded: true } });
-          }
         } catch (error) {
           console.error('Failed to load business info:', error);
           set({ businessInfo: { name: 'Survey Admin', isLoaded: true } });

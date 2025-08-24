@@ -209,8 +209,11 @@ class FileStorageManager:
             # Get client-specific directory
             client_logos_dir = self._get_client_directory(client_id, "logos")
             
-            # Generate unique filename with client prefix for extra safety
-            filename = self.generate_unique_filename(original_filename, f"client_{client_id}")
+            # Use original filename with timestamp to avoid collisions but keep it readable
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            file_extension = Path(original_filename).suffix.lower()
+            base_name = Path(original_filename).stem
+            filename = f"{base_name}_{timestamp}{file_extension}"
             file_path = client_logos_dir / filename
             
             # Write file

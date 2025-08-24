@@ -69,5 +69,8 @@ export const API_ENDPOINTS = {
       UPDATE_CONVERSION: (id: string) => buildApiUrl(`/api/admin/leads/${id}/conversion`),
       STATS: buildApiUrl('/api/admin/leads/stats/summary'),
     },
+    FORMS: {
+      LIST: (params?: URLSearchParams) => buildApiUrl(`/api/forms${params ? `?${params}` : ''}`),
+    },
   },
 } as const;

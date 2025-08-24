@@ -84,13 +84,17 @@ export default function FormPage() {
 
   if (error) {
     return (
-      <PageLayout businessName="Loading...">
-        <div className="flex items-center justify-center min-h-[400px] p-4">
+      <PageLayout businessName="Form Not Available">
+        <div className="flex items-center justify-center min-h-screen py-12 px-4">
           <ErrorMessage
             title="Form Not Available"
-            message={error}
+            message={error.includes('not found') ? 
+              "Sorry, the form you're looking for doesn't exist or has been removed. Please check the link and try again." :
+              error}
             showRetry
             onRetry={() => window.location.reload()}
+            variant="form-unavailable"
+            type="error"
           />
         </div>
       </PageLayout>

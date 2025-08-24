@@ -19,13 +19,13 @@ class ConsolidatedSurveyAdminSupervisor(SupervisorAgent):
     def __init__(self, **kwargs):
         super().__init__(
             name="ConsolidatedSurveyAdminSupervisor",
-            model_name="o4-mini",
+            model_name="gpt-4.1-nano",
             temperature=0.3,
             max_tokens=2000,  # Reduced for faster responses
             timeout_seconds=15,  # Reduced timeout for faster responses
             **kwargs
         )
-        self.llm = get_chat_model(model_name="o4-mini")
+        self.llm = get_chat_model(model_name="gpt-4.1-nano")
 
     def make_decision(self, state: SurveyState, context: Dict[str, Any] = None) -> SupervisorDecision:
         """Make strategic survey administration decision - delegates to process_survey_step."""

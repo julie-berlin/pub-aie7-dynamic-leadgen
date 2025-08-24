@@ -780,10 +780,11 @@ Just write the message, no other text."""
             return 0
     
     def _update_database_status(self, state: SurveyState, classification: Dict):
-        """Update database with final lead status."""
+        """Update database with final lead status and create lead outcome record when ending."""
         try:
             session_id = state.get("core", {}).get("session_id")
             
+            # Always update the lead session status
             self.toolbelt.update_lead_status_in_database(
                 session_id=session_id,
                 lead_status=classification["lead_status"],
@@ -791,8 +792,109 @@ Just write the message, no other text."""
                 confidence=classification["confidence"],
                 completion_message=classification.get("completion_message")
             )
+            
+            # CRITICAL FIX: Create lead outcome record when survey is ending
+            route_decision = classification.get("route_decision", "continue")
+            if route_decision == "end" or classification.get("completed", False):
+                self._create_lead_outcome_record(state, classification)
+                
         except Exception as e:
             logger.error(f"Database update error: {e}")
+    
+    def _create_lead_outcome_record(self, state: SurveyState, classification: Dict):
+        """Create a lead outcome record for completed surveys."""
+        try:
+            from ...database import db
+            
+            # Get session and form information
+            core = state.get("core", {})
+            session_id = core.get("session_id")
+            form_id = core.get("form_id")
+            
+            # Get session record from database for client_id and session database ID
+            session_record = db.get_lead_session(session_id)
+            if not session_record:
+                logger.error(f"No session record found for {session_id} - cannot create lead outcome")
+                return
+            
+            session_db_id = session_record.get("id")  # Database UUID
+            client_id = session_record.get("client_id")
+            
+            # Map lead status to outcome status for lead_outcomes table
+            lead_status = classification["lead_status"]
+            if lead_status == "yes":
+                final_status = "qualified"
+            elif lead_status == "maybe":
+                final_status = "maybe"
+            elif lead_status == "no":
+                final_status = "unqualified"
+            else:  # unknown or error states
+                # Keep unknown status as unknown, don't default to unqualified
+                logger.warning(f"Survey ended with unknown lead status: {lead_status}")
+                return  # Don't create lead outcome for unknown status
+            
+            # Extract contact information from responses
+            contact_info = self._extract_contact_info(state)
+            
+            # Determine notification requirements
+            notification_required = final_status in ["qualified", "maybe"]
+            notification_method = "email" if notification_required else None
+            
+            # Create lead outcome record
+            outcome_data = {
+                "session_id": session_db_id,  # Use database UUID, not session_id string
+                "client_id": client_id,
+                "form_id": form_id,
+                "final_status": final_status,
+                "contact_info": contact_info,
+                "lead_score": classification["final_score"],
+                "confidence_score": classification.get("confidence", 0.0),
+                "notification_sent": False,  # Will be updated when notification is actually sent
+                "notification_method": notification_method,
+                "follow_up_required": notification_required,
+                "follow_up_date": None  # Can be set by business logic later
+            }
+            
+            result = db.create_lead_outcome(outcome_data)
+            logger.info(f"✅ Created lead outcome record: {result.get('id')} for session {session_id} with status {final_status}")
+            
+        except Exception as e:
+            logger.error(f"Failed to create lead outcome record: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+    
+    def _extract_contact_info(self, state: SurveyState) -> Dict[str, Any]:
+        """Extract contact information from survey responses."""
+        try:
+            contact_info = {}
+            
+            # Get all responses from the lead intelligence state
+            all_responses = state.get("lead_intelligence", {}).get("responses", [])
+            
+            for response in all_responses:
+                question_text = response.get("question_text", "").lower()
+                answer = response.get("answer", "").strip()
+                
+                if not answer:
+                    continue
+                
+                # Extract common contact fields
+                if "name" in question_text and not contact_info.get("name"):
+                    contact_info["name"] = answer
+                elif "email" in question_text and not contact_info.get("email"):
+                    contact_info["email"] = answer
+                elif "phone" in question_text and not contact_info.get("phone"):
+                    contact_info["phone"] = answer
+                elif "address" in question_text and not contact_info.get("address"):
+                    contact_info["address"] = answer
+                elif "company" in question_text and not contact_info.get("company"):
+                    contact_info["company"] = answer
+            
+            return contact_info
+            
+        except Exception as e:
+            logger.error(f"Failed to extract contact info: {e}")
+            return {}
     
     def _create_fallback_decision(self, score: int, responses: List[Dict]) -> Dict[str, Any]:
         """Create fallback decision when LLM fails."""
