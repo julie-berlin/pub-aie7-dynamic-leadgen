@@ -68,7 +68,7 @@ export const useAdminStore = create<AdminStore>()(
       isLoading: false,
       error: null,
       businessInfo: {
-        name: 'Survey Admin',
+        name: 'Business Admin',
         industry: undefined,
         isLoaded: false
       },
@@ -119,8 +119,11 @@ export const useAdminStore = create<AdminStore>()(
               error: null 
             });
             
-              // Load business info
-              get().loadBusinessInfo().catch(console.warn);
+              // Load business info (non-blocking)
+              // TODO: Temporarily disabled to debug login hanging
+              // setTimeout(() => {
+              //   get().loadBusinessInfo().catch(console.warn);
+              // }, 0);
             } else {
               // Response format error
               localStorage.removeItem('admin_token');
@@ -180,8 +183,18 @@ export const useAdminStore = create<AdminStore>()(
           // Store token in localStorage for API requests
           localStorage.setItem('admin_token', access_token);
           
+          // Map backend user format to frontend format
+          const mappedUser: AdminUser = {
+            id: user.id,
+            email: user.email,
+            name: `${user.first_name} ${user.last_name}`,
+            role: user.role as 'admin' | 'manager' | 'viewer',
+            clientId: user.client_id, // Map client_id to clientId
+            permissions: user.permissions || ['read', 'write', 'delete']
+          };
+          
           set({ 
-            user, 
+            user: mappedUser, 
             isAuthenticated: true,
             isInitialized: true,
             isLoading: false,
@@ -189,7 +202,10 @@ export const useAdminStore = create<AdminStore>()(
           });
           
           // Load business info after successful login (non-blocking)
-          get().loadBusinessInfo().catch(console.warn);
+          // TODO: Temporarily disabled to debug login hanging
+          // setTimeout(() => {
+          //   get().loadBusinessInfo().catch(console.warn);
+          // }, 0);
         } catch (error) {
           set({ 
             error: error instanceof Error ? error.message : 'Login failed',
@@ -206,7 +222,7 @@ export const useAdminStore = create<AdminStore>()(
           isInitialized: true, // Keep initialized as true - we know the auth state
           error: null,
           businessInfo: {
-            name: 'Survey Admin',
+            name: 'Business Admin',
             industry: undefined,
             isLoaded: false
           }
@@ -231,7 +247,18 @@ export const useAdminStore = create<AdminStore>()(
           if (result.success && result.data) {
             const { access_token, user } = result.data;
             localStorage.setItem('admin_token', access_token);
-            set({ user, isAuthenticated: true });
+            
+            // Map backend user format to frontend format
+            const mappedUser: AdminUser = {
+              id: user.id,
+              email: user.email,
+              name: `${user.first_name} ${user.last_name}`,
+              role: user.role as 'admin' | 'manager' | 'viewer',
+              clientId: user.client_id, // Map client_id to clientId
+              permissions: user.permissions || ['read', 'write', 'delete']
+            };
+            
+            set({ user: mappedUser, isAuthenticated: true });
           } else {
             throw new Error(result.message || 'Token refresh failed');
           }
@@ -256,22 +283,35 @@ export const useAdminStore = create<AdminStore>()(
         try {
           const token = localStorage.getItem('admin_token');
           if (!token) {
-            set({ businessInfo: { name: 'Survey Admin', isLoaded: true } });
+            set({ businessInfo: { name: 'Business Admin', isLoaded: true } });
             return;
           }
 
-          // For now, just set default business info since we have user info from login
-          // TODO: Implement proper business info endpoint later
-          set({
-            businessInfo: {
-              name: 'Survey Admin',
-              industry: undefined,
-              isLoaded: true
+          // Fetch actual business info from API
+          const response = await fetch(buildApiUrl('/api/clients/me'), {
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`,
             }
           });
+
+          if (response.ok) {
+            const result = await response.json();
+            const data = result.data;
+            set({
+              businessInfo: {
+                name: data.name || 'Business Admin',
+                industry: data.industry,
+                isLoaded: true
+              }
+            });
+          } else {
+            console.warn('Failed to load business info - API response not ok:', response.status);
+            set({ businessInfo: { name: 'Business Admin', isLoaded: true } });
+          }
         } catch (error) {
           console.error('Failed to load business info:', error);
-          set({ businessInfo: { name: 'Survey Admin', isLoaded: true } });
+          set({ businessInfo: { name: 'Business Admin', isLoaded: true } });
         }
       },
     }),

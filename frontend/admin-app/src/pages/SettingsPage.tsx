@@ -15,7 +15,7 @@ interface CompanySettings {
 }
 
 export default function SettingsPage() {
-  const { user } = useAdminStore();
+  const { user, loadBusinessInfo } = useAdminStore();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState<CompanySettings>({
@@ -56,7 +56,7 @@ export default function SettingsPage() {
       if (response.ok) {
         const { data } = await response.json();
         const clientSettings = {
-          name: data.business_name || data.name || '',
+          name: data.name || '',
           businessObjective: data.goals || '',
           industry: data.industry || '',
           description: data.background || '',
@@ -91,13 +91,13 @@ export default function SettingsPage() {
           'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
-          business_name: settings.name,
+          name: settings.name,
           goals: settings.businessObjective,
           industry: settings.industry,
-          background: settings.description,
-          website: settings.website,
-          phone: settings.phone,
-          address: settings.address,
+          business_description: settings.description,
+          website_url: settings.website,
+          contact_phone: settings.phone,
+          business_address: settings.address,
           logo_url: settings.logoUrl
         })
       });
@@ -105,7 +105,7 @@ export default function SettingsPage() {
       if (response.ok) {
         const { data } = await response.json();
         const updatedSettings = {
-          name: data.business_name || data.name || '',
+          name: data.name || '',
           businessObjective: data.goals || '',
           industry: data.industry || '',
           description: data.background || '',
@@ -116,6 +116,9 @@ export default function SettingsPage() {
         };
         setOriginalSettings(updatedSettings);
         setSettings(updatedSettings);
+        
+        // Refresh business info to update the sidebar
+        loadBusinessInfo();
       } else {
         throw new Error('Failed to save settings');
       }
