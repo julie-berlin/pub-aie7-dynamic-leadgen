@@ -170,10 +170,10 @@ async def start_session(
         logger.info(f"🏢 Loading business info for client_id: {client_id}")
         if client_id:
             try:
-                client_data = db.client.table('clients').select('business_name', 'company_logo_url').eq('id', client_id).execute()
+                client_data = db.client.table('clients').select('name', 'company_logo_url').eq('id', client_id).execute()
                 logger.info(f"🏢 Client query result: {client_data.data}")
                 if client_data.data and len(client_data.data) > 0:
-                    business_name = client_data.data[0].get('business_name')
+                    business_name = client_data.data[0].get('name')
                     logo_url = client_data.data[0].get('company_logo_url')
                     logger.info(f"🏢 Successfully loaded business name: {business_name}, logo_url: {logo_url}")
                 else:

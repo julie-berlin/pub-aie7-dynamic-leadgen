@@ -24,12 +24,10 @@ export default function FormPage() {
     initializeForm
   } = useFormStore();
 
-  // Business name and logo from form data
+  // Business name and logo from persisted form data (loaded once, cached)
   const businessName = currentForm?.businessName;
-  const { loadTheme, currentTheme } = useThemeStore();
-  
-  // Priority: theme logo > form logo
-  const logoUrl = currentTheme?.logo_url || currentForm?.logoUrl;
+  const logoUrl = currentForm?.logoUrl;
+  const { loadTheme } = useThemeStore();
 
   useEffect(() => {
     if (!formId) {

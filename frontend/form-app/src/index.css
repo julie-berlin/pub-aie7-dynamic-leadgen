@@ -122,10 +122,15 @@ body {
         color: var(--color-text);
         /* margin-top: var(--spacing-input); */
         padding: var(--spacing-input);
+        line-height: 140%;
     }
 }
 
 .question-label {
+    line-height: 140%;
+}
+
+label {
     line-height: 140%;
 }
 
