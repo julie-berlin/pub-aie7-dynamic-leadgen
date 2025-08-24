@@ -17,10 +17,10 @@ export default function FormNavigation({ currentStep, canGoBack = false, loading
   };
 
   return (
-    <div className="flex justify-between items-center mt-12 pt-8">
-      {/* Back Button */}
-      <div>
-        {canGoBack ? (
+    <div className="flex justify-center items-center mt-12 pt-8">
+      {/* Next/Submit Button - Centered */}
+      <div className="flex gap-4 items-center">
+        {canGoBack && (
           <button
             type="button"
             onClick={handleBack}
@@ -48,13 +48,7 @@ export default function FormNavigation({ currentStep, canGoBack = false, loading
             </svg>
             Back
           </button>
-        ) : (
-          <div></div>
         )}
-      </div>
-
-      {/* Next/Submit Button */}
-      <div>
         <button
           type="submit"
           disabled={loading}

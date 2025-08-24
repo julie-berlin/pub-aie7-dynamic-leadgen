@@ -114,22 +114,29 @@ body {
 /* Question container styles */
 .question-container {
     max-width: 80%;
-    margin: 2rem auto;
+    margin: 0 auto;
 
     label {
         display: block;
         font-weight: 500;
         color: var(--color-text);
-        margin-top: var(--spacing-input);
+        /* margin-top: var(--spacing-input); */
         padding: var(--spacing-input);
     }
 }
 
+.question-label {
+    line-height: 140%;
+}
 
 .question-description {
     font-size: 0.875rem;
     color: var(--color-text-muted);
     margin-bottom: 0.75rem;
+}
+
+fieldset {
+    border: 0;
 }
 
 /* Input field styles */
