@@ -26,7 +26,7 @@ class ConsolidatedSurveyAdminSupervisor(SupervisorAgent):
             timeout_seconds=15,
             **kwargs
         )
-        self.llm = get_chat_model(model_name="gpt-5-mini", temperature=0.3)
+        self.llm = get_chat_model(model_name="o4-mini", temperature=0.3)
 
     def get_system_prompt(self) -> str:
         """System prompt for survey administration."""

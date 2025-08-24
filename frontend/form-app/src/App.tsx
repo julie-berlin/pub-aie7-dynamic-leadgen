@@ -10,10 +10,10 @@ function App() {
       <div className="min-h-screen bg-background">
         <Routes>
           {/* Main form route */}
-          <Route path="/form/:clientId/:formId" element={<FormPage />} />
+          <Route path="/form/:formId" element={<FormPage />} />
           
           {/* Form completion route */}
-          <Route path="/form/:clientId/:formId/complete" element={<CompletionPage />} />
+          <Route path="/form/:formId/complete" element={<CompletionPage />} />
           
           {/* Error page */}
           <Route path="/error" element={<ErrorPage />} />

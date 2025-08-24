@@ -18,18 +18,30 @@ export const useFormStore = create<FormStore>()(
       formState: null,
       currentStep: null,
       theme: null,
+      completionData: null,
       loading: false,
       error: null,
 
       // Actions
-      initializeForm: async (clientId: string, formId: string, trackingData?: Partial<TrackingData>) => {
-        // Clear any stale state when initializing
-        set({ 
-          loading: true, 
-          error: null,
-          currentStep: null,  // Clear old step data
-          formState: null     // Clear old form state
-        });
+      initializeForm: async (formId: string, trackingData?: Partial<TrackingData>) => {
+        const currentState = get();
+        
+        // Only clear state if we're switching to a different form
+        // This prevents unnecessary clearing during step navigation
+        const isSameForm = currentState.currentForm?.id === formId;
+        
+        if (isSameForm) {
+          // Just update loading state, preserve existing form data
+          set({ loading: true, error: null });
+        } else {
+          // Clear state only when switching to a new form
+          set({ 
+            loading: true, 
+            error: null,
+            currentStep: null,  // Clear old step data
+            formState: null     // Clear old form state
+          });
+        }
         
         try {
           // Check if we have an existing session for this form
@@ -41,7 +53,6 @@ export const useFormStore = create<FormStore>()(
           // Start or resume session
           const response = await apiClient.startSession({
             formId,
-            clientId,
             trackingData: {
               ...trackingData
               // userAgent and timestamp are not supported by backend API
@@ -53,7 +64,6 @@ export const useFormStore = create<FormStore>()(
           
           const newFormState: FormState = {
             formId,
-            clientId,
             sessionId: '', // Backend session managed via HTTP-only cookies
             currentStep: response.step.stepNumber,
             totalSteps: response.step.totalSteps,
@@ -66,7 +76,6 @@ export const useFormStore = create<FormStore>()(
           set({
             currentForm: {
               id: response.form.id,
-              clientId,
               title: response.form.title,
               description: response.form.description,
               businessName: response.form.businessName,
@@ -90,8 +99,24 @@ export const useFormStore = create<FormStore>()(
 
         } catch (error) {
           console.error('Failed to initialize form:', error);
+          
+          // Provide user-friendly error messages
+          let errorMessage = 'Failed to load form';
+          
+          if (error instanceof Error) {
+            if (error.message.includes('404') || error.message.includes('Not Found')) {
+              errorMessage = 'This form is not available or may have expired.';
+            } else if (error.message.includes('500') || error.message.includes('Internal Server Error')) {
+              errorMessage = 'Our service is temporarily unavailable. Please try again later.';
+            } else if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+              errorMessage = 'Unable to connect. Please check your internet connection and try again.';
+            } else {
+              errorMessage = error.message;
+            }
+          }
+          
           set({ 
-            error: error instanceof Error ? error.message : 'Failed to load form',
+            error: errorMessage,
             loading: false 
           });
         }
@@ -159,11 +184,8 @@ export const useFormStore = create<FormStore>()(
 
           // If form is complete, handle completion
           if (response.isComplete && response.completionData) {
-            // Store completion data for the completion page (using form ID since session is cookie-managed)
-            localStorage.setItem(
-              `completion_${formState.formId}_${Date.now()}`, 
-              JSON.stringify(response.completionData)
-            );
+            // Store completion data in the store
+            set({ completionData: response.completionData });
           }
 
         } catch (error) {
@@ -251,6 +273,7 @@ export const useFormStore = create<FormStore>()(
           formState: null,
           currentStep: null,
           theme: null,
+          completionData: null,
           loading: false,
           error: null
         });
@@ -258,6 +281,10 @@ export const useFormStore = create<FormStore>()(
         // Clear theme
         const root = document.documentElement;
         root.removeAttribute('style');
+      },
+
+      clearCompletionData: () => {
+        set({ completionData: null });
       },
 
       setError: (error: string | null) => {

@@ -1,19 +1,25 @@
-import { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Suspense, lazy, useEffect } from 'react';
 import { useAdminStore } from './stores/adminStore';
-import { useAnalyticsStore } from './stores/analyticsStore';
+import { LoadingSpinner } from './components/ui';
 
 // Layout components (placeholder imports for now)
 import AdminLayout from './components/layout/AdminLayout';
 import { BreadcrumbProvider } from './components/common/BreadcrumbContext';
+
+// Always load LoginPage immediately since it's needed for unauthenticated users
 import LoginPage from './pages/LoginPage';
-import DashboardPage from './pages/DashboardPage';
-import FormsPage from './pages/FormsPage';
-import AnalyticsPage from './pages/AnalyticsPage';
-import SettingsPage from './pages/SettingsPage';
-import FormDetailPage from './pages/FormDetailPage';
-import LeadsPage from './pages/LeadsPage';
+
+// Lazy load authenticated pages to prevent loading on login page
+const DashboardPage = lazy(() => import('./pages/DashboardPage'));
+const FormsPage = lazy(() => import('./pages/FormsPage'));
+const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'));
+const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+const FormDetailPage = lazy(() => import('./pages/FormDetailPage'));
+const LeadsPage = lazy(() => import('./pages/LeadsPage'));
+const ThemesPage = lazy(() => import('./pages/ThemesPage'));
+const ThemeEditorPage = lazy(() => import('./pages/ThemeEditorPage'));
 
 // Create Query Client for data fetching
 const queryClient = new QueryClient({
@@ -28,22 +34,24 @@ const queryClient = new QueryClient({
 });
 
 function App() {
-  const { isAuthenticated, refreshToken } = useAdminStore();
-  const { startRealTimeUpdates: startAnalyticsUpdates } = useAnalyticsStore();
+  const { isAuthenticated, isInitialized, initializeAuth } = useAdminStore();
 
+  // Initialize authentication on app startup
   useEffect(() => {
-    // Check authentication on app load
-    if (localStorage.getItem('admin_token')) {
-      refreshToken();
-    }
-  }, [refreshToken]);
+    initializeAuth();
+  }, [initializeAuth]);
 
-  useEffect(() => {
-    // Start real-time updates when authenticated
-    if (isAuthenticated) {
-      startAnalyticsUpdates();
-    }
-  }, [isAuthenticated, startAnalyticsUpdates]);
+  // Show loading spinner while determining auth state
+  if (!isInitialized) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-center">
+          <LoadingSpinner />
+          <p className="mt-2 text-sm text-slate-600">Initializing...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -57,17 +65,22 @@ function App() {
           ) : (
             <BreadcrumbProvider>
               <AdminLayout>
-                <Routes>
-                  <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                  <Route path="/dashboard" element={<DashboardPage />} />
-                  <Route path="/forms" element={<FormsPage />} />
-                  <Route path="/forms/:id" element={<FormDetailPage />} />
-                  <Route path="/leads" element={<LeadsPage />} />
-                  <Route path="/analytics" element={<AnalyticsPage />} />
-                  <Route path="/settings" element={<SettingsPage />} />
-                  <Route path="/login" element={<Navigate to="/dashboard" replace />} />
-                  <Route path="*" element={<Navigate to="/dashboard" replace />} />
-                </Routes>
+                <Suspense fallback={<div className="flex justify-center items-center min-h-64"><LoadingSpinner /></div>}>
+                  <Routes>
+                    <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                    <Route path="/dashboard" element={<DashboardPage />} />
+                    <Route path="/forms" element={<FormsPage />} />
+                    <Route path="/forms/:id" element={<FormDetailPage />} />
+                    <Route path="/leads" element={<LeadsPage />} />
+                    <Route path="/analytics" element={<AnalyticsPage />} />
+                    <Route path="/themes" element={<ThemesPage />} />
+                    <Route path="/themes/new" element={<ThemeEditorPage />} />
+                    <Route path="/themes/:id/edit" element={<ThemeEditorPage />} />
+                    <Route path="/settings" element={<SettingsPage />} />
+                    <Route path="/login" element={<Navigate to="/dashboard" replace />} />
+                    <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                  </Routes>
+                </Suspense>
               </AdminLayout>
             </BreadcrumbProvider>
           )}

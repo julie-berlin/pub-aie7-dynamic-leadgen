@@ -236,7 +236,6 @@ class APIClient {
    */
   async startSession(params: {
     formId: string;
-    clientId?: string;
     trackingData?: Partial<TrackingData>;
   }): Promise<StartSessionResponse> {
     const response = await this.request<BackendStartSessionResponse>('/api/survey/start', {

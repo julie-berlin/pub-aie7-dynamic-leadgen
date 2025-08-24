@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { PencilIcon, TrashIcon, PlusIcon, DocumentDuplicateIcon } from '@heroicons/react/24/outline';
+import { PencilIcon, TrashIcon, PlusIcon, DocumentDuplicateIcon, SwatchIcon } from '@heroicons/react/24/outline';
 import { useFormsStore } from '../stores/formsStore';
 import type { AdminForm } from '../stores/formsStore';
 import type { FormStatus } from '../types';
 import { API_ENDPOINTS } from '../config/api';
 import { createFormDetailBreadcrumbs } from '../components/common/Breadcrumb';
 import { useBreadcrumbContext } from '../components/common/BreadcrumbContext';
+import { themeService, type ThemeResponse } from '../services/themeService';
 
 interface FormQuestion {
   id: number;
@@ -31,18 +32,17 @@ export default function FormDetailPage() {
   const [form, setForm] = useState<FormDetails | null>(null);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleValue, setTitleValue] = useState('');
-  const [isEditingTheme, setIsEditingTheme] = useState(false);
-  const [themeValues, setThemeValues] = useState({
-    primaryColor: '#3B82F6',
-    fontFamily: 'Inter',
-    borderRadius: '0.5rem'
-  });
+  const [availableThemes, setAvailableThemes] = useState<ThemeResponse[]>([]);
+  const [selectedThemeId, setSelectedThemeId] = useState<string>('');
+  const [isSelectingTheme, setIsSelectingTheme] = useState(false);
   const [editingQuestionId, setEditingQuestionId] = useState<number | null>(null);
   const [questionEditValues, setQuestionEditValues] = useState<any>({});
 
   useEffect(() => {
     if (id) {
+      // Auth is guaranteed to be ready when this component renders
       loadFormDetails(id);
+      loadAvailableThemes();
     }
   }, [id]);
 
@@ -61,9 +61,17 @@ export default function FormDetailPage() {
   const loadFormDetails = async (formId: string) => {
     setLoading(true);
     try {
+      const token = localStorage.getItem('admin_token');
+      if (!token) {
+        console.error('No admin token found');
+        setLoading(false);
+        return;
+      }
+
       const response = await fetch(API_ENDPOINTS.FORMS.BY_ID(formId), {
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
         }
       });
 
@@ -104,27 +112,12 @@ export default function FormDetailPage() {
             primaryColor: data.theme_config.primary_color || '#3B82F6',
             fontFamily: data.theme_config.font_family || 'Inter',
             borderRadius: data.theme_config.border_radius || '0.5rem',
+            themeName: data.theme_config.theme_name || 'Custom Theme',
           } : undefined,
         };
         
         setForm(transformedForm);
         setTitleValue(transformedForm.title || '');
-        
-        // Initialize theme values
-        if (transformedForm.theme) {
-          setThemeValues({
-            primaryColor: transformedForm.theme.primaryColor || '#3B82F6',
-            fontFamily: transformedForm.theme.fontFamily || 'Inter',
-            borderRadius: transformedForm.theme.borderRadius || '0.5rem'
-          });
-        } else {
-          // Set default theme values if no theme exists
-          setThemeValues({
-            primaryColor: '#3B82F6',
-            fontFamily: 'Inter',
-            borderRadius: '0.5rem'
-          });
-        }
       } else if (response.status === 404) {
         navigate('/forms', { replace: true });
       } else {
@@ -134,6 +127,15 @@ export default function FormDetailPage() {
       console.error('Error loading form details:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadAvailableThemes = async () => {
+    try {
+      const themes = await themeService.getThemes();
+      setAvailableThemes(themes);
+    } catch (error) {
+      console.error('Error loading themes:', error);
     }
   };
 
@@ -159,124 +161,65 @@ export default function FormDetailPage() {
     setIsEditingTitle(false);
   };
 
-  const handleThemeSave = async () => {
-    if (!form) return;
+  const handleApplyTheme = async () => {
+    if (!form || !selectedThemeId) return;
 
     try {
-      // Use form ID to create a consistent theme name
-      const themeName = `Form ${form.id} Theme`;
-      
-      // First, check if a theme with this name already exists
-      const existingThemesResponse = await fetch('/api/themes/');
-      const existingThemesData = await existingThemesResponse.json();
-      
-      const existingTheme = existingThemesData.data.themes.find(
-        (theme: any) => theme.name === themeName
-      );
-      
-      const themeConfig = {
-        name: `${form.title} Theme`,
-        colors: {
-          primary: themeValues.primaryColor,
-          primaryHover: themeValues.primaryColor,
-          primaryLight: themeValues.primaryColor,
-          secondary: "#64748B",
-          secondaryHover: "#4b5563",
-          secondaryLight: "#f3f4f6",
-          accent: "#10b981",
-          text: "#111827",
-          textLight: "#6b7280",
-          textMuted: "#9ca3af",
-          background: "#ffffff",
-          backgroundLight: "#f9fafb",
-          border: "#e5e7eb",
-          error: "#ef4444",
-          success: "#10b981",
-          warning: "#f59e0b"
-        },
-        typography: {
-          primary: `${themeValues.fontFamily}, sans-serif`,
-          secondary: `${themeValues.fontFamily}, sans-serif`
-        },
-        spacing: {
-          section: "2rem",
-          element: "1rem"
-        },
-        borderRadius: themeValues.borderRadius,
-        borderRadiusLg: "0.75rem",
-        shadow: "0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)",
-        shadowLg: "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)"
-      };
-      
-      let response;
-      
-      if (existingTheme) {
-        // Update existing theme
-        response = await fetch(`/api/themes/${existingTheme.id}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            description: `Theme for ${form.title}`,
-            theme_config: themeConfig,
-            primary_color: themeValues.primaryColor,
-            secondary_color: "#64748B",
-            font_family: themeValues.fontFamily,
-            is_default: false
-          })
-        });
-      } else {
-        // Create new theme
-        response = await fetch('/api/themes/', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            name: themeName,
-            description: `Theme for ${form.title}`,
-            theme_config: themeConfig,
-            primary_color: themeValues.primaryColor,
-            secondary_color: "#64748B",
-            font_family: themeValues.fontFamily,
-            is_default: false
-          })
-        });
+      // Get the selected theme details
+      const selectedTheme = availableThemes.find(theme => theme.id === selectedThemeId);
+      if (!selectedTheme) {
+        alert('Selected theme not found');
+        return;
       }
 
+
+      // Apply theme to form by updating form's theme_config
+      const token = localStorage.getItem('admin_token');
+      const response = await fetch(API_ENDPOINTS.FORMS.BY_ID(form.id), {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` }),
+        },
+        body: JSON.stringify({
+          theme_config: {
+            theme_id: selectedTheme.id,
+            primary_color: selectedTheme.primary_color,
+            font_family: selectedTheme.font_family,
+            theme_name: selectedTheme.name
+          }
+        })
+      });
+
+      const responseData = await response.json();
+
       if (response.ok) {
-        await response.json();
+        // Update local form state
         setForm(prev => prev ? {
           ...prev,
           theme: {
-            primaryColor: themeValues.primaryColor,
-            fontFamily: themeValues.fontFamily,
-            borderRadius: themeValues.borderRadius
+            primaryColor: selectedTheme.primary_color,
+            fontFamily: selectedTheme.font_family,
+            borderRadius: '0.5rem', // Default value
+            themeName: selectedTheme.name
           }
         } : null);
-        setIsEditingTheme(false);
-        alert('Theme saved successfully!');
+        
+        setIsSelectingTheme(false);
+        setSelectedThemeId('');
+        alert('Theme applied successfully!');
       } else {
-        const errorData = await response.json();
-        console.error('Theme save failed:', response.status, errorData);
-        throw new Error(`Failed to save theme: ${response.status} - ${errorData.message || 'Unknown error'}`);
+        throw new Error(`Failed to apply theme: ${response.status} - ${responseData.message || 'Unknown error'}`);
       }
     } catch (error) {
-      console.error('Failed to save theme:', error);
-      alert(`Failed to save theme. Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error('Failed to apply theme:', error);
+      alert(`Failed to apply theme. Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
-  const handleThemeCancel = () => {
-    if (form?.theme) {
-      setThemeValues({
-        primaryColor: form.theme.primaryColor || '#3B82F6',
-        fontFamily: form.theme.fontFamily || 'Inter',
-        borderRadius: form.theme.borderRadius || '0.5rem'
-      });
-    }
-    setIsEditingTheme(false);
+  const handleCancelThemeSelection = () => {
+    setIsSelectingTheme(false);
+    setSelectedThemeId('');
   };
 
   const handleEditQuestion = (question: FormQuestion) => {
@@ -367,10 +310,17 @@ export default function FormDetailPage() {
     }
 
     try {
+      const token = localStorage.getItem('admin_token');
+      if (!token) {
+        alert('Authentication required. Please log in again.');
+        return;
+      }
+
       const response = await fetch(API_ENDPOINTS.FORMS.UPDATE(form.id), {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
           status: newStatus
@@ -418,10 +368,17 @@ export default function FormDetailPage() {
         }
       };
 
+      const token = localStorage.getItem('admin_token');
+      if (!token) {
+        alert('Authentication required. Please log in again.');
+        return;
+      }
+
       const createResponse = await fetch(API_ENDPOINTS.FORMS.CREATE, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify(duplicateData)
       });
@@ -737,154 +694,148 @@ export default function FormDetailPage() {
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-lg font-medium text-slate-900">Theme Configuration</h3>
-              <p className="text-sm text-slate-500">Visual styling for this form</p>
+              <p className="text-sm text-slate-500">Apply a theme to style this form</p>
             </div>
             <button
-              onClick={() => setIsEditingTheme(true)}
-              disabled={isEditingTheme}
+              onClick={() => setIsSelectingTheme(true)}
+              disabled={isSelectingTheme}
               className="text-slate-400 hover:text-slate-600 transition-colors disabled:opacity-50"
-              title="Edit theme"
+              title="Select theme"
             >
-              <PencilIcon className="w-4 h-4" />
+              <SwatchIcon className="w-4 h-4" />
             </button>
           </div>
         </div>
         
         <div className="admin-card-body">
-          {isEditingTheme ? (
+          {isSelectingTheme ? (
             <div className="space-y-6">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="admin-form-group">
-                  <label htmlFor="primaryColor" className="admin-label">
-                    Primary Color
-                  </label>
-                  <div className="flex items-center space-x-3">
-                    <input
-                      type="color"
-                      id="primaryColor"
-                      value={themeValues.primaryColor}
-                      onChange={(e) => setThemeValues(prev => ({ ...prev, primaryColor: e.target.value }))}
-                      className="w-12 h-10 rounded border border-slate-300 cursor-pointer"
-                    />
-                    <input
-                      type="text"
-                      value={themeValues.primaryColor}
-                      onChange={(e) => setThemeValues(prev => ({ ...prev, primaryColor: e.target.value }))}
-                      className="admin-input font-mono text-sm"
-                      placeholder="#3B82F6"
-                    />
-                  </div>
-                </div>
-
-                <div className="admin-form-group">
-                  <label htmlFor="fontFamily" className="admin-label">
-                    Font Family
-                  </label>
-                  <select
-                    id="fontFamily"
-                    value={themeValues.fontFamily}
-                    onChange={(e) => setThemeValues(prev => ({ ...prev, fontFamily: e.target.value }))}
-                    className="admin-input"
-                  >
-                    <option value="Inter">Inter</option>
-                    <option value="Roboto">Roboto</option>
-                    <option value="Open Sans">Open Sans</option>
-                    <option value="Lato">Lato</option>
-                    <option value="Poppins">Poppins</option>
-                    <option value="Montserrat">Montserrat</option>
-                    <option value="Source Sans Pro">Source Sans Pro</option>
-                    <option value="system-ui">System Default</option>
-                  </select>
-                </div>
-
-                <div className="admin-form-group">
-                  <label htmlFor="borderRadius" className="admin-label">
-                    Border Radius
-                  </label>
-                  <select
-                    id="borderRadius"
-                    value={themeValues.borderRadius}
-                    onChange={(e) => setThemeValues(prev => ({ ...prev, borderRadius: e.target.value }))}
-                    className="admin-input"
-                  >
-                    <option value="0">None (0px)</option>
-                    <option value="0.25rem">Small (4px)</option>
-                    <option value="0.5rem">Medium (8px)</option>
-                    <option value="0.75rem">Large (12px)</option>
-                    <option value="1rem">Extra Large (16px)</option>
-                    <option value="1.5rem">Rounded (24px)</option>
-                  </select>
-                </div>
+              <div className="admin-form-group">
+                <label htmlFor="themeSelect" className="admin-label">
+                  Select Theme
+                </label>
+                <select
+                  id="themeSelect"
+                  value={selectedThemeId}
+                  onChange={(e) => setSelectedThemeId(e.target.value)}
+                  className="admin-input"
+                >
+                  <option value="">Choose a theme...</option>
+                  {availableThemes.map((theme) => (
+                    <option key={theme.id} value={theme.id}>
+                      {theme.name} {theme.is_default && '(Default)'}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* Theme preview */}
-              <div className="border border-slate-200 rounded-lg p-4 bg-slate-50">
-                <h4 className="text-sm font-medium text-slate-700 mb-3">Preview</h4>
-                <div className="space-y-3">
-                  <div
-                    className="p-4 bg-white border-2 shadow-sm"
-                    style={{
-                      borderColor: themeValues.primaryColor,
-                      borderRadius: themeValues.borderRadius,
-                      fontFamily: themeValues.fontFamily
-                    }}
-                  >
-                    <h5 className="font-semibold text-slate-900 mb-2">Sample Question</h5>
-                    <p className="text-slate-600 text-sm mb-3">How would you rate your experience with our service?</p>
-                    <button
-                      className="px-4 py-2 text-white rounded transition-colors"
-                      style={{
-                        backgroundColor: themeValues.primaryColor,
-                        borderRadius: themeValues.borderRadius
-                      }}
-                    >
-                      Submit Response
-                    </button>
+              {selectedThemeId && (() => {
+                const selectedTheme = availableThemes.find(t => t.id === selectedThemeId);
+                if (!selectedTheme) return null;
+                
+                return (
+                  <div className="border border-slate-200 rounded-lg p-4 bg-slate-50">
+                    <h4 className="text-sm font-medium text-slate-700 mb-3">Preview</h4>
+                    <div className="space-y-3">
+                      <div
+                        className="p-4 bg-white border-2 shadow-sm rounded-lg"
+                        style={{
+                          borderColor: selectedTheme.primary_color,
+                          fontFamily: `${selectedTheme.font_family}, sans-serif`
+                        }}
+                      >
+                        <h5 className="font-semibold text-slate-900 mb-2">Sample Question</h5>
+                        <p className="text-slate-600 text-sm mb-3">How would you rate your experience with our service?</p>
+                        <button
+                          className="px-4 py-2 text-white rounded transition-colors"
+                          style={{
+                            backgroundColor: selectedTheme.primary_color
+                          }}
+                        >
+                          Submit Response
+                        </button>
+                      </div>
+                      
+                      {/* Theme details */}
+                      <div className="grid grid-cols-3 gap-4 text-xs">
+                        <div>
+                          <span className="text-slate-500">Primary Color:</span>
+                          <div className="flex items-center space-x-1 mt-1">
+                            <div 
+                              className="w-4 h-4 rounded border border-slate-200"
+                              style={{ backgroundColor: selectedTheme.primary_color }}
+                            />
+                            <span className="font-mono">{selectedTheme.primary_color}</span>
+                          </div>
+                        </div>
+                        <div>
+                          <span className="text-slate-500">Font:</span>
+                          <div className="mt-1">{selectedTheme.font_family}</div>
+                        </div>
+                        <div>
+                          <span className="text-slate-500">Description:</span>
+                          <div className="mt-1">{selectedTheme.description || 'No description'}</div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
+                );
+              })()}
 
               <div className="flex items-center justify-end space-x-3 pt-4 border-t border-slate-200">
                 <button
-                  onClick={handleThemeCancel}
+                  onClick={handleCancelThemeSelection}
                   className="admin-btn-secondary"
                 >
                   Cancel
                 </button>
                 <button
-                  onClick={handleThemeSave}
-                  className="admin-btn-primary"
+                  onClick={handleApplyTheme}
+                  disabled={!selectedThemeId}
+                  className="admin-btn-primary disabled:opacity-50"
                 >
-                  Save Theme
+                  Apply Theme
                 </button>
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <div>
-                <dt className="text-sm font-medium text-slate-500">Primary Color</dt>
-                <dd className="flex items-center space-x-2 mt-1">
-                  <div 
-                    className="w-6 h-6 rounded border border-slate-200"
-                    style={{ backgroundColor: form?.theme?.primaryColor || themeValues.primaryColor }}
-                  />
-                  <span className="text-sm text-slate-900 font-mono">
-                    {form?.theme?.primaryColor || themeValues.primaryColor}
-                  </span>
-                </dd>
-              </div>
-              <div>
-                <dt className="text-sm font-medium text-slate-500">Font Family</dt>
-                <dd className="text-sm text-slate-900 mt-1">
-                  {form?.theme?.fontFamily || themeValues.fontFamily}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-sm font-medium text-slate-500">Border Radius</dt>
-                <dd className="text-sm text-slate-900 mt-1">
-                  {form?.theme?.borderRadius || themeValues.borderRadius}
-                </dd>
-              </div>
+            <div className="space-y-4">
+              {/* Current theme display */}
+              {form?.theme ? (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                  <div>
+                    <dt className="text-sm font-medium text-slate-500">Primary Color</dt>
+                    <dd className="flex items-center space-x-2 mt-1">
+                      <div 
+                        className="w-6 h-6 rounded border border-slate-200"
+                        style={{ backgroundColor: form.theme.primaryColor }}
+                      />
+                      <span className="text-sm text-slate-900 font-mono">
+                        {form.theme.primaryColor}
+                      </span>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-sm font-medium text-slate-500">Font Family</dt>
+                    <dd className="text-sm text-slate-900 mt-1">
+                      {form.theme.fontFamily}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-sm font-medium text-slate-500">Applied Theme</dt>
+                    <dd className="text-sm text-slate-900 mt-1">
+                      {form.theme.themeName || 'Custom Theme'}
+                    </dd>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-slate-500">
+                  <SwatchIcon className="w-12 h-12 mx-auto mb-2 text-slate-300" />
+                  <p>No theme applied to this form</p>
+                  <p className="text-sm">Click the theme icon to select and apply a theme</p>
+                </div>
+              )}
             </div>
           )}
         </div>

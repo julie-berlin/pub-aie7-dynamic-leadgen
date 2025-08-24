@@ -19,13 +19,13 @@ class ConsolidatedSurveyAdminSupervisor(SupervisorAgent):
     def __init__(self, **kwargs):
         super().__init__(
             name="ConsolidatedSurveyAdminSupervisor",
-            model_name="gpt-3.5-turbo",
+            model_name="gpt-4.1-nano",
             temperature=0.3,
             max_tokens=2000,  # Reduced for faster responses
             timeout_seconds=15,  # Reduced timeout for faster responses
             **kwargs
         )
-        self.llm = get_chat_model(model_name="gpt-3.5-turbo", temperature=0.3)
+        self.llm = get_chat_model(model_name="gpt-4.1-nano")
 
     def make_decision(self, state: SurveyState, context: Dict[str, Any] = None) -> SupervisorDecision:
         """Make strategic survey administration decision - delegates to process_survey_step."""
@@ -52,11 +52,12 @@ class ConsolidatedSurveyAdminSupervisor(SupervisorAgent):
    - Early steps: 1-2 questions to build trust
    - Later steps: 3-4 questions when momentum established
 
-2. QUESTION REPHRASING: Make questions engaging and personal
-   - Use user's name if known
-   - Reference previous responses when relevant
-   - Make conversational and natural
-   - Each question asks for exactly ONE piece of information
+2. QUESTION REPHRASING: Analyze intent and rephrase precisely
+   - Read the original question and understand what specific information it needs
+   - Rephrase to collect exactly that information and only that information
+   - Use user's name if known and make conversational
+   - Exception: textarea questions can ask for broader, multi-faceted responses
+   - NEVER add extra requests beyond the original question's intent
 
 3. ENGAGEMENT MESSAGING: Business context + completion encouragement
    - Include specific business services/benefits
@@ -103,8 +104,16 @@ MESSAGE: At Pawsome Dog Walking, we've helped over 500 pet owners. Tell us more 
             # Load available questions
             available_questions = self._load_available_questions(state)
             if not available_questions:
-                logger.warning("No available questions found, completing survey")
-                return self._create_completion_response("No more questions available")
+                logger.warning("No available questions found, routing to lead intelligence for completion check")
+                return {
+                    "route_to_lead_intelligence": True,
+                    "pending_responses": [],  # Empty responses to trigger completion check
+                    "supervisor_metadata": {
+                        "supervisor_name": self.name,
+                        "action": "route_to_completion_check",
+                        "decision_timestamp": datetime.now().isoformat()
+                    }
+                }
 
             # Analyze current state
             analysis = self._analyze_survey_state(state, available_questions)
@@ -180,15 +189,15 @@ MESSAGE: At Pawsome Dog Walking, we've helped over 500 pet owners. Tell us more 
             # CRITICAL FIX: Get already asked questions from TWO sources (like langgraph_test)
             # 1. Database tracking (persistent)
             asked_ids_db = db.get_asked_questions(session_id) if session_id else []
-            
-            # 2. State-based tracking (current session)  
+
+            # 2. State-based tracking (current session)
             asked_ids_state = state.get("question_strategy", {}).get("asked_questions", [])
-            
+
             # Combine both sources (this is what makes langgraph_test work!)
             asked_ids = list(set(asked_ids_db + asked_ids_state))
 
             logger.info(f"🔥 DUAL TRACKING: DB asked questions: {asked_ids_db}")
-            logger.info(f"🔥 DUAL TRACKING: State asked questions: {asked_ids_state}") 
+            logger.info(f"🔥 DUAL TRACKING: State asked questions: {asked_ids_state}")
             logger.info(f"🔥 DUAL TRACKING: Combined asked questions: {asked_ids}")
 
             # Filter to available questions using question_id (not database id)
@@ -351,7 +360,7 @@ BUSINESS PROVIDING SERVICE: {business_name} ({industry})
 - Target: {target_audience[:150]}
 
 USER FILLING OUT FORM:
-- Name: {user_name or 'not provided yet'}
+- Name: {user_name if user_name else 'not provided yet'}
 - Questions answered: {analysis['questions_asked']}
 - Engagement risk: {analysis['risk_level']}
 - Recent responses: {json.dumps(responses[-2:] if responses else [], indent=1)}
@@ -362,18 +371,38 @@ AVAILABLE QUESTIONS:
 CRITICAL INSTRUCTIONS:
 1. Select 1-4 questions (vary the count - don't always pick same number)
 2. Rephrase questions FOR THE USER (person filling out form)
-3. Use user's name ({user_name}) if known - NOT business owner info
+3. Use user's name ({user_name if user_name else ''}) ONLY if known - NOT business owner info
 4. Questions ask about USER'S needs/info - NOT business owner's info
-5. ENGAGEMENT MESSAGES (HEADLINE + MESSAGE): Use business info to entice user
+5. **MANDATORY**: Understand the original question's intent and rephrase to get exactly that
+   - Read what information the original question is trying to collect
+   - Rephrase to get exactly that information and nothing extra
+   - For text/select/radio: single focused answer
+   - For textarea: can be broader and ask for detailed explanation
+   - NEVER add additional requests beyond the original question's scope
+6. ENGAGEMENT MESSAGES (HEADLINE + MESSAGE): Use business info to entice user
    - Mention {business_name}'s background, qualifications, experience
    - Highlight specific services and benefits offered
    - Show why the business is perfect for the user's needs
    - Reference business owner's expertise to build trust
-6. NEVER mix business owner details into user questions
+7. NEVER mix business owner details into user questions
 
-QUESTION PHRASING:
+QUESTION PHRASING RULES - MATCH THE ORIGINAL INTENT:
+ORIGINAL: "What is your full name?" 
+WRONG REPHRASE: "What's your name and what should we call you?" (adds extra request)
+RIGHT REPHRASE: "What's your name?" (matches original intent exactly)
+
+ORIGINAL: "What is your email address?"
+WRONG REPHRASE: "What's your email and phone number?" (adds extra request) 
+RIGHT REPHRASE: "What's your email address?" (matches original intent exactly)
+
+ORIGINAL: "Tell us about your project requirements" (textarea)
+RIGHT REPHRASE: "Tell us about your project - what are you looking to accomplish and what challenges are you facing?" (textarea can be broader)
+
+OTHER EXAMPLES:
 WRONG: "What should we call you, the dog-loving recent Psychology graduate?"
-RIGHT: "What should we call you?" or "Hi {user_name}, what should we call you?"
+WRONG: "How well-behaved is your dog on walks, None?"
+RIGHT: "What should we call you?" or "Hi {user_name if user_name else ''}, what should we call you?"
+RIGHT: "How well-behaved is your dog on walks?" (without name if not known)
 
 ENGAGEMENT MESSAGING:
 GOOD: "As a Psychology graduate who loves dogs, [Business] provides expert care..."
@@ -619,12 +648,12 @@ Use the exact output format specified in your instructions."""
         # CRITICAL FIX: Update state asked_questions (like langgraph_test does)
         question_strategy = state.get('question_strategy', {})
         current_asked = question_strategy.get('asked_questions', [])
-        
+
         # Add newly selected questions to asked_questions (prevents repetition!)
         selected_questions = decision.get("selected_questions", [])
         new_question_ids = [q.get('question_id') for q in selected_questions if q.get('question_id') is not None]
         updated_asked = current_asked + new_question_ids
-        
+
         logger.info(f"🔥 STATE UPDATE: Adding {new_question_ids} to asked_questions")
         logger.info(f"🔥 STATE UPDATE: {current_asked} -> {updated_asked}")
 
@@ -695,7 +724,7 @@ Use the exact output format specified in your instructions."""
             }
         }
 
-        return {
+        result = {
             # This is the key the API is looking for
             "frontend_response": {
                 **frontend_data,

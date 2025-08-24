@@ -12,7 +12,7 @@ interface TextInputProps {
 
 export default function TextInput({ question, register, error, disabled }: TextInputProps) {
   const inputType = question.type === 'email' ? 'email' : 
-                   question.type === 'phone' ? 'tel' :
+                   question.type === 'tel' ? 'tel' :
                    question.type === 'number' ? 'number' : 'text';
 
   return (

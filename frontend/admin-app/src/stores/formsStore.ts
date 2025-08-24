@@ -2,6 +2,18 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { API_ENDPOINTS } from '../config/api';
 
+// Helper function to get authenticated headers
+const getAuthHeaders = () => {
+  const token = localStorage.getItem('admin_token');
+  if (!token) {
+    throw new Error('No authentication token found');
+  }
+  return {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${token}`
+  };
+};
+
 // Form interface for admin management
 export interface AdminForm {
   id: string;
@@ -130,9 +142,7 @@ export const useFormsStore = create<FormsStore>()(
           if (filters.dateRange.end) params.set('endDate', filters.dateRange.end);
           
           const response = await fetch(API_ENDPOINTS.FORMS.LIST(params), {
-            headers: { 
-              'Content-Type': 'application/json'
-            },
+            headers: getAuthHeaders(),
           });
           
           if (!response.ok) {
@@ -188,9 +198,11 @@ export const useFormsStore = create<FormsStore>()(
         set({ isLoading: true, error: null });
         
         try {
+          const token = localStorage.getItem('admin_token');
           const response = await fetch(API_ENDPOINTS.FORMS.BY_ID(id), {
             headers: { 
-              'Content-Type': 'application/json'
+              'Content-Type': 'application/json',
+              ...(token && { 'Authorization': `Bearer ${token}` })
             },
           });
           
@@ -314,7 +326,8 @@ export const useFormsStore = create<FormsStore>()(
           const response = await fetch(API_ENDPOINTS.FORMS.BY_ID(id), {
             method: 'DELETE',
             headers: { 
-              'Content-Type': 'application/json'
+              'Content-Type': 'application/json',
+              ...(localStorage.getItem('admin_token') && { 'Authorization': `Bearer ${localStorage.getItem('admin_token')}` })
             },
           });
           

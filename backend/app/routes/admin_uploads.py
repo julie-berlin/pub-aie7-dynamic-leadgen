@@ -98,13 +98,6 @@ async def delete_logo(
                 'updated_at': datetime.utcnow().isoformat()
             }).eq('client_id', current_user.client_id).execute()
             
-            # Also clear clients.company_logo_url for backward compatibility
-            try:
-                client_update = db.client.table('clients').update({
-                    'company_logo_url': None
-                }).eq('id', current_user.client_id).execute()
-            except Exception as client_error:
-                logger.warning(f"Failed to clear client company_logo_url: {client_error}")
             
             # Note: We don't fail if the update doesn't work since the file is already deleted
             # This handles cases where client_settings record might not exist

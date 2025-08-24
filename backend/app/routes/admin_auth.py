@@ -16,16 +16,11 @@ import jwt
 
 from app.database import db
 from app.utils.response_helpers import success_response, error_response
+from app.utils.admin_auth_unified import create_access_token, verify_token, hash_password, verify_password
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/admin/auth", tags=["admin-auth"])
 security = HTTPBearer()
-
-# JWT Configuration (should be in environment variables)
-import os
-JWT_SECRET = os.getenv('JWT_SECRET', 'dev-secret-key-change-in-production')
-JWT_ALGORITHM = "HS256"
-JWT_EXPIRATION_HOURS = 24
 
 # === PYDANTIC MODELS ===
 
@@ -58,44 +53,14 @@ class AdminTokenResponse(BaseModel):
 
 # === UTILITY FUNCTIONS ===
 
-def hash_password(password: str) -> str:
-    """Hash a password with salt."""
-    salt = secrets.token_hex(16)
-    password_hash = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000)
-    return f"{salt}:{password_hash.hex()}"
+def verify_token_from_credentials(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict:
+    """Verify JWT token from HTTP Authorization header."""
+    token_payload = verify_token(credentials.credentials)
+    if not token_payload:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    return token_payload
 
-def verify_password(password: str, hashed_password: str) -> bool:
-    """Verify a password against its hash."""
-    try:
-        salt, stored_hash = hashed_password.split(':')
-        password_hash = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000)
-        return password_hash.hex() == stored_hash
-    except ValueError:
-        return False
-
-def create_access_token(user_id: str, client_id: str) -> tuple[str, int]:
-    """Create a JWT access token."""
-    expiration = datetime.utcnow() + timedelta(hours=JWT_EXPIRATION_HOURS)
-    payload = {
-        'user_id': user_id,
-        'client_id': client_id,
-        'exp': expiration,
-        'iat': datetime.utcnow()
-    }
-    token = jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
-    return token, int(JWT_EXPIRATION_HOURS * 3600)
-
-def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict:
-    """Verify JWT token."""
-    try:
-        payload = jwt.decode(credentials.credentials, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        return payload
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token has expired")
-    except jwt.InvalidTokenError:
-        raise HTTPException(status_code=401, detail="Invalid token")
-
-def get_current_admin_user(token_payload: dict = Depends(verify_token)) -> AdminUserResponse:
+def get_current_admin_user(token_payload: dict = Depends(verify_token_from_credentials)) -> AdminUserResponse:
     """Get current admin user from token."""
     try:
         # Get user by ID using Supabase client
@@ -185,10 +150,25 @@ async def login_admin_user(login_request: AdminUserLogin):
             created_at=user_data['created_at']
         )
         
-        return AdminTokenResponse(
+        token_response = AdminTokenResponse(
             access_token=access_token,
             expires_in=expires_in,
             user=user_response
+        )
+        
+        # Convert to dict with proper datetime serialization
+        response_data = token_response.dict()
+        # Convert datetime fields to ISO strings
+        if 'user' in response_data and response_data['user']:
+            user_data = response_data['user']
+            if 'last_login_at' in user_data and user_data['last_login_at']:
+                user_data['last_login_at'] = user_data['last_login_at'].isoformat() if hasattr(user_data['last_login_at'], 'isoformat') else str(user_data['last_login_at'])
+            if 'created_at' in user_data and user_data['created_at']:
+                user_data['created_at'] = user_data['created_at'].isoformat() if hasattr(user_data['created_at'], 'isoformat') else str(user_data['created_at'])
+        
+        return success_response(
+            data=response_data,
+            message="Login successful"
         )
             
     except HTTPException:
@@ -197,22 +177,46 @@ async def login_admin_user(login_request: AdminUserLogin):
         logger.error(f"Failed to login user: {e}")
         raise HTTPException(status_code=500, detail="Failed to login user")
 
-@router.get("/me", response_model=AdminUserResponse)
+@router.get("/me")
 async def get_current_user(current_user: AdminUserResponse = Depends(get_current_admin_user)):
     """Get current authenticated user."""
-    return current_user
+    # Convert to dict with proper datetime serialization
+    user_data = current_user.dict()
+    if 'last_login_at' in user_data and user_data['last_login_at']:
+        user_data['last_login_at'] = user_data['last_login_at'].isoformat() if hasattr(user_data['last_login_at'], 'isoformat') else str(user_data['last_login_at'])
+    if 'created_at' in user_data and user_data['created_at']:
+        user_data['created_at'] = user_data['created_at'].isoformat() if hasattr(user_data['created_at'], 'isoformat') else str(user_data['created_at'])
+    
+    return success_response(
+        data=user_data,
+        message="User retrieved successfully"
+    )
 
-@router.post("/refresh", response_model=AdminTokenResponse)
+@router.post("/refresh")
 async def refresh_token(current_user: AdminUserResponse = Depends(get_current_admin_user)):
     """Refresh access token."""
     try:
         # Create new access token
         access_token, expires_in = create_access_token(current_user.id, current_user.client_id)
         
-        return AdminTokenResponse(
+        token_response = AdminTokenResponse(
             access_token=access_token,
             expires_in=expires_in,
             user=current_user
+        )
+        
+        # Convert to dict with proper datetime serialization
+        response_data = token_response.dict()
+        if 'user' in response_data and response_data['user']:
+            user_data = response_data['user']
+            if 'last_login_at' in user_data and user_data['last_login_at']:
+                user_data['last_login_at'] = user_data['last_login_at'].isoformat() if hasattr(user_data['last_login_at'], 'isoformat') else str(user_data['last_login_at'])
+            if 'created_at' in user_data and user_data['created_at']:
+                user_data['created_at'] = user_data['created_at'].isoformat() if hasattr(user_data['created_at'], 'isoformat') else str(user_data['created_at'])
+        
+        return success_response(
+            data=response_data,
+            message="Token refreshed successfully"
         )
         
     except Exception as e:

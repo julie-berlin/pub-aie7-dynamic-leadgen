@@ -33,15 +33,23 @@ export default function SettingsPage() {
   const hasChanges = originalSettings ? JSON.stringify(settings) !== JSON.stringify(originalSettings) : false;
 
   useEffect(() => {
+    // Auth is guaranteed to be ready when this component renders
     loadSettings();
   }, []);
 
   const loadSettings = async () => {
     setLoading(true);
     try {
+      const token = localStorage.getItem('admin_token');
+      if (!token) {
+        console.error('No admin token found');
+        return;
+      }
+
       const response = await fetch(API_ENDPOINTS.CLIENTS.ME, {
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
         }
       });
 
@@ -70,19 +78,26 @@ export default function SettingsPage() {
   const saveSettings = async () => {
     setSaving(true);
     try {
+      const token = localStorage.getItem('admin_token');
+      if (!token) {
+        console.error('No admin token found');
+        return;
+      }
+
       const response = await fetch(API_ENDPOINTS.CLIENTS.ME, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
           business_name: settings.name,
           goals: settings.businessObjective,
           industry: settings.industry,
-          business_description: settings.description,
-          website_url: settings.website,
-          contact_phone: settings.phone,
-          business_address: settings.address,
+          background: settings.description,
+          website: settings.website,
+          phone: settings.phone,
+          address: settings.address,
           logo_url: settings.logoUrl
         })
       });

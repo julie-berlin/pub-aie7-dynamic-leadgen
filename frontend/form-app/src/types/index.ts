@@ -1,7 +1,6 @@
 // Form configuration and question types
 export interface FormConfig {
   id: string;
-  clientId: string;
   title: string;
   description?: string;
   businessName?: string;
@@ -28,7 +27,7 @@ export type QuestionType =
   | 'text' 
   | 'textarea' 
   | 'email' 
-  | 'phone'
+  | 'tel'
   | 'number'
   | 'radio' 
   | 'checkbox' 
@@ -132,12 +131,13 @@ export interface ThemeConfig {
   borderRadiusLg: string;
   shadow: string;
   shadowLg: string;
+  logo_url?: string;
+  custom_css?: string;
 }
 
 // Form state and responses
 export interface FormState {
   formId: string;
-  clientId: string;
   sessionId: string;
   currentStep: number;
   totalSteps: number;
@@ -244,11 +244,12 @@ export interface FormStore {
   formState: FormState | null;
   currentStep: FormStep | null;
   theme: ThemeConfig | null;
+  completionData: CompletionData | null;
   loading: boolean;
   error: string | null;
 
   // Actions
-  initializeForm: (clientId: string, formId: string, trackingData?: Partial<TrackingData>) => Promise<void>;
+  initializeForm: (formId: string, trackingData?: Partial<TrackingData>) => Promise<void>;
   submitStep: (stepNumber: number) => Promise<void>;
   submitResponses: (responses: Record<string, any>) => Promise<void>;
   goBack: () => Promise<void>;
@@ -256,6 +257,7 @@ export interface FormStore {
   updateTheme: (theme: ThemeConfig) => void;
   saveProgress: () => Promise<void>;
   clearForm: () => void;
+  clearCompletionData: () => void;
   setError: (error: string | null) => void;
   setLoading: (loading: boolean) => void;
 }
@@ -284,7 +286,6 @@ export interface FormProgress {
 
 // Navigation and routing
 export interface FormRoute {
-  clientId: string;
   formId: string;
   step?: number;
   sessionId?: string;

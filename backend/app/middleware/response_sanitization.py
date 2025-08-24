@@ -192,7 +192,8 @@ class ResponseSanitizationMiddleware(BaseHTTPMiddleware):
         # Admin endpoints (if authentication is enabled)
         self.admin_paths = {
             '/admin/', '/internal/', '/debug/', 
-            '/api/forms', '/api/clients', '/api/admin/'  # Admin API endpoints
+            '/api/forms', '/api/clients', '/api/admin/', '/api/themes',
+            '/api/analytics', '/api/files'  # Admin API endpoints
         } if config.auth_enabled else set()
         
         logger.info(f"Response sanitization middleware initialized - "
@@ -211,7 +212,8 @@ class ResponseSanitizationMiddleware(BaseHTTPMiddleware):
         # Define admin paths for both auth enabled and disabled scenarios
         admin_paths = {
             '/admin/', '/internal/', '/debug/', 
-            '/api/forms', '/api/clients', '/api/admin/'  # Admin API endpoints
+            '/api/forms', '/api/clients', '/api/admin/', '/api/themes',
+            '/api/analytics', '/api/files'  # Admin API endpoints
         }
         
         # Check if admin path

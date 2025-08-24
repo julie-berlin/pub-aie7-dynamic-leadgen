@@ -429,8 +429,9 @@ class LeadIntelligenceToolbelt:
                 update_data["requires_review"] = True
                 update_data["review_priority"] = "normal" if confidence < 0.5 else "high"
             
-            if lead_status in ["qualified", "no"]:
+            if lead_status in ["qualified", "no", "yes"]:
                 update_data["completed_at"] = datetime.now().isoformat()
+                update_data["completed"] = True
             
             # Update database
             db.update_lead_session(session_id, update_data)

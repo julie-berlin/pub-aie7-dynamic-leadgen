@@ -19,8 +19,7 @@ import uuid
 
 from app.database import db
 from app.routes.admin_auth import AdminUserResponse
-# from app.routes.admin_api import get_current_admin_user  # TODO: Re-enable when auth is ready
-from app.utils.mock_auth import get_mock_admin_user as get_current_admin_user
+from app.routes.admin_auth import get_current_admin_user
 from app.utils.response_helpers import success_response, error_response
 from pydantic import BaseModel, Field
 from typing import Dict, Any, List, Optional
@@ -69,6 +68,7 @@ class ThemeConfig(BaseModel):
     borderRadiusLg: str = Field("0.75rem", description="Large border radius")
     shadow: str = Field("0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)", description="Default shadow")
     shadowLg: str = Field("0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)", description="Large shadow")
+    logo_url: Optional[str] = Field(None, description="Logo URL for branded forms")
 
 class ThemeCreateRequest(BaseModel):
     """Request to create a new theme."""
@@ -116,12 +116,14 @@ def transform_theme_to_frontend_format(admin_theme_config: dict) -> dict:
     """
     Transform admin-saved theme config to complete frontend ThemeConfig format.
     
-    Admin saves: {primary_color, font_family, border_radius}
+    Admin saves: {primary_color, font_family, border_radius, logo_url, custom_css}
     Frontend expects: Complete ThemeConfig with colors, typography, spacing, etc.
     """
     primary_color = admin_theme_config.get('primary_color', '#3b82f6')
     font_family = admin_theme_config.get('font_family', 'Inter')
     border_radius = admin_theme_config.get('border_radius', '0.5rem')
+    logo_url = admin_theme_config.get('logo_url')
+    custom_css = admin_theme_config.get('custom_css')
     
     # Generate color variations from primary color
     def hex_to_rgb(hex_color):
@@ -149,7 +151,7 @@ def transform_theme_to_frontend_format(admin_theme_config: dict) -> dict:
     primary_hover = darken_color(primary_color, 0.85)
     primary_light = lighten_color(primary_color, 0.85)
     
-    return {
+    theme_data = {
         "name": "Custom Theme",
         "colors": {
             "primary": primary_color,
@@ -185,6 +187,14 @@ def transform_theme_to_frontend_format(admin_theme_config: dict) -> dict:
         "shadow": "0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)",
         "shadowLg": "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)"
     }
+    
+    # Add logo and custom CSS if provided
+    if logo_url:
+        theme_data["logo_url"] = logo_url
+    if custom_css:
+        theme_data["custom_css"] = custom_css
+        
+    return theme_data
 
 def verify_theme_ownership(theme_id: str, client_id: str) -> bool:
     """

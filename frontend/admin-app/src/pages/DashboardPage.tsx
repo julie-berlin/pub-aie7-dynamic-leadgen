@@ -19,7 +19,7 @@ export default function DashboardPage() {
   } = useAnalyticsStore();
 
   useEffect(() => {
-    // Fetch initial data
+    // Auth is guaranteed to be ready when this component renders
     fetchDashboardMetrics();
     fetchRealTimeMetrics();
   }, [fetchDashboardMetrics, fetchRealTimeMetrics]);

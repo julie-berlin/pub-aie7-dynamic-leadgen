@@ -36,6 +36,7 @@ export default function FormsPage() {
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // Auth is guaranteed to be ready when this component renders
     fetchForms();
   }, [fetchForms]);
 
@@ -93,9 +94,16 @@ export default function FormsPage() {
 
     try {
       // Since there's no specific duplicate endpoint, we'll fetch the form and create a new one
+      const token = localStorage.getItem('admin_token');
+      if (!token) {
+        alert('Authentication required. Please log in again.');
+        return;
+      }
+
       const response = await fetch(`http://localhost:8000/api/forms/${formId}`, {
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
         }
       });
 
@@ -124,6 +132,7 @@ export default function FormsPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify(duplicateData)
       });

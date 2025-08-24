@@ -170,10 +170,10 @@ async def start_session(
         logger.info(f"🏢 Loading business info for client_id: {client_id}")
         if client_id:
             try:
-                client_data = db.client.table('clients').select('business_name', 'company_logo_url').eq('id', client_id).execute()
+                client_data = db.client.table('clients').select('name', 'company_logo_url').eq('id', client_id).execute()
                 logger.info(f"🏢 Client query result: {client_data.data}")
                 if client_data.data and len(client_data.data) > 0:
-                    business_name = client_data.data[0].get('business_name')
+                    business_name = client_data.data[0].get('name')
                     logo_url = client_data.data[0].get('company_logo_url')
                     logger.info(f"🏢 Successfully loaded business name: {business_name}, logo_url: {logo_url}")
                 else:
@@ -251,7 +251,7 @@ async def submit_and_continue(
             logger.error(f"🔥 STEP: Session {session_id} NOT FOUND in database!")
             # Try to list recent sessions for debugging
             try:
-                recent = db.client.table('lead_sessions').select('session_id, created_at').order('created_at', desc=True).limit(5).execute()
+                recent = db.client.table('lead_sessions').select('session_id, started_at').order('started_at', desc=True).limit(5).execute()
                 logger.error(f"🔥 STEP: Recent sessions in DB: {recent.data}")
             except:
                 pass
@@ -361,6 +361,12 @@ async def submit_and_continue(
             completed = True
             logger.info(f"🏁 Survey marked as completed by Survey Admin (step_type: completion)")
         
+        # CRITICAL FIX: Check if Lead Intelligence indicates completion
+        route_decision = result.get('route_decision')
+        if route_decision == "end":
+            completed = True
+            logger.info(f"🏁 Survey marked as completed by Lead Intelligence (route_decision: end)")
+        
         # Get frontend response data
         frontend_data = result.get('frontend_response', {})
         
@@ -373,7 +379,7 @@ async def submit_and_continue(
             # Form is complete - return completion data
             response_data["completionData"] = {
                 "leadStatus": result.get('lead_status', 'unknown'),
-                "score": result.get('lead_score', 0),
+                "score": result.get('final_score', 0),
                 "message": result.get('completion_message', 'Thank you for your time and interest.'),
                 "nextSteps": result.get('next_steps', [])
             }
@@ -510,7 +516,7 @@ async def debug_session(session_id: str):
         session = db.get_lead_session(session_id)
         
         # Also get recent sessions
-        recent = db.client.table('lead_sessions').select('session_id, created_at').order('created_at', desc=True).limit(10).execute()
+        recent = db.client.table('lead_sessions').select('session_id, started_at').order('started_at', desc=True).limit(10).execute()
         
         return success_response(
             data={
