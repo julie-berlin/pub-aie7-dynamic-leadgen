@@ -18,6 +18,7 @@ export const useFormStore = create<FormStore>()(
       formState: null,
       currentStep: null,
       theme: null,
+      completionData: null,
       loading: false,
       error: null,
 
@@ -183,11 +184,8 @@ export const useFormStore = create<FormStore>()(
 
           // If form is complete, handle completion
           if (response.isComplete && response.completionData) {
-            // Store completion data for the completion page (using form ID since session is cookie-managed)
-            localStorage.setItem(
-              `completion_${formState.formId}_${Date.now()}`, 
-              JSON.stringify(response.completionData)
-            );
+            // Store completion data in the store
+            set({ completionData: response.completionData });
           }
 
         } catch (error) {
@@ -275,6 +273,7 @@ export const useFormStore = create<FormStore>()(
           formState: null,
           currentStep: null,
           theme: null,
+          completionData: null,
           loading: false,
           error: null
         });
@@ -282,6 +281,10 @@ export const useFormStore = create<FormStore>()(
         // Clear theme
         const root = document.documentElement;
         root.removeAttribute('style');
+      },
+
+      clearCompletionData: () => {
+        set({ completionData: null });
       },
 
       setError: (error: string | null) => {

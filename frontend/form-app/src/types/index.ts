@@ -244,6 +244,7 @@ export interface FormStore {
   formState: FormState | null;
   currentStep: FormStep | null;
   theme: ThemeConfig | null;
+  completionData: CompletionData | null;
   loading: boolean;
   error: string | null;
 
@@ -256,6 +257,7 @@ export interface FormStore {
   updateTheme: (theme: ThemeConfig) => void;
   saveProgress: () => Promise<void>;
   clearForm: () => void;
+  clearCompletionData: () => void;
   setError: (error: string | null) => void;
   setLoading: (loading: boolean) => void;
 }

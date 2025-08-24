@@ -66,6 +66,20 @@ async def get_client(
         
         row = result.data[0]
         
+        # Fetch all data from client_settings
+        settings_data = {}
+        try:
+            settings_result = db.client.table('client_settings')\
+                .select('*')\
+                .eq('client_id', client_id)\
+                .execute()
+            
+            if settings_result.data:
+                settings_data = settings_result.data[0]
+        except Exception as settings_error:
+            # Don't fail the request if settings lookup fails, just log it
+            logger.warning(f"Failed to fetch client_settings for client {client_id}: {settings_error}")
+        
         client_response = ClientResponse(
             id=str(row["id"]),
             name=row["name"],
@@ -81,6 +95,7 @@ async def get_client(
             background=row.get("background"),
             goals=row.get("goals"),
             target_audience=row.get("target_audience"),
+            logo_url=settings_data.get("logo_url"),
             created_at=row["created_at"],
             updated_at=row["updated_at"]
         )
@@ -180,10 +195,10 @@ async def patch_client(
         if not existing.data:
             raise HTTPException(status_code=404, detail="Client not found")
         
-        # Build dynamic update data
+        # Build dynamic update data for clients table
         update_data = {}
         
-        # Map request fields to database columns
+        # Map request fields to database columns (exclude logo_url - that goes to client_settings)
         field_mapping = {
             'name': 'name',
             'legal_name': 'legal_name',
@@ -203,6 +218,7 @@ async def patch_client(
             if value is not None:
                 update_data[db_field] = value
         
+        # Update clients table if there's data to update
         if update_data:
             result = db.client.table("clients")\
                 .update(update_data)\
@@ -211,6 +227,37 @@ async def patch_client(
             
             if not result.data:
                 raise HTTPException(status_code=404, detail="Failed to update client")
+        
+        # Handle logo_url separately - update client_settings table
+        logo_url = getattr(client_request, 'logo_url', None)
+        if logo_url is not None:
+            from datetime import datetime
+            import uuid
+            
+            # Check if client_settings record exists
+            settings_result = db.client.table('client_settings').select('id').eq('client_id', client_id).execute()
+            
+            settings_update = {
+                'logo_url': logo_url,
+                'updated_at': datetime.now(datetime.UTC).isoformat()
+            }
+            
+            if settings_result.data:
+                # Update existing record
+                settings_update_result = db.client.table('client_settings').update(settings_update).eq('client_id', client_id).execute()
+                if not settings_update_result.data:
+                    logger.warning(f"Failed to update client_settings logo_url for client {client_id}")
+            else:
+                # Create new record
+                new_settings = {
+                    'id': str(uuid.uuid4()),
+                    'client_id': client_id,
+                    **settings_update
+                }
+                
+                settings_insert_result = db.client.table('client_settings').insert(new_settings).execute()
+                if not settings_insert_result.data:
+                    logger.warning(f"Failed to create client_settings record for client {client_id}")
         
         # Return updated client
         return await get_client(client_id, current_user)

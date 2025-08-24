@@ -506,6 +506,7 @@ class ClientPatchRequest(BaseModel):
     business_type: Optional[str] = Field(None, max_length=100)
     target_audience: Optional[str] = Field(None, max_length=500)
     goals: Optional[str] = Field(None, max_length=1000)
+    logo_url: Optional[str] = Field(None, description="Company logo URL")
 
 class ClientResponse(BaseModel):
     """Response model for client data."""
@@ -523,6 +524,7 @@ class ClientResponse(BaseModel):
     background: Optional[str]
     goals: Optional[str]
     target_audience: Optional[str]
+    logo_url: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

@@ -74,11 +74,10 @@ export default function FormPage() {
   useEffect(() => {
     if (formState?.isComplete) {
       navigate(`/form/${formId}/complete`, {
-        state: { sessionId: formState.sessionId },
         replace: true // Use replace to avoid back button issues
       });
     }
-  }, [formState?.isComplete, formId, formState?.sessionId, navigate]);
+  }, [formState?.isComplete, formId, navigate]);
 
   if (error) {
     return (
