@@ -54,10 +54,11 @@ export default function FormPage() {
       });
     }
 
-    // Load theme separately with fallback (theme API is slow)
-    loadTheme(formId).catch(err => {
+    // Load theme with better error handling
+    loadTheme(formId).then(() => {
+      console.log('✅ Theme loaded successfully for form:', formId);
+    }).catch(err => {
       console.warn('Theme loading failed, using default:', err);
-      // Theme store will automatically fall back to default theme
     });
   }, [formId, searchParams, initializeForm, loadTheme, navigate, currentForm]);
 

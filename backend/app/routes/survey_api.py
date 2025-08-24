@@ -170,13 +170,20 @@ async def start_session(
         logger.info(f"🏢 Loading business info for client_id: {client_id}")
         if client_id:
             try:
-                client_data = db.client.table('clients').select('name', 'company_logo_url').eq('id', client_id).execute()
+                # Get business name from clients table
+                client_data = db.client.table('clients').select('name').eq('id', client_id).execute()
                 logger.info(f"🏢 Client query result: {client_data.data}")
                 if client_data.data and len(client_data.data) > 0:
                     business_name = client_data.data[0].get('name')
-                    logo_url = client_data.data[0].get('company_logo_url')
-                    logger.info(f"🏢 Successfully loaded business name: {business_name}, logo_url: {logo_url}")
-                else:
+                    
+                # Get logo URL from client_settings table
+                settings_data = db.client.table('client_settings').select('logo_url').eq('client_id', client_id).execute()
+                if settings_data.data and len(settings_data.data) > 0:
+                    logo_url = settings_data.data[0].get('logo_url')
+                    
+                logger.info(f"🏢 Successfully loaded business name: {business_name}, logo_url: {logo_url}")
+                    
+                if not client_data.data:
                     logger.warning(f"🏢 No client data found for client_id: {client_id}")
             except Exception as e:
                 logger.error(f"🏢 Failed to load business info for client {client_id}: {e}")

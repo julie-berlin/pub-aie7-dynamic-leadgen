@@ -151,25 +151,35 @@ def transform_theme_to_frontend_format(admin_theme_config: dict) -> dict:
     primary_hover = darken_color(primary_color, 0.85)
     primary_light = lighten_color(primary_color, 0.85)
     
+    # Get additional colors from theme config
+    secondary_color = admin_theme_config.get('secondary_color', '#6b7280')
+    accent_color = admin_theme_config.get('accent_color', '#10b981')
+    text_color = admin_theme_config.get('text_color', '#111827')
+    background_color = admin_theme_config.get('background_color', '#ffffff')
+    border_color = admin_theme_config.get('border_color', '#e5e7eb')
+    error_color = admin_theme_config.get('error_color', '#ef4444')
+    success_color = admin_theme_config.get('success_color', '#10b981')
+    warning_color = admin_theme_config.get('warning_color', '#f59e0b')
+    
     theme_data = {
         "name": "Custom Theme",
         "colors": {
             "primary": primary_color,
             "primaryHover": primary_hover,
             "primaryLight": primary_light,
-            "secondary": "#6b7280",
-            "secondaryHover": "#4b5563",
-            "secondaryLight": "#f3f4f6",
-            "accent": "#10b981",
-            "text": "#111827",
-            "textLight": "#6b7280",
-            "textMuted": "#9ca3af",
-            "background": "#ffffff",
-            "backgroundLight": "#f9fafb",
-            "border": "#e5e7eb",
-            "error": "#ef4444",
-            "success": "#10b981",
-            "warning": "#f59e0b"
+            "secondary": secondary_color,
+            "secondaryHover": darken_color(secondary_color, 0.85),
+            "secondaryLight": lighten_color(secondary_color, 0.85),
+            "accent": accent_color,
+            "text": text_color,
+            "textLight": admin_theme_config.get('muted_text_color', '#6b7280'),
+            "textMuted": admin_theme_config.get('muted_text_color', '#9ca3af'),
+            "background": background_color,
+            "backgroundLight": admin_theme_config.get('light_bg_color', '#f9fafb'),
+            "border": border_color,
+            "error": error_color,
+            "success": success_color,
+            "warning": warning_color
         },
         "typography": {
             "primary": f"{font_family}, sans-serif",
