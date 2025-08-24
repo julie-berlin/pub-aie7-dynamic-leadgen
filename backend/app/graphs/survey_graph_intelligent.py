@@ -229,9 +229,9 @@ def should_wait_or_continue(state: SurveyState) -> str:
 
 def should_continue_or_complete(state: SurveyState) -> str:
     """Determine if survey should continue or complete."""
-    lead_status = state.get("lead_status", "continue")
+    route_decision = state.get("route_decision", "end")
     
-    if lead_status == "continue":
+    if route_decision == "continue":
         return "continue"
     else:
         return "complete"

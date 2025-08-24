@@ -75,34 +75,34 @@ export default function QuestionRenderer({
       case 'email':
       case 'phone':
       case 'number':
-        return <TextInput key={question.id} {...baseProps} />;
+        return <TextInput {...baseProps} />;
       
       case 'textarea':
-        return <TextareaInput key={question.id} {...baseProps} />;
+        return <TextareaInput {...baseProps} />;
       
       case 'radio':
-        return <RadioInput key={question.id} {...baseProps} />;
+        return <RadioInput {...baseProps} />;
       
       case 'checkbox':
-        return <CheckboxInput key={question.id} {...baseProps} />;
+        return <CheckboxInput {...baseProps} />;
       
       case 'select':
       case 'multiselect':
-        return <SelectInput key={question.id} {...baseProps} />;
+        return <SelectInput {...baseProps} />;
       
       case 'rating':
-        return <RatingInput key={question.id} {...baseProps} />;
+        return <RatingInput {...baseProps} />;
       
       case 'date':
       case 'time':
-        return <DateInput key={question.id} {...baseProps} />;
+        return <DateInput {...baseProps} />;
       
       case 'file':
-        return <FileInput key={question.id} {...baseProps} />;
+        return <FileInput {...baseProps} />;
       
       default:
         return (
-          <div key={question.id} className="p-4 bg-warning bg-opacity-10 border border-warning border-opacity-20 rounded-theme">
+          <div className="p-4 bg-warning bg-opacity-10 border border-warning border-opacity-20 rounded-theme">
             <p className="text-warning text-sm">
               Unsupported question type: {question.type}
             </p>
@@ -113,7 +113,11 @@ export default function QuestionRenderer({
 
   return (
     <div>
-      {visibleQuestions.map((question) => renderQuestion(question))}
+      {visibleQuestions.map((question) => (
+        <div key={question.id}>
+          {renderQuestion(question)}
+        </div>
+      ))}
     </div>
   );
 }

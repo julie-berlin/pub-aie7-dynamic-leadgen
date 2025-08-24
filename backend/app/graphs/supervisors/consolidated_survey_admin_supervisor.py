@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 class ConsolidatedSurveyAdminSupervisor(SupervisorAgent):
     """Consolidated supervisor handling all survey administration tasks."""
-    
+
     def __init__(self, **kwargs):
         super().__init__(
             name="ConsolidatedSurveyAdminSupervisor",
@@ -26,13 +26,13 @@ class ConsolidatedSurveyAdminSupervisor(SupervisorAgent):
             **kwargs
         )
         self.llm = get_chat_model(model_name="gpt-3.5-turbo", temperature=0.3)
-    
+
     def make_decision(self, state: SurveyState, context: Dict[str, Any] = None) -> SupervisorDecision:
         """Make strategic survey administration decision - delegates to process_survey_step."""
         # This method is required by base class but we use process_survey_step instead
         # Create a simple decision wrapper
         result = self.process_survey_step(state)
-        
+
         return SupervisorDecision(
             decision=result.get("step_type", "continue"),
             reasoning="Survey administration processing completed",
@@ -40,7 +40,7 @@ class ConsolidatedSurveyAdminSupervisor(SupervisorAgent):
             recommendations=[],
             metadata=result
         )
-    
+
     def get_system_prompt(self) -> str:
         """Simple system prompt for the 3 core LLM responsibilities."""
         return """You are a Survey Administration AI with exactly 3 responsibilities:
@@ -78,13 +78,13 @@ QUESTION_7: How soon are you looking to get started?
 QUESTION_9: What's your biggest concern about choosing a service provider?
 HEADLINE: Let's find the perfect solution for you!
 MESSAGE: At Pawsome Dog Walking, we've helped over 500 pet owners. Tell us more so we can create a custom plan that fits your needs perfectly."""
-    
+
     def process_survey_step(self, state: SurveyState) -> Dict[str, Any]:
         """Main entry point - processes entire survey administration step."""
         try:
             logger.info(f"Starting survey administration processing for state: {type(state)}")
             logger.debug(f"State keys: {list(state.keys()) if isinstance(state, dict) else 'Not a dict'}")
-            
+
             # Check if we have pending responses - if so, signal to route to lead intelligence
             # This should only happen on the first entry, not after lead intelligence processes them
             pending_responses = state.get("pending_responses")
@@ -99,37 +99,37 @@ MESSAGE: At Pawsome Dog Walking, we've helped over 500 pet owners. Tell us more 
                         "decision_timestamp": datetime.now().isoformat()
                     }
                 }
-            
+
             # Load available questions
             available_questions = self._load_available_questions(state)
             if not available_questions:
                 logger.warning("No available questions found, completing survey")
                 return self._create_completion_response("No more questions available")
-            
+
             # Analyze current state
             analysis = self._analyze_survey_state(state, available_questions)
             logger.debug(f"State analysis: {analysis}")
             logger.info(f"About to call _make_comprehensive_decision with {len(available_questions)} questions")
-            
+
             # Make comprehensive decision
             logger.info("🔥 CALLING _make_comprehensive_decision")
             decision = self._make_comprehensive_decision(state, available_questions, analysis)
             logger.info("🔥 RETURNED FROM _make_comprehensive_decision")
             logger.info(f"Decision completed: action={decision.get('action', 'unknown')}, questions={len(decision.get('selected_questions', []))}")
             logger.debug(f"Decision metadata: {decision.get('metadata', {})}")
-            
+
             # Prepare frontend response
             frontend_data = self._prepare_frontend_response(decision, state)
             logger.info(f"Survey admin processing completed successfully")
-            
+
             return frontend_data
-            
+
         except Exception as e:
             logger.error(f"Survey admin processing error: {e}")
             import traceback
             logger.error(f"Traceback: {traceback.format_exc()}")
             return self._create_error_response(str(e))
-    
+
     def _load_form_details(self, form_id: str) -> Dict[str, Any]:
         """Load form details from database."""
         try:
@@ -154,45 +154,43 @@ MESSAGE: At Pawsome Dog Walking, we've helped over 500 pet owners. Tell us more 
             logger.error(f"Failed to load form details for {form_id}: {e}")
             return {
                 "id": form_id,
-                "title": "Survey Form", 
+                "title": "Survey Form",
                 "description": None,
                 "client_id": None
             }
-    
+
     def _load_available_questions(self, state: SurveyState) -> List[Dict]:
         """Load and filter available questions."""
         try:
             # Get form_id from state
             core = state.get('core', {})
             form_id = core.get('form_id', 'default_form')
-            
-            logger.debug(f"Loading questions for form_id: {form_id}")
-            
-            # Load all questions
-            from ...utils.cached_data_loader import data_loader
-            logger.debug(f"Data loader type: {type(data_loader)}")
-            
-            try:
-                all_questions = data_loader.get_questions(form_id)
-                logger.debug(f"Questions returned: {type(all_questions)}, length: {len(all_questions) if all_questions else 0}")
-                if all_questions:
-                    logger.debug(f"Sample question: {all_questions[0] if len(all_questions) > 0 else 'None'}")
-            except Exception as e:
-                logger.error(f"Error loading questions: {e}")
-                import traceback
-                logger.error(f"Traceback: {traceback.format_exc()}")
-                all_questions = []
-            
-            logger.debug(f"Loaded {len(all_questions) if all_questions else 0} total questions")
-            
-            # Get already asked questions from database (reliable source of truth)
-            from ...database import db
             session_id = state.get('core', {}).get('session_id')
-            asked_ids = db.get_asked_questions(session_id) if session_id else []
+
+            logger.debug(f"Loading questions for form_id: {form_id}")
+
+            # Load all questions directly from database (same as test implementation)
+            from ...database import db
+            all_questions = db.get_form_questions(form_id)
+            logger.debug(f"Loaded {len(all_questions) if all_questions else 0} total questions from database")
+
+            if all_questions:
+                logger.debug(f"Sample question: {all_questions[0] if len(all_questions) > 0 else 'None'}")
+
+            # CRITICAL FIX: Get already asked questions from TWO sources (like langgraph_test)
+            # 1. Database tracking (persistent)
+            asked_ids_db = db.get_asked_questions(session_id) if session_id else []
             
-            logger.info(f"🔥 DATABASE TRACKING: Already asked question IDs from DB: {asked_ids}")
-            logger.debug(f"Already asked question IDs types: {[type(id).__name__ for id in asked_ids]}")
+            # 2. State-based tracking (current session)  
+            asked_ids_state = state.get("question_strategy", {}).get("asked_questions", [])
             
+            # Combine both sources (this is what makes langgraph_test work!)
+            asked_ids = list(set(asked_ids_db + asked_ids_state))
+
+            logger.info(f"🔥 DUAL TRACKING: DB asked questions: {asked_ids_db}")
+            logger.info(f"🔥 DUAL TRACKING: State asked questions: {asked_ids_state}") 
+            logger.info(f"🔥 DUAL TRACKING: Combined asked questions: {asked_ids}")
+
             # Filter to available questions using question_id (not database id)
             available_questions = []
             for q in all_questions:
@@ -202,26 +200,26 @@ MESSAGE: At Pawsome Dog Walking, we've helped over 500 pet owners. Tell us more 
                         available_questions.append(q)
                     else:
                         logger.debug(f"🔥 FILTERING: Question ID {question_id} already asked, skipping")
-            
+
             logger.info(f"🔥 DATABASE TRACKING: Loaded {len(available_questions)} available questions for form {form_id} (filtered from {len(all_questions)} total, {len(asked_ids)} already asked)")
             return available_questions
-            
+
         except Exception as e:
             logger.error(f"Failed to load questions: {e}")
             import traceback
             logger.error(f"Traceback: {traceback.format_exc()}")
             return []
-    
+
     def _analyze_survey_state(self, state: SurveyState, available_questions: List[Dict]) -> Dict[str, Any]:
         """Analyze current survey state for decision making."""
         responses = state.get('lead_intelligence', {}).get('responses', [])
         timing_data = state.get('timing_data', {})
-        
+
         # Calculate engagement metrics
         questions_asked = len(responses)
         response_depth = self._calculate_response_depth(responses)
         time_on_form = timing_data.get('total_time', 0)
-        
+
         # Calculate abandonment risk
         risk_score = 0.0
         if questions_asked > 8:
@@ -230,13 +228,13 @@ MESSAGE: At Pawsome Dog Walking, we've helped over 500 pet owners. Tell us more 
             risk_score += 0.4
         if time_on_form > 300:  # 5 minutes
             risk_score += 0.3
-        
+
         risk_level = "high" if risk_score > 0.7 else "medium" if risk_score > 0.4 else "low"
-        
+
         # Determine progress
         estimated_total = 10  # Default estimate
         progress_percentage = min(90, (questions_asked / estimated_total) * 100)
-        
+
         return {
             "questions_asked": questions_asked,
             "available_count": len(available_questions),
@@ -246,12 +244,12 @@ MESSAGE: At Pawsome Dog Walking, we've helped over 500 pet owners. Tell us more 
             "progress_percentage": progress_percentage,
             "time_on_form": time_on_form
         }
-    
+
     def _calculate_response_depth(self, responses: List[Dict]) -> float:
         """Calculate average response depth/quality."""
         if not responses:
             return 0.0
-        
+
         total_depth = 0.0
         for response in responses:
             answer = response.get("answer", "")
@@ -261,24 +259,24 @@ MESSAGE: At Pawsome Dog Walking, we've helped over 500 pet owners. Tell us more 
                 total_depth += 0.5
             else:
                 total_depth += 0.1
-        
+
         return total_depth / len(responses)
-    
+
     def _make_comprehensive_decision(
-        self, 
-        state: SurveyState, 
+        self,
+        state: SurveyState,
         available_questions: List[Dict],
         analysis: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Make comprehensive decision including selection, phrasing, and engagement."""
-        
+
         logger.info("🔥 ENTERED _make_comprehensive_decision")
         logger.info("Starting comprehensive decision making...")
-        
+
         try:
             # Prepare context for LLM
             responses = state.get('lead_intelligence', {}).get('responses', [])
-            
+
             # Load client info if not already in state
             core = state.get('core', {})
             form_id = core.get('form_id')
@@ -293,10 +291,10 @@ MESSAGE: At Pawsome Dog Walking, we've helped over 500 pet owners. Tell us more 
                     logger.warning(f"Failed to load client info: {e}")
                     client_info = {}
                     # Continue with default values instead of failing
-            
+
             business_name = client_info.get('business_name', 'our business')
             industry = client_info.get('industry', 'service business')
-            
+
             # Create numbered question list for LLM using original question_id as the number
             numbered_questions = []
             for q in available_questions[:15]:  # Limit to 15 for context
@@ -305,11 +303,11 @@ MESSAGE: At Pawsome Dog Walking, we've helped over 500 pet owners. Tell us more 
                     numbered_questions.append({
                         "number": question_id,  # Use original question_id as number
                         "question_text": q.get("question_text", ""),
-                        "question_type": q.get("question_type", ""),
+                        "input_type": q.get("input_type", ""),
                         "is_required": q.get("is_required", False),
                         "category": q.get("category", "")
                     })
-            
+
             # Determine recommended approach based on analysis
             if analysis["risk_level"] == "high":
                 recommended_count = 1
@@ -323,28 +321,28 @@ MESSAGE: At Pawsome Dog Walking, we've helped over 500 pet owners. Tell us more 
                 recommended_count = 2 if analysis["questions_asked"] < 5 else 3
                 engagement_approach = "casual"
                 phrasing_tone = "conversational"
-            
+
             # Extract user information from responses for personalization
             user_name = None
             user_info = {}
             for resp in responses:
                 answer = resp.get('answer', '').strip()
                 question_text = resp.get('question_text', '').lower()
-                
+
                 # Look for name in responses
                 if 'name' in question_text and answer and len(answer.split()) <= 3:
                     user_name = answer.split()[0]  # First name only
-                
+
                 # Collect other user info for context
                 if answer and answer != "ASKED_PLACEHOLDER":
                     user_info[question_text] = answer
-            
+
             # Get detailed client info for engagement
             client_data = client_info.get('client', {}) if client_info else {}
             business_background = client_data.get('background', '')
             business_goals = client_data.get('goals', '')
             target_audience = client_data.get('target_audience', '')
-            
+
             user_prompt = f"""Select and rephrase questions for this survey step:
 
 BUSINESS PROVIDING SERVICE: {business_name} ({industry})
@@ -382,21 +380,21 @@ GOOD: "As a Psychology graduate who loves dogs, [Business] provides expert care.
 GOOD: "With experience hiking and jogging with dogs, we understand..."
 
 Use the exact output format specified in your instructions."""
-            
+
             # Get LLM response
             messages = [
                 {"role": "system", "content": self.get_system_prompt()},
                 {"role": "user", "content": user_prompt}
             ]
-            
+
             logger.info("Calling LLM for question selection and rephrasing...")
             response = self.llm.invoke(messages)
-            
+
             if hasattr(response, 'content'):
                 llm_content = response.content
             else:
                 llm_content = str(response)
-            
+
             logger.info(f"LLM response received, length: {len(llm_content)}")
             # Log first 1000 chars to avoid truncation in logs
             logger.info(f"🔥 LLM RAW START: {llm_content[:1000]}")
@@ -405,28 +403,28 @@ Use the exact output format specified in your instructions."""
             if len(llm_content) > 2000:
                 logger.info(f"🔥 LLM RAW END: {llm_content[2000:]}")
             logger.debug(f"LLM response content: {llm_content[:500]}...")
-            
+
             if not llm_content or not llm_content.strip():
                 logger.error("LLM returned empty response")
                 return self._create_fallback_decision(available_questions, analysis)
-            
+
             # Parse simple response from LLM
             logger.info("Parsing LLM simple response...")
             decision_data = self._parse_simple_response(llm_content, available_questions)
             logger.info(f"Parsed {len(decision_data.get('selected_questions', []))} questions from LLM")
-            
+
             # If parsing failed or no questions selected, use fallback
             if not decision_data.get('selected_questions'):
                 logger.warning("Simple parser returned no questions, using fallback")
                 return self._create_fallback_decision(available_questions, analysis)
-            
+
             # Debug parsed questions
             for i, q in enumerate(decision_data.get('selected_questions', [])):
                 original_text = q.get('question', q.get('question_text', 'NO_ORIGINAL'))
                 final_text = q.get('final_text', 'NO_FINAL')
                 phrased_text = q.get('phrased_text', 'NO_PHRASED')
                 logger.info(f"🔥 Q{i+1}: orig='{original_text}', final='{final_text}', phrased='{phrased_text}'")
-            
+
             return {
                 "action": decision_data.get("action", "continue"),
                 "selected_questions": decision_data.get("selected_questions", []),
@@ -440,13 +438,13 @@ Use the exact output format specified in your instructions."""
                     "llm_decision": True
                 }
             }
-            
+
         except Exception as e:
             logger.error(f"Comprehensive decision error: {e}")
             import traceback
             logger.error(f"Traceback: {traceback.format_exc()}")
             return self._create_fallback_decision(available_questions, analysis)
-    
+
     def _parse_simple_response(self, content: str, available_questions: List[Dict]) -> Dict[str, Any]:
         """Parse simple structured response from LLM."""
         result = {
@@ -456,12 +454,12 @@ Use the exact output format specified in your instructions."""
             "engagement_message": "Help us understand your needs better.",
             "metadata": {}
         }
-        
+
         try:
             lines = [line.strip() for line in content.split('\n') if line.strip()]
             selected_numbers = []
             rephrased_questions = {}
-            
+
             for line in lines:
                 if line.startswith('SELECTED:'):
                     # Parse selected question numbers
@@ -471,7 +469,7 @@ Use the exact output format specified in your instructions."""
                         logger.info(f"🔥 PARSED SELECTION: {selected_numbers}")
                     except ValueError as e:
                         logger.error(f"Failed to parse selected numbers: {numbers_text}, error: {e}")
-                        
+
                 elif line.startswith('QUESTION_'):
                     # Parse rephrased questions
                     try:
@@ -484,13 +482,13 @@ Use the exact output format specified in your instructions."""
                             logger.info(f"🔥 PARSED REPHRASE: Q{question_num} = '{question_text[:50]}...'")
                     except (ValueError, IndexError) as e:
                         logger.error(f"Failed to parse question line: {line}, error: {e}")
-                        
+
                 elif line.startswith('HEADLINE:'):
                     result["engagement_headline"] = line.split(':', 1)[1].strip()
-                    
+
                 elif line.startswith('MESSAGE:'):
                     result["engagement_message"] = line.split(':', 1)[1].strip()
-            
+
             # Build selected questions list using question_id matching
             for num in selected_numbers:
                 # Find question by question_id in available_questions
@@ -499,10 +497,10 @@ Use the exact output format specified in your instructions."""
                     if q.get("question_id") == num:
                         found_question = q
                         break
-                
+
                 if found_question:
                     rephrased_text = rephrased_questions.get(num, found_question.get("question_text", ""))
-                    
+
                     result["selected_questions"].append({
                         **found_question,
                         "phrased_text": rephrased_text,
@@ -511,30 +509,30 @@ Use the exact output format specified in your instructions."""
                     logger.info(f"🔥 ADDED QUESTION: {num} -> '{rephrased_text[:50]}...'")
                 else:
                     logger.warning(f"Question ID {num} not found in available questions")
-            
+
             logger.info(f"🔥 SIMPLE PARSER SUCCESS: {len(result['selected_questions'])} questions selected")
             return result
-            
+
         except Exception as e:
             logger.error(f"Failed to parse simple response: {e}")
             logger.error(f"Content was: {content[:500]}...")
             # Return fallback
             return {
-                "action": "continue", 
+                "action": "continue",
                 "selected_questions": [],
                 "engagement_headline": "Let's get to know you better!",
                 "engagement_message": "Help us understand your needs better.",
                 "metadata": {"fallback": True, "parse_error": str(e)}
             }
-    
+
     def _clean_engagement_message(self, message: str) -> str:
         """Clean engagement message by removing any accidental metadata."""
         import re
-        
+
         # Remove lines that look like metadata (- Key: value pattern)
         lines = message.split('\n')
         cleaned_lines = []
-        
+
         for line in lines:
             line = line.strip()
             # Skip lines that match metadata patterns
@@ -543,25 +541,25 @@ Use the exact output format specified in your instructions."""
             # Skip empty lines at the end
             if line:
                 cleaned_lines.append(line)
-        
+
         # Join back and clean up
         cleaned_message = '\n'.join(cleaned_lines).strip()
-        
+
         # Remove any trailing metadata that might be at the end
         # Look for patterns like "- Questions: X - Risk: Y - Approach: Z"
         cleaned_message = re.sub(r'\s*-\s*(Questions Selected|Risk Level|Approach):\s*\w+(\s*-\s*(Questions Selected|Risk Level|Approach):\s*\w+)*\s*$', '', cleaned_message, flags=re.IGNORECASE)
-        
+
         # Clean up any remaining metadata patterns
         cleaned_message = re.sub(r'\s*Total\s+\w+\s+Steps:\s*\d+\s*', '', cleaned_message, flags=re.IGNORECASE)
         cleaned_message = re.sub(r'\s*Risk\s+Level:\s*\w+\s*', '', cleaned_message, flags=re.IGNORECASE)
         cleaned_message = re.sub(r'\s*Approach:\s*\w+\s*', '', cleaned_message, flags=re.IGNORECASE)
-        
+
         return cleaned_message.strip()
-    
+
     def _create_fallback_decision(self, available_questions: List[Dict], analysis: Dict) -> Dict[str, Any]:
         """Create fallback decision when LLM fails with randomized selection."""
         import random
-        
+
         # Randomized rule-based selection to vary question count
         if analysis["risk_level"] == "high":
             count = 1  # Always 1 for high risk
@@ -571,32 +569,32 @@ Use the exact output format specified in your instructions."""
             if questions_asked == 0:
                 count = random.choice([1, 2])  # First step: 1-2 questions
             elif questions_asked < 4:
-                count = random.choice([2, 3])  # Early steps: 2-3 questions  
+                count = random.choice([2, 3])  # Early steps: 2-3 questions
             else:
                 count = random.choice([1, 2, 3, 4])  # Later steps: vary widely
-        
+
         # Don't select more questions than available
         count = min(count, len(available_questions))
-        
+
         # Random selection instead of always taking first N
         if len(available_questions) > count:
             selected = random.sample(available_questions, count)
         else:
             selected = available_questions[:count]
-        
+
         logger.info(f"🔥 FALLBACK: Selected {count} questions randomly (risk: {analysis['risk_level']}, asked: {analysis.get('questions_asked', 0)})")
-        
+
         for q in selected:
             q["phrased_text"] = q.get("question", q.get("question_text"))
             q["final_text"] = q.get("question", q.get("question_text"))
-        
+
         engagement_headline = "Let's learn more about you!"
         engagement_message = "Help us understand your needs so we can provide you with the best possible service."
-        
+
         if analysis["risk_level"] == "high":
             engagement_headline = "Just a quick question!"
             engagement_message = "We're almost ready to help you get exactly what you need."
-        
+
         return {
             "action": "continue",
             "selected_questions": selected,
@@ -610,24 +608,31 @@ Use the exact output format specified in your instructions."""
                 "fallback_count": count
             }
         }
-    
+
     def _prepare_frontend_response(self, decision: Dict, state: SurveyState) -> Dict[str, Any]:
         """Prepare the final response for frontend consumption.
-        
+
         CRITICAL: This method MUST include question IDs in the response to prevent
-        questions from repeating. See FIX_DOCUMENTATION.md for details on the 
+        questions from repeating. See FIX_DOCUMENTATION.md for details on the
         recurring question repetition bug and its fix.
         """
-        # Update state with selected questions
+        # CRITICAL FIX: Update state asked_questions (like langgraph_test does)
         question_strategy = state.get('question_strategy', {})
-        # Don't use state's asked_questions - database is source of truth
-        # asked_questions = question_strategy.get('asked_questions', [])
+        current_asked = question_strategy.get('asked_questions', [])
         
+        # Add newly selected questions to asked_questions (prevents repetition!)
+        selected_questions = decision.get("selected_questions", [])
+        new_question_ids = [q.get('question_id') for q in selected_questions if q.get('question_id') is not None]
+        updated_asked = current_asked + new_question_ids
+        
+        logger.info(f"🔥 STATE UPDATE: Adding {new_question_ids} to asked_questions")
+        logger.info(f"🔥 STATE UPDATE: {current_asked} -> {updated_asked}")
+
         # Mark newly selected questions as asked in database
         from ...database import db
         session_id = state.get('core', {}).get('session_id')
         new_question_ids = []
-        
+
         for q in decision["selected_questions"]:
             q_id = q.get("question_id")
             if q_id is not None:
@@ -635,20 +640,18 @@ Use the exact output format specified in your instructions."""
                 logger.info(f"🔥 DATABASE TRACKING: Marking question ID {q_id} as asked")
             else:
                 logger.error(f"🔥 ERROR: Question missing question_id: {q}")
-        
-        # Mark questions as asked in database
-        if session_id and new_question_ids:
-            db.mark_questions_asked(session_id, new_question_ids, decision["selected_questions"])
-            logger.info(f"🔥 DATABASE TRACKING: Marked {len(new_question_ids)} questions as asked in database")
-        
-        # Get current asked questions from database (source of truth) and state  
+
+        # Questions will be tracked when actual responses are saved by lead intelligence agent
+        # No need to pre-mark questions as asked - tracking happens via real response records
+
+        # Get current asked questions from database (source of truth) and state
         db_asked_questions = db.get_asked_questions(session_id) if session_id else []
         state_asked_questions = question_strategy.get('asked_questions', [])
-        
+
         # Combine database and state (state should now only contain integers)
         all_asked_questions = list(set(db_asked_questions + state_asked_questions))
         logger.info(f"🔥 STATE SYNC: DB={db_asked_questions}, State={state_asked_questions}, Final={all_asked_questions}")
-        
+
         # Format questions for frontend API client (using backend format that frontend transforms)
         # NOTE: Never expose scoring_rubric to frontend - that's sensitive business logic
         # CRITICAL FIX: Include question ID for proper tracking
@@ -669,15 +672,15 @@ Use the exact output format specified in your instructions."""
                 "placeholder": q.get("placeholder", "")
                 # scoring_rubric intentionally excluded - sensitive data
             })
-        
+
         # Get session_id from core state
         core = state.get('core', {})
         session_id = core.get('session_id')
-        
+
         # Load form details for proper title/description
         form_id = core.get('form_id')
         form_details = self._load_form_details(form_id)
-        
+
         # Prepare the frontend response data
         frontend_data = {
             "session_id": session_id,
@@ -691,14 +694,14 @@ Use the exact output format specified in your instructions."""
                 "estimated_remaining": 3
             }
         }
-        
+
         return {
             # This is the key the API is looking for
             "frontend_response": {
                 **frontend_data,
                 "form_details": form_details  # Add form details to frontend response
             },
-            
+
             # Core response
             "step_type": "questions" if decision["action"] == "continue" else "completion",
             "questions": frontend_questions,
@@ -707,19 +710,19 @@ Use the exact output format specified in your instructions."""
                 "progress": decision.get("progress_indicator", ""),
                 "motivation": decision.get("completion_motivation", "")
             },
-            
+
             # State updates
             "question_strategy": {
                 "all_questions": question_strategy.get("all_questions", []),
-                "asked_questions": all_asked_questions,  # CRITICAL: Clean state with only integer question IDs
+                "asked_questions": updated_asked,  # CRITICAL: Include newly selected questions
                 "current_questions": frontend_questions,
                 "selection_history": question_strategy.get("selection_history", []),
                 "selection_confidence": decision.get("confidence", 0.7)
             },
-            
+
             # Add form details to core state
             "form_details": form_details,
-            
+
             # Metadata
             "supervisor_metadata": {
                 "supervisor_name": self.name,
@@ -730,11 +733,11 @@ Use the exact output format specified in your instructions."""
                 "llm_decision": decision["metadata"].get("llm_decision", False)
             }
         }
-        
+
         # Debug: Log what we're returning
         logger.info(f"🔥 SUPERVISOR RETURN: asked_questions = {all_asked_questions}")
         return result
-    
+
     def _create_completion_response(self, reason: str) -> Dict[str, Any]:
         """Create a completion response when survey should end."""
         return {
@@ -751,7 +754,7 @@ Use the exact output format specified in your instructions."""
                 "decision_timestamp": datetime.now().isoformat()
             }
         }
-    
+
     def _create_error_response(self, error: str) -> Dict[str, Any]:
         """Create an error response."""
         return {
@@ -769,13 +772,13 @@ def consolidated_survey_admin_node(state: SurveyState) -> Dict[str, Any]:
     """Node function for Consolidated Survey Administration Supervisor."""
     logger.info("🔥 consolidated_survey_admin_node called by LangGraph!")
     logger.debug(f"🔥 State keys: {list(state.keys()) if isinstance(state, dict) else 'Not a dict'}")
-    
+
     supervisor = ConsolidatedSurveyAdminSupervisor()
     result = supervisor.process_survey_step(state)
-    
+
     logger.info(f"🔥 Node result: {type(result)}, keys: {list(result.keys()) if isinstance(result, dict) else 'Not a dict'}")
     if isinstance(result, dict) and 'supervisor_metadata' in result:
         metadata = result['supervisor_metadata']
         logger.info(f"🔥 LLM decision used: {metadata.get('llm_decision', 'unknown')}")
-    
+
     return result

@@ -19,10 +19,10 @@ def get_chat_model(model_name: str | None = None, *, temperature: float = 0) -> 
 
     Returns: a LangChain-compatible chat model instance.
     """
-    name = model_name or os.environ.get("OPENAI_MODEL", "gpt-3.5-turbo")
+    name = model_name or os.environ.get("OPENAI_MODEL", "gpt-5-mini")
     return ChatOpenAI(
-        model=name, 
-        temperature=temperature,
+        model=name,
+        # temperature=temperature,
         timeout=30,  # 30 second timeout to prevent hanging
         max_retries=2  # Retry failed requests
     )

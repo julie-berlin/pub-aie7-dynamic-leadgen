@@ -39,21 +39,30 @@ class LeadIntelligenceToolbelt:
         try:
             from ...database import db
             
+            # Get the actual database ID for the session (foreign key reference)
+            session_record = db.client.table('lead_sessions').select('id').eq('session_id', session_id).execute()
+            if not session_record.data:
+                raise Exception(f"Session {session_id} not found in database")
+            
+            session_db_id = session_record.data[0]['id']
+            
             saved_count = 0
             errors = []
             
             for response in responses:
                 try:
-                    # Save individual response
+                    # Save individual response using the database ID with complete question info
                     response_data = {
-                        "session_id": session_id,
+                        "session_id": session_db_id,  # Use database ID for foreign key
                         "form_id": form_id,
                         "question_id": response.get("question_id"),
                         "answer": response.get("answer"),
-                        "answered_at": datetime.now().isoformat()
+                        "step": response.get("step", 0),  # Track which step this was asked on
+                        "score": response.get("score_awarded", 0)  # Score for this response
+                        # created_at will be set automatically by database DEFAULT NOW()
                     }
                     
-                    db.save_individual_response(session_id, response_data)
+                    db.save_individual_response(session_db_id, response_data)
                     saved_count += 1
                     
                 except Exception as e:
@@ -62,8 +71,7 @@ class LeadIntelligenceToolbelt:
             
             # Update session with latest activity
             db.update_lead_session(session_id, {
-                "last_activity_time": datetime.now().isoformat(),
-                "responses_count": saved_count
+                "last_activity_time": datetime.now().isoformat()
             })
             
             return {
@@ -392,12 +400,6 @@ class LeadIntelligenceToolbelt:
             if score > 30:
                 actions.append("referral_suggestions")
         
-        elif lead_status == "continue":
-            actions = [
-                "prepare_next_questions",
-                "maintain_session_state",
-                "update_progress_tracking"
-            ]
         
         return actions
     
@@ -417,8 +419,7 @@ class LeadIntelligenceToolbelt:
                 "lead_status": lead_status,
                 "final_score": final_score,
                 "confidence": confidence,
-                "status": "completed" if lead_status != "continue" else "active",
-                "updated_at": datetime.now().isoformat()
+                "last_updated": datetime.now().isoformat()
             }
             
             if completion_message:

@@ -199,11 +199,11 @@ class SupabaseClient:
     
     def save_individual_response(self, session_id: str, response_data: Dict[str, Any]) -> Dict[str, Any]:
         """Save individual response immediately (fire-and-forget)"""
-        # Add session_id and timestamp if not present
+        # Add session_id - created_at will be set automatically by database DEFAULT NOW()
         response_with_metadata = {
             **response_data,
-            "session_id": session_id,
-            "timestamp": datetime.now().isoformat()
+            "session_id": session_id
+            # Note: created_at is automatically set by database DEFAULT NOW()
         }
         result = self.client.table("responses").insert(response_with_metadata).execute()
         return result.data[0] if result.data else {}
@@ -231,22 +231,19 @@ class SupabaseClient:
         """Save session state snapshot for recovery"""
         snapshot_data = {
             "session_id": session_id,
-            "full_state": full_state,
-            "core_state": full_state.get('core', {}),
-            "step": step,
-            "recoverable": True,
-            "recovery_reason": recovery_reason,
-            "created_at": datetime.now().isoformat()
+            "step_number": step,
+            "form_state": full_state,
+            "responses_snapshot": full_state.get('responses', {}),
+            "score_snapshot": full_state.get('current_score', 0)
         }
         result = self.client.table("session_snapshots").insert(snapshot_data).execute()
         return result.data[0] if result.data else {}
     
     def get_latest_session_snapshot(self, session_id: str) -> Optional[Dict[str, Any]]:
-        """Get the most recent recoverable snapshot for a session"""
+        """Get the most recent snapshot for a session"""
         result = self.client.table("session_snapshots")\
             .select("*")\
             .eq("session_id", session_id)\
-            .eq("recoverable", True)\
             .order("created_at", desc=True)\
             .limit(1)\
             .execute()
@@ -333,48 +330,23 @@ class SupabaseClient:
     def get_asked_questions(self, session_id: str) -> List[int]:
         """Get list of question_ids already asked for this session"""
         try:
-            # Simple and reliable: get all questions that have responses (including placeholders)
-            result = self.client.table("responses").select("question_id").eq("session_id", session_id).execute()
+            # Get the database ID from the session_id string
+            session_record = self.client.table('lead_sessions').select('id').eq('session_id', session_id).execute()
+            if not session_record.data:
+                logger.warning(f"Session {session_id} not found in database")
+                return []
+            
+            session_db_id = session_record.data[0]['id']
+            
+            # Get all questions that have responses using the database ID
+            result = self.client.table("responses").select("question_id").eq("session_id", session_db_id).execute()
             asked_questions = [r["question_id"] for r in result.data] if result.data else []
-            return asked_questions
+            return list(set(asked_questions))  # Remove duplicates
         except Exception as e:
             logger.error(f"Error getting asked questions for session {session_id}: {e}")
             return []
     
-    def mark_questions_asked(self, session_id: str, question_ids: List[int], questions_data: List[Dict] = None) -> bool:
-        """Mark questions as asked by creating entries in responses table"""
-        try:
-            for q_id in question_ids:
-                # Check if already exists
-                existing = self.client.table("responses").select("id").eq("session_id", session_id).eq("question_id", q_id).execute()
-                if existing.data:
-                    continue  # Already marked
-                
-                # Find question text from questions_data if provided
-                question_text = f"Question {q_id}"  # Default
-                if questions_data:
-                    for q in questions_data:
-                        if q.get('question_id') == q_id:
-                            question_text = q.get('question', q.get('question_text', f"Question {q_id}"))
-                            break
-                
-                # Create placeholder response to mark as asked
-                placeholder = {
-                    "session_id": session_id,
-                    "question_id": q_id,
-                    "question_text": question_text,
-                    "answer": "ASKED_PLACEHOLDER",  # Placeholder to mark as asked
-                    "timestamp": "now()",
-                    "step": 0
-                }
-                
-                self.client.table("responses").insert(placeholder).execute()
-                logger.info(f"DATABASE: Marked question {q_id} as asked with placeholder response")
-            
-            return True
-        except Exception as e:
-            logger.error(f"Error marking questions as asked for session {session_id}: {e}")
-            return False
+    # mark_questions_asked method removed - questions are tracked via actual response records
     
     # === Lead Outcome Management ===
     

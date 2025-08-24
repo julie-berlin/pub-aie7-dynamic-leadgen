@@ -66,7 +66,7 @@ class ConversionUpdate(BaseModel):
 
 # === LEADS MANAGEMENT ENDPOINTS ===
 
-@router.get("/", response_model=List[LeadSummary])
+@router.get("/")
 async def get_leads(
     form_id: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
@@ -79,14 +79,14 @@ async def get_leads(
     try:
         # Base query for lead sessions
         query = db.client.table('lead_sessions').select(
-            'session_id, form_id, status, score, started_at, completed_at'
+            'id, session_id, form_id, lead_status, final_score, started_at, completed_at'
         ).eq('client_id', current_user.client_id)
         
         # Apply filters
         if form_id:
             query = query.eq('form_id', form_id)
         if status:
-            query = query.eq('status', status)
+            query = query.eq('lead_status', status)
             
         # Execute query with pagination
         lead_sessions = query.order('started_at', desc=True).range(offset, offset + limit - 1).execute()
@@ -108,27 +108,37 @@ async def get_leads(
             ).in_('session_id', session_ids).execute()
             tracking_data = {track['session_id']: track for track in tracking_result.data}
         
+        # TODO: Get contact information (name, email, phone) from responses
+        # Temporarily disabled due to session ID format issues
+        contact_data = {}
+        
         # Build response
         leads = []
-        for session in lead_sessions.data:
+        for idx, session in enumerate(lead_sessions.data):
             # Apply utm_source filter if specified
             session_tracking = tracking_data.get(session['session_id'], {})
             if utm_source and session_tracking.get('utm_source') != utm_source:
                 continue
                 
-            leads.append(LeadSummary(
-                session_id=session['session_id'],
-                form_id=session['form_id'],
-                form_title=form_titles.get(session['form_id'], 'Unknown Form'),
-                status=session['status'],
-                score=session.get('score'),
-                started_at=datetime.fromisoformat(session['started_at'].replace('Z', '+00:00')),
-                completed_at=datetime.fromisoformat(session['completed_at'].replace('Z', '+00:00')) if session.get('completed_at') else None,
-                utm_source=session_tracking.get('utm_source'),
-                utm_campaign=session_tracking.get('utm_campaign')
-            ))
+            # Get contact info for this session
+            session_contact = contact_data.get(session['session_id'], {})
+            
+            lead_data = {
+                "lead_id": session['id'],  # Proper lead UUID from database
+                "form_title": form_titles.get(session['form_id'], 'Unknown Form'),
+                "lead_status": session['lead_status'],
+                "final_score": session.get('final_score'),
+                "started_at": session['started_at'],
+                "completed_at": session.get('completed_at'),
+                "utm_source": session_tracking.get('utm_source'),
+                "utm_campaign": session_tracking.get('utm_campaign'),
+                "contact_name": session_contact.get('name'),
+                "contact_email": session_contact.get('email'),
+                "contact_phone": session_contact.get('phone')
+            }
+            leads.append(lead_data)
         
-        return leads
+        return success_response({"leads": leads}, f"Retrieved {len(leads)} leads")
         
     except Exception as e:
         logger.error(f"Failed to get leads: {e}")
@@ -243,7 +253,7 @@ async def update_lead_conversion(
         logger.error(f"Failed to update lead conversion: {e}")
         return error_response("Failed to update lead conversion", 500)
 
-@router.get("/stats/summary", response_model=LeadStats)
+@router.get("/stats/summary")
 async def get_leads_summary(
     form_id: Optional[str] = Query(None),
     days: int = Query(30, ge=1, le=365),
@@ -265,18 +275,18 @@ async def get_leads_summary(
         total_leads = len(recent_leads.data)
         completed_leads = len([l for l in recent_leads.data if l.get('completed_at')])
         
-        # Calculate qualified leads (status = 'yes' or score >= threshold)
+        # Calculate qualified leads (lead_status = 'yes' or final_score >= threshold)
         qualified_leads = len([
             l for l in recent_leads.data 
-            if l.get('status') == 'yes' or (l.get('score') and l['score'] >= 70)
+            if l.get('lead_status') == 'yes' or (l.get('final_score') and l['final_score'] >= 70)
         ])
         
         # Calculate conversion rate
         conversion_rate = (qualified_leads / total_leads * 100) if total_leads > 0 else 0
         
         # Calculate average score
-        scored_leads = [l for l in recent_leads.data if l.get('score') is not None]
-        average_score = sum(l['score'] for l in scored_leads) / len(scored_leads) if scored_leads else 0
+        scored_leads = [l for l in recent_leads.data if l.get('final_score') is not None]
+        average_score = sum(l['final_score'] for l in scored_leads) / len(scored_leads) if scored_leads else 0
         
         # Time-based counts
         now = datetime.now()
@@ -299,16 +309,38 @@ async def get_leads_summary(
             if datetime.fromisoformat(l['started_at'].replace('Z', '+00:00')) >= month_start.replace(tzinfo=datetime.now().astimezone().tzinfo)
         ])
         
-        return LeadStats(
-            total_leads=total_leads,
-            completed_leads=completed_leads,
-            qualified_leads=qualified_leads,
-            conversion_rate=round(conversion_rate, 2),
-            average_score=round(average_score, 2),
-            leads_today=leads_today,
-            leads_this_week=leads_this_week,
-            leads_this_month=leads_this_month
-        )
+        # Status breakdown
+        status_breakdown = {}
+        for status in ['yes', 'maybe', 'no', 'unknown']:
+            status_leads = [l for l in recent_leads.data if l.get('lead_status') == status]
+            status_scores = [l.get('final_score', 0) for l in status_leads if l.get('final_score') is not None]
+            status_breakdown[status] = {
+                "count": len(status_leads),
+                "avg_score": round(sum(status_scores) / len(status_scores), 2) if status_scores else 0
+            }
+        
+        # UTM sources breakdown  
+        utm_sources = []
+        utm_data = {}
+        for lead in recent_leads.data:
+            # We'd need to join with tracking_data table for this, simplified for now
+            pass
+        
+        stats_data = {
+            "status_breakdown": status_breakdown,
+            "conversion_stats": {
+                "total_leads": total_leads,
+                "tracked_conversions": 0,  # Placeholder - would need lead_outcomes data
+                "conversions": qualified_leads,
+                "conversion_rate": round(conversion_rate, 2),
+                "total_value": 0,  # Placeholder - could calculate from lead outcomes
+                "avg_value": 0     # Placeholder
+            },
+            "utm_sources": utm_sources,  # Placeholder - empty for now
+            "period_days": days
+        }
+        
+        return success_response(stats_data, f"Retrieved summary for {total_leads} leads over {days} days")
         
     except Exception as e:
         logger.error(f"Failed to get leads summary: {e}")

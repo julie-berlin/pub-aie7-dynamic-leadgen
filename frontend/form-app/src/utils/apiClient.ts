@@ -125,19 +125,39 @@ class APIClient {
 
     if (!backendQuestion.options) return undefined;
 
-    // If options is an array of strings (like for select), convert to choices
+    // If options is an array, transform to choices format
     if (Array.isArray(backendQuestion.options)) {
-      return {
-        choices: backendQuestion.options.map((option: string, index: number) => ({
-          id: (index + 1).toString(),
-          text: option,
-          value: option
-        }))
-      };
+      // Check if array contains objects with label/value or strings
+      const firstOption = backendQuestion.options[0];
+      
+      if (typeof firstOption === 'string') {
+        // Array of strings - convert to choice objects
+        return {
+          choices: backendQuestion.options.map((option: string, index: number) => ({
+            id: (index + 1).toString(),
+            text: option,
+            value: option
+          }))
+        };
+      } else if (typeof firstOption === 'object' && 'label' in firstOption && 'value' in firstOption) {
+        // Array of {label, value} objects - transform to {id, text, value} format
+        return {
+          choices: backendQuestion.options.map((option: any, index: number) => ({
+            id: (index + 1).toString(),
+            text: option.label,
+            value: option.value
+          }))
+        };
+      }
     }
 
-    // If options is an object, return as-is (for complex option structures)
-    return backendQuestion.options;
+    // If options is an object with choices property, return as-is
+    if (backendQuestion.options && typeof backendQuestion.options === 'object' && 'choices' in backendQuestion.options) {
+      return backendQuestion.options;
+    }
+
+    // Fallback - return undefined for unsupported option formats
+    return undefined;
   }
 
   /**

@@ -122,7 +122,7 @@ def get_form_questions(form_id: str, client_id: str) -> List[FormQuestionConfig]
         
         # Get questions for the form
         questions_result = db.client.table("form_questions")\
-            .select("question_id, question_order, question_text, question_type, options, scoring_rubric, is_required, category, metadata")\
+            .select("question_id, question_order, question_text, input_type, options, scoring_rubric, is_required, category, metadata")\
             .eq("form_id", form_id)\
             .order("question_order")\
             .execute()
@@ -149,7 +149,7 @@ def get_form_questions(form_id: str, client_id: str) -> List[FormQuestionConfig]
                 question_id=q.get("question_id"),
                 question_order=q.get("question_order"),
                 question_text=q.get("question_text"),
-                question_type=q.get("question_type") or "text",
+                input_type=q.get("input_type") or "text",
                 options=options,
                 validation_rules=q.get("metadata", {}).get("validation_rules"),
                 scoring_rubric=scoring_rubric,
@@ -188,7 +188,7 @@ def save_form_questions(form_id: str, questions: List[FormQuestionConfig], clien
                     "question_id": question.question_id,
                     "question_order": question.question_order,
                     "question_text": question.question_text,
-                    "question_type": question.question_type,
+                    "input_type": question.input_type,
                     "options": question.options,
                     "validation_rules": question.validation_rules,
                     "scoring_rubric": question.scoring_rubric,

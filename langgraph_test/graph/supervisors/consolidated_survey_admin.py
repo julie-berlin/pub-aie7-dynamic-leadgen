@@ -243,7 +243,7 @@ MESSAGE: At Pawsome Dog Walking, we've helped over 500 pet owners. Tell us more 
                     {
                         "id": q['question_id'],
                         "text": q.get('phrased_question', q['question_text']),
-                        "type": q.get('question_type', 'text'),
+                        "type": q.get('input_type', 'text'),
                         "required": q.get('is_required', False)
                     }
                     for q in selected_questions

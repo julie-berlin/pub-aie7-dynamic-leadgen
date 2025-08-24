@@ -50,7 +50,7 @@ Always provide clear, data-driven assessments and maintain professional communic
         result = self.process_lead_responses(state)
         
         return SupervisorDecision(
-            decision=result.get("lead_status", "continue"),
+            decision=result.get("lead_status", "unknown"),  # Default to unknown, not continue
             reasoning=result.get("business_reasoning", "Lead intelligence processing completed"),
             confidence=result.get("confidence", 0.5),
             recommendations=result.get("next_actions", []),
@@ -124,6 +124,14 @@ Just write the message, no other text."""
     def process_lead_responses(self, state: SurveyState) -> Dict[str, Any]:
         """Main entry point - processes all lead intelligence tasks."""
         try:
+            logger.info("🤖 Lead Intelligence: Starting processing")
+            
+            # Get pending responses - early return if none 
+            pending_responses = state.get("pending_responses", [])
+            if not pending_responses:
+                logger.info("No pending responses to process")
+                return {"lead_status": "unknown", "route_decision": "continue"}
+            
             # Step 1: Save responses to database
             save_result = self._save_responses(state)
             if not save_result["success"]:
@@ -179,50 +187,30 @@ Just write the message, no other text."""
             
         except Exception as e:
             logger.error(f"Lead intelligence processing error: {e}")
-            return self._create_error_response(str(e))
+            import traceback
+            logger.error(traceback.format_exc())
+            return {
+                "lead_status": "unknown",
+                "route_decision": "continue", 
+                "error": str(e)
+            }
     
-    def _mark_questions_as_asked(self, state: SurveyState) -> List[str]:
-        """Convert question_id numbers from responses to question UUIDs for tracking."""
+    def _mark_questions_as_asked(self, state: SurveyState) -> List[int]:
+        """Extract integer question_ids from responses for tracking."""
         try:
             pending_responses = state.get("pending_responses", [])
             if not pending_responses:
                 return []
             
-            # Get form_id to load questions
-            form_id = state.get("core", {}).get("form_id")
-            if not form_id:
-                logger.warning("No form_id found, cannot mark questions as asked")
-                return []
-            
-            # Load all questions for this form to create mapping
-            from ...utils.cached_data_loader import data_loader
-            all_questions = data_loader.get_questions(form_id)
-            if not all_questions:
-                logger.warning(f"No questions found for form {form_id}")
-                return []
-            
-            # Create mapping from question_id (number) to id (UUID)
-            question_id_to_uuid = {}
-            for q in all_questions:
-                question_id = q.get('question_id')
-                question_uuid = q.get('id')
-                if question_id is not None and question_uuid:
-                    question_id_to_uuid[question_id] = question_uuid
-            
-            # Convert response question_ids to UUIDs
-            asked_uuids = []
+            # Simply extract integer question_ids from responses (like langgraph test does)
+            asked_question_ids = []
             for response in pending_responses:
                 question_id = response.get('question_id')
-                if question_id in question_id_to_uuid:
-                    question_uuid = question_id_to_uuid[question_id]
-                    if question_uuid not in asked_uuids:
-                        asked_uuids.append(question_uuid)
-                        logger.debug(f"Marking question as asked: question_id={question_id} -> uuid={question_uuid}")
-                else:
-                    logger.warning(f"Could not find UUID for question_id {question_id}")
+                if question_id is not None and question_id not in asked_question_ids:
+                    asked_question_ids.append(question_id)
             
-            logger.info(f"Marked {len(asked_uuids)} questions as asked: {asked_uuids}")
-            return asked_uuids
+            logger.info(f"Marked {len(asked_question_ids)} questions as asked: {asked_question_ids}")
+            return asked_question_ids
             
         except Exception as e:
             logger.error(f"Failed to mark questions as asked: {e}")
@@ -402,16 +390,24 @@ Just write the message, no other text."""
         
         # Final status determination
         if final_score >= 75 and confidence >= 0.7:
-            lead_status = "qualified"
+            lead_status = "yes"
         elif final_score <= 35 and confidence >= 0.6:
             lead_status = "no"
-        elif len(state.get("lead_intelligence", {}).get("responses", [])) < 4:
-            lead_status = "continue"
         else:
-            lead_status = "maybe"
+            # Check total responses from database to determine if we need more data
+            session_id = state.get("core", {}).get("session_id")
+            if session_id:
+                from ...database import db
+                asked_questions = db.get_asked_questions(session_id)
+                if len(asked_questions) < 4:  # Need at least 4 responses before classification
+                    lead_status = "unknown"  # Need more data
+                else:
+                    lead_status = "maybe"  # Have enough data but not definitively qualified/unqualified
+            else:
+                lead_status = "unknown"  # No session data, need more info
         
-        # Generate final completion message if not continuing
-        if lead_status != "continue" and not decision.get("completion_message"):
+        # Generate final completion message for definitive status
+        if lead_status in ["yes", "maybe", "no"] and not decision.get("completion_message"):
             # Get business context and responses for personalized message
             form_id = state.get("core", {}).get("form_id")
             business_context = self._get_business_context_from_db(form_id)
@@ -437,12 +433,13 @@ Just write the message, no other text."""
             "final_score": final_score,
             "confidence": confidence,
             "tool_results": tool_results,
-            "completed": lead_status != "continue",
+            "completed": lead_status in ["yes", "no"] or route_decision == "end",
             "route_decision": route_decision  # ← CRITICAL: Add this field
         }
     
     def _determine_route_decision(self, state: SurveyState, lead_status: str) -> str:
         """Determine routing decision based on lead status and available questions."""
+        logger.info(f"🔀 _determine_route_decision called with lead_status={lead_status}")
         try:
             # Get session info for database queries
             session_id = state.get("core", {}).get("session_id")
@@ -453,28 +450,43 @@ Just write the message, no other text."""
                 return "end"
             
             # Get available questions and asked questions from database
-            from ...database.supabase_client import supabase_client as db
-            available_questions = db.get_form_questions(form_id)
-            asked_questions = db.get_asked_questions(session_id)
-            remaining_questions = len(available_questions) - len(asked_questions)
+            from ...database import db
+            all_questions = db.get_form_questions(form_id)
+            asked_question_ids = db.get_asked_questions(session_id)
             
-            logger.info(f"🔀 Routing decision: lead_status={lead_status}, remaining_questions={remaining_questions}")
+            # Count remaining questions by checking question_id field
+            remaining_questions = 0
+            for q in all_questions:
+                question_id = q.get('question_id')
+                if question_id is not None and question_id not in asked_question_ids:
+                    remaining_questions += 1
             
-            # Routing logic: separate from lead classification
-            if lead_status == "unknown" and remaining_questions > 0:
+            logger.info(f"🔀 Routing decision analysis:")
+            logger.info(f"   - Total questions in form: {len(all_questions)}")
+            logger.info(f"   - Asked question IDs: {asked_question_ids}")
+            logger.info(f"   - Remaining questions: {remaining_questions}")
+            logger.info(f"   - Lead status: {lead_status}")
+            
+            # UPDATED ROUTING LOGIC: 
+            # Always end if no questions remain, regardless of lead status
+            if remaining_questions == 0:
+                route_decision = "end"  # No more questions available
+            elif lead_status == "unknown" and remaining_questions > 0:
                 route_decision = "continue"  # Need more data
             elif lead_status == "maybe" and remaining_questions > 0:
                 route_decision = "continue"  # Maybe leads need more information to become yes/no
-            elif lead_status in ["qualified", "yes", "no"] or remaining_questions == 0:
-                route_decision = "end"  # Definitive classification or no more questions
+            elif lead_status in ["yes", "no"]:
+                route_decision = "end"  # Definitive classification - complete regardless of remaining questions
             else:
                 route_decision = "end"  # Default to end
                 
-            logger.info(f"🔀 Routing decision: {route_decision} (status: {lead_status}, remaining questions: {remaining_questions})")
+            logger.info(f"🔀 Routing decision: {route_decision}")
             return route_decision
             
         except Exception as e:
             logger.error(f"Error determining route decision: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return "end"  # Safe default
     
     def _get_tool_recommendations(self, responses: List[Dict]) -> str:
@@ -609,7 +621,7 @@ Just write the message, no other text."""
     def _get_business_context_from_db(self, form_id: str) -> str:
         """Get business context from database for LLM prompts."""
         try:
-            from ...database.supabase_client import supabase_client as db
+            from ...database import db
             
             # Get form and client info
             form = db.get_form(form_id)
@@ -646,14 +658,14 @@ Just write the message, no other text."""
     
     def _determine_lead_status(self, final_score: int, num_responses: int) -> str:
         """Determine lead status based on score and responses."""
-        # Lead status should be one of: unknown, maybe, qualified, no
+        # Lead status should be one of: unknown, maybe, yes, no (matching langgraph_test)
         # Routing is handled separately
         
         if num_responses < 3:
             return "unknown"  # Insufficient data
         
         if final_score >= 75:
-            return "qualified"  # Qualified
+            return "yes"  # Qualified (changed from "qualified" to match test)
         elif final_score >= 40:
             return "maybe"  # Maybe qualified
         else:
@@ -662,9 +674,10 @@ Just write the message, no other text."""
     def _get_total_responses_count(self, session_id: str) -> int:
         """Get total response count from database."""
         try:
-            from ...database.supabase_client import supabase_client as db
-            responses = db.get_responses(session_id)
-            return len(responses) if responses else 0
+            from ...database import db
+            # Use get_asked_questions as a proxy for response count
+            asked_questions = db.get_asked_questions(session_id)
+            return len(asked_questions) if asked_questions else 0
         except Exception as e:
             logger.error(f"Error getting response count: {e}")
             return 0

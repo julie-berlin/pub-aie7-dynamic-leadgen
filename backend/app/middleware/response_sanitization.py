@@ -49,7 +49,8 @@ class ResponseSanitizer:
         self.public_fields = {
             'businessname', 'business_name', 'company_name', 'companyname',
             'organization_name', 'organizationname', 'brand_name', 'brandname',
-            'question_id'  # Form-specific question identifier needed by frontend
+            'question_id',  # Form-specific question identifier needed by frontend
+            'lead_id'       # Safe unique identifier for React keys
         }
         
         # Fields to mask instead of remove (show partial data)
@@ -191,7 +192,7 @@ class ResponseSanitizationMiddleware(BaseHTTPMiddleware):
         # Admin endpoints (if authentication is enabled)
         self.admin_paths = {
             '/admin/', '/internal/', '/debug/', 
-            '/api/forms', '/api/clients'  # Admin API endpoints
+            '/api/forms', '/api/clients', '/api/admin/'  # Admin API endpoints
         } if config.auth_enabled else set()
         
         logger.info(f"Response sanitization middleware initialized - "
@@ -210,7 +211,7 @@ class ResponseSanitizationMiddleware(BaseHTTPMiddleware):
         # Define admin paths for both auth enabled and disabled scenarios
         admin_paths = {
             '/admin/', '/internal/', '/debug/', 
-            '/api/forms', '/api/clients'  # Admin API endpoints
+            '/api/forms', '/api/clients', '/api/admin/'  # Admin API endpoints
         }
         
         # Check if admin path
