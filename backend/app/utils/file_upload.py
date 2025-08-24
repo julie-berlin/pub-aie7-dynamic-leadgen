@@ -15,6 +15,7 @@ from datetime import datetime
 
 from fastapi import UploadFile, HTTPException, status
 from PIL import Image
+from app.database import db
 
 # Try to import magic, fallback to mimetypes if not available
 try:
@@ -202,7 +203,7 @@ class FileStorageManager:
         
         return filename
     
-    def save_logo(self, file_content: bytes, original_filename: str, client_id: str) -> Dict[str, str]:
+    def save_logo(self, file_content: bytes, original_filename: str, client_id: str, mime_type: str = 'image/jpeg') -> Dict[str, str]:
         """Save logo file in client-specific directory and return file information"""
         try:
             # Get client-specific directory
@@ -222,6 +223,31 @@ class FileStorageManager:
             # Generate file hash for integrity verification
             file_hash = hashlib.sha256(file_content).hexdigest()
             
+            # Save metadata to database
+            upload_time = datetime.now()
+            uploaded_file_record = {
+                'client_id': client_id,
+                'filename': filename,
+                'original_filename': original_filename,
+                'file_type': 'logo',
+                'size_bytes': len(file_content),
+                'mime_type': mime_type,
+                'file_hash': file_hash,
+                'storage_path': f"clients/{client_id}/logos/{filename}",
+                'url': f"/api/files/clients/{client_id}/logos/{filename}",
+                'uploaded_at': upload_time.isoformat(),
+                'is_active': True
+            }
+            
+            try:
+                db_result = db.client.table("uploaded_files").insert(uploaded_file_record).execute()
+                file_id = db_result.data[0]['id'] if db_result.data else None
+                logger.info(f"Saved file metadata to database: {filename} (ID: {file_id})")
+            except Exception as db_error:
+                logger.error(f"Failed to save file metadata to database: {db_error}")
+                # Don't fail the upload if database insert fails, just log the error
+                file_id = None
+            
             # Return file information
             return {
                 'filename': filename,
@@ -230,8 +256,9 @@ class FileStorageManager:
                 'url': f"/api/files/clients/{client_id}/logos/{filename}",
                 'size': len(file_content),
                 'hash': file_hash,
-                'uploaded_at': datetime.now().isoformat(),
-                'client_id': client_id
+                'uploaded_at': upload_time.isoformat(),
+                'client_id': client_id,
+                'file_id': file_id
             }
             
         except Exception as e:
@@ -288,13 +315,35 @@ class FileStorageManager:
                 logger.error(f"Client isolation check failed for {filename} (client {client_id})")
                 return False
             
-            if file_path.exists() and file_path.is_file():
+            file_exists = file_path.exists() and file_path.is_file()
+            
+            # Update database record first (soft delete)
+            try:
+                delete_time = datetime.now()
+                update_result = db.client.table("uploaded_files").update({
+                    'is_active': False,
+                    'deleted_at': delete_time.isoformat(),
+                    'updated_at': delete_time.isoformat()
+                }).eq('client_id', client_id).eq('filename', filename).eq('file_type', 'logo').execute()
+                
+                if update_result.data:
+                    logger.info(f"Marked logo as deleted in database: {filename} (client {client_id})")
+                else:
+                    logger.warning(f"No database record found for logo: {filename} (client {client_id})")
+                    
+            except Exception as db_error:
+                logger.error(f"Failed to update database for logo deletion: {db_error}")
+                # Continue with file deletion even if database update fails
+            
+            # Delete physical file
+            if file_exists:
                 file_path.unlink()
-                logger.info(f"Deleted logo: {filename} for client {client_id}")
+                logger.info(f"Deleted logo file: {filename} for client {client_id}")
                 return True
             else:
-                logger.warning(f"Logo not found for deletion: {filename} (client {client_id})")
-                return False
+                logger.warning(f"Logo file not found for deletion: {filename} (client {client_id})")
+                # Return True if database was updated successfully even if file doesn't exist
+                return True
                 
         except Exception as e:
             logger.error(f"Error deleting logo {filename} (client {client_id}): {e}")
@@ -337,7 +386,7 @@ class FileUploadHandler:
             image_info = self.validator.validate_image_content(file_content, is_logo=True)
             
             # Save file
-            file_info = self.storage.save_logo(file_content, file.filename, client_id)
+            file_info = self.storage.save_logo(file_content, file.filename, client_id, mime_type)
             
             # Combine all information
             result = {
