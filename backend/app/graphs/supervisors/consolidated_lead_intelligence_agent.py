@@ -133,6 +133,42 @@ Just write the message, no other text."""
                 # Still need to check if survey should be completed (no more questions)
                 route_decision = self._determine_route_decision(state, "unknown")
                 completed = route_decision == "end"
+                
+                if completed:
+                    # Form is complete - generate completion data even without new responses
+                    session_id = state.get("core", {}).get("session_id")
+                    
+                    # Get current lead status from database since we have no new responses to process
+                    from ...database import db
+                    db_session_data = db.get_lead_session(session_id)
+                    current_lead_status = db_session_data.get('lead_status', 'unknown') if db_session_data else 'unknown'
+                    current_score = db_session_data.get('final_score', 0) if db_session_data else 0
+                    
+                    # Generate completion message
+                    form_id = state.get("core", {}).get("form_id")
+                    business_context = self._get_business_context_from_db(form_id)
+                    completion_message = self._generate_completion_message_llm(
+                        current_lead_status, [], business_context  # No new responses
+                    )
+                    
+                    # Update database with final completion
+                    self.toolbelt.update_lead_status_in_database(
+                        session_id=session_id,
+                        lead_status=current_lead_status,
+                        final_score=current_score,
+                        confidence=0.8,  # Default confidence for completion
+                        completion_message=completion_message
+                    )
+                    
+                    return {
+                        "lead_status": current_lead_status,
+                        "final_score": current_score,
+                        "completion_message": completion_message,
+                        "route_decision": route_decision,
+                        "completed": True,
+                        "next_steps": []  # Could generate these too if needed
+                    }
+                
                 return {
                     "lead_status": "unknown", 
                     "route_decision": route_decision,
@@ -441,7 +477,7 @@ Just write the message, no other text."""
             "confidence": confidence,
             "tool_results": tool_results,
             "completed": lead_status in ["yes", "no"] or route_decision == "end",
-            "route_decision": route_decision  # ← CRITICAL: Add this field
+            "route_decision": route_decision
         }
     
     def _determine_route_decision(self, state: SurveyState, lead_status: str) -> str:
@@ -456,35 +492,67 @@ Just write the message, no other text."""
                 logger.warning("Missing session_id or form_id for routing decision")
                 return "end"
             
-            # Get available questions and asked questions from database
-            from ...database import db
-            all_questions = db.get_form_questions(form_id)
-            asked_question_ids = db.get_asked_questions(session_id)
+            # CRITICAL FIX: Use state data instead of database queries for immediate availability
             
-            # Count remaining questions by checking question_id field
-            remaining_questions = 0
-            for q in all_questions:
-                question_id = q.get('question_id')
-                if question_id is not None and question_id not in asked_question_ids:
-                    remaining_questions += 1
+            # Get currently asked questions from state
+            question_strategy = state.get("question_strategy", {})
+            asked_questions_from_state = set(question_strategy.get("asked_questions", []))
             
-            logger.info(f"🔀 Routing decision analysis:")
-            logger.info(f"   - Total questions in form: {len(all_questions)}")
-            logger.info(f"   - Asked question IDs: {asked_question_ids}")
+            # Add newly answered questions from current pending responses
+            if newly_asked is None:
+                newly_asked = self._mark_questions_as_asked(state)
+            asked_questions_from_state.update(newly_asked)
+            
+            # Get available questions from state (provided by Survey Admin)
+            all_questions_from_state = question_strategy.get("all_questions", [])
+            if not all_questions_from_state:
+                # Fallback to database if not in state
+                from ...database import db
+                all_questions_from_state = db.get_form_questions(form_id)
+            
+            # Calculate remaining questions
+            total_questions = len(all_questions_from_state)
+            asked_count = len(asked_questions_from_state)
+            remaining_questions = total_questions - asked_count
+            
+            logger.info(f"🔀 Routing decision analysis (using state):")
+            logger.info(f"   - Total questions: {total_questions}")
+            logger.info(f"   - Asked questions: {sorted(list(asked_questions_from_state))}")
             logger.info(f"   - Remaining questions: {remaining_questions}")
             logger.info(f"   - Lead status: {lead_status}")
             
-            # UPDATED ROUTING LOGIC: 
-            # Always end if no questions remain, regardless of lead status
-            if remaining_questions == 0:
-                route_decision = "end"  # No more questions available
-            elif lead_status == "unknown" and remaining_questions > 0:
-                route_decision = "continue"  # Need more data
-            elif lead_status == "maybe" and remaining_questions > 0:
-                route_decision = "continue"  # Maybe leads need more information to become yes/no
+            # CONSOLIDATED COMPLETION LOGIC - All completion criteria in one place
+            
+            # Get current step for business rules
+            db_session = self.toolbelt.get_lead_session(session_id) if session_id else None
+            current_step = db_session.get("step", 0) if db_session else 0
+            
+            logger.info(f"🔍 Completion analysis - step: {current_step}, lead_status: {lead_status}, remaining: {remaining_questions}")
+            
+            # Rule 1: If step < 2, always continue (need minimum engagement)
+            if current_step < 2:
+                route_decision = "continue"
+                logger.info("📋 Step < 2 - continue for minimum engagement")
+            
+            # Rule 2: If step 2+ and lead_status is "no", end (qualified out)
+            elif current_step >= 2 and lead_status == "no":
+                route_decision = "end"
+                logger.info("🏁 Step 2+ and 'no' lead - end (qualified out)")
+            
+            # Rule 3: If no questions remain, end (survey exhausted)
+            elif remaining_questions == 0:
+                route_decision = "end"
+                logger.info("🏁 No more questions available - end")
+            
+            # Rule 4: If definitive classification (yes/no), end
+            elif lead_status in ["yes", "no"]:
+                route_decision = "end"
+                logger.info(f"🏁 Definitive lead status ({lead_status}) - end")
+            
+            # Rule 5: Otherwise continue (unknown/maybe with questions remaining)
             else:
-                # Handle all lead statuses with clear completion logic
-                route_decision = self._get_completion_decision(state, lead_status)
+                route_decision = "continue"
+                logger.info(f"📋 {lead_status} status with {remaining_questions} questions - continue")
                 
             logger.info(f"🔀 Routing decision: {route_decision}")
             return route_decision

@@ -52,11 +52,12 @@ class ConsolidatedSurveyAdminSupervisor(SupervisorAgent):
    - Early steps: 1-2 questions to build trust
    - Later steps: 3-4 questions when momentum established
 
-2. QUESTION REPHRASING: Make questions engaging and personal
-   - Use user's name if known
-   - Reference previous responses when relevant
-   - Make conversational and natural
-   - Each question asks for exactly ONE piece of information
+2. QUESTION REPHRASING: Analyze intent and rephrase precisely
+   - Read the original question and understand what specific information it needs
+   - Rephrase to collect exactly that information and only that information
+   - Use user's name if known and make conversational
+   - Exception: textarea questions can ask for broader, multi-faceted responses
+   - NEVER add extra requests beyond the original question's intent
 
 3. ENGAGEMENT MESSAGING: Business context + completion encouragement
    - Include specific business services/benefits
@@ -372,14 +373,32 @@ CRITICAL INSTRUCTIONS:
 2. Rephrase questions FOR THE USER (person filling out form)
 3. Use user's name ({user_name if user_name else ''}) ONLY if known - NOT business owner info
 4. Questions ask about USER'S needs/info - NOT business owner's info
-5. ENGAGEMENT MESSAGES (HEADLINE + MESSAGE): Use business info to entice user
+5. **MANDATORY**: Understand the original question's intent and rephrase to get exactly that
+   - Read what information the original question is trying to collect
+   - Rephrase to get exactly that information and nothing extra
+   - For text/select/radio: single focused answer
+   - For textarea: can be broader and ask for detailed explanation
+   - NEVER add additional requests beyond the original question's scope
+6. ENGAGEMENT MESSAGES (HEADLINE + MESSAGE): Use business info to entice user
    - Mention {business_name}'s background, qualifications, experience
    - Highlight specific services and benefits offered
    - Show why the business is perfect for the user's needs
    - Reference business owner's expertise to build trust
-6. NEVER mix business owner details into user questions
+7. NEVER mix business owner details into user questions
 
-QUESTION PHRASING:
+QUESTION PHRASING RULES - MATCH THE ORIGINAL INTENT:
+ORIGINAL: "What is your full name?" 
+WRONG REPHRASE: "What's your name and what should we call you?" (adds extra request)
+RIGHT REPHRASE: "What's your name?" (matches original intent exactly)
+
+ORIGINAL: "What is your email address?"
+WRONG REPHRASE: "What's your email and phone number?" (adds extra request) 
+RIGHT REPHRASE: "What's your email address?" (matches original intent exactly)
+
+ORIGINAL: "Tell us about your project requirements" (textarea)
+RIGHT REPHRASE: "Tell us about your project - what are you looking to accomplish and what challenges are you facing?" (textarea can be broader)
+
+OTHER EXAMPLES:
 WRONG: "What should we call you, the dog-loving recent Psychology graduate?"
 WRONG: "How well-behaved is your dog on walks, None?"
 RIGHT: "What should we call you?" or "Hi {user_name if user_name else ''}, what should we call you?"
@@ -705,7 +724,7 @@ Use the exact output format specified in your instructions."""
             }
         }
 
-        return {
+        result = {
             # This is the key the API is looking for
             "frontend_response": {
                 **frontend_data,

@@ -361,6 +361,12 @@ async def submit_and_continue(
             completed = True
             logger.info(f"🏁 Survey marked as completed by Survey Admin (step_type: completion)")
         
+        # CRITICAL FIX: Check if Lead Intelligence indicates completion
+        route_decision = result.get('route_decision')
+        if route_decision == "end":
+            completed = True
+            logger.info(f"🏁 Survey marked as completed by Lead Intelligence (route_decision: end)")
+        
         # Get frontend response data
         frontend_data = result.get('frontend_response', {})
         
@@ -373,7 +379,7 @@ async def submit_and_continue(
             # Form is complete - return completion data
             response_data["completionData"] = {
                 "leadStatus": result.get('lead_status', 'unknown'),
-                "score": result.get('lead_score', 0),
+                "score": result.get('final_score', 0),
                 "message": result.get('completion_message', 'Thank you for your time and interest.'),
                 "nextSteps": result.get('next_steps', [])
             }

@@ -1,0 +1,216 @@
+/* Pawsome Dog Walking Theme */
+/* Color palette inspired by the warm teal, golden yellow, and brown colors from the logo */
+
+:root {
+  /* Primary brand colors from logo */
+  --pawsome-primary: #4A9B8E; /* Warm teal from "PAWSOME" text */
+  --pawsome-secondary: #F4C430; /* Golden yellow from "DOG WALKING" text */
+  --pawsome-accent: #8B4513; /* Warm brown from dog outline */
+  --pawsome-cream: #FFF8DC; /* Soft cream background */
+  
+  /* UI Colors */
+  --pawsome-bg-primary: var(--pawsome-cream);
+  --pawsome-bg-secondary: #F0F8F6;
+  --pawsome-text-primary: #2C3E50;
+  --pawsome-text-secondary: #5A6C7D;
+  --pawsome-border: #D4E4E0;
+  
+  /* Interactive states */
+  --pawsome-button-primary: var(--pawsome-primary);
+  --pawsome-button-primary-hover: #3D8A7C;
+  --pawsome-button-secondary: var(--pawsome-secondary);
+  --pawsome-button-secondary-hover: #E6B029;
+  
+  /* Form elements */
+  --pawsome-input-bg: #FFFFFF;
+  --pawsome-input-border: var(--pawsome-border);
+  --pawsome-input-focus: var(--pawsome-primary);
+  
+  /* Progress bar */
+  --pawsome-progress-bg: #E8F4F1;
+  --pawsome-progress-fill: var(--pawsome-primary);
+}
+
+/* Theme application */
+.theme-pawsome {
+  background-color: var(--pawsome-bg-primary);
+  color: var(--pawsome-text-primary);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.theme-pawsome .form-container {
+  background-color: var(--pawsome-input-bg);
+  border: 1px solid var(--pawsome-border);
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(74, 155, 142, 0.1);
+}
+
+.theme-pawsome .page-header {
+  background: linear-gradient(135deg, var(--pawsome-primary), var(--pawsome-secondary));
+  color: white;
+  border-radius: 16px 16px 0 0;
+}
+
+.theme-pawsome .progress-bar {
+  background-color: var(--pawsome-progress-bg);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.theme-pawsome .progress-fill {
+  background: linear-gradient(90deg, var(--pawsome-primary), var(--pawsome-secondary));
+  transition: width 0.3s ease;
+}
+
+.theme-pawsome .question-title {
+  color: var(--pawsome-text-primary);
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+.theme-pawsome .question-subtitle {
+  color: var(--pawsome-text-secondary);
+  margin-bottom: 1.5rem;
+}
+
+/* Form inputs */
+.theme-pawsome input,
+.theme-pawsome textarea,
+.theme-pawsome select {
+  background-color: var(--pawsome-input-bg);
+  border: 2px solid var(--pawsome-input-border);
+  border-radius: 8px;
+  padding: 0.75rem;
+  font-size: 1rem;
+  transition: border-color 0.2s ease;
+}
+
+.theme-pawsome input:focus,
+.theme-pawsome textarea:focus,
+.theme-pawsome select:focus {
+  border-color: var(--pawsome-input-focus);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(74, 155, 142, 0.1);
+}
+
+/* Buttons */
+.theme-pawsome .btn-primary {
+  background-color: var(--pawsome-button-primary);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 0.875rem 2rem;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.theme-pawsome .btn-primary:hover {
+  background-color: var(--pawsome-button-primary-hover);
+}
+
+.theme-pawsome .btn-secondary {
+  background-color: var(--pawsome-button-secondary);
+  color: var(--pawsome-text-primary);
+  border: 2px solid var(--pawsome-button-secondary);
+  border-radius: 8px;
+  padding: 0.875rem 2rem;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.theme-pawsome .btn-secondary:hover {
+  background-color: var(--pawsome-button-secondary-hover);
+  border-color: var(--pawsome-button-secondary-hover);
+}
+
+/* Radio buttons and checkboxes */
+.theme-pawsome input[type="radio"],
+.theme-pawsome input[type="checkbox"] {
+  accent-color: var(--pawsome-primary);
+}
+
+.theme-pawsome .radio-option,
+.theme-pawsome .checkbox-option {
+  background-color: var(--pawsome-bg-secondary);
+  border: 2px solid var(--pawsome-border);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.theme-pawsome .radio-option:hover,
+.theme-pawsome .checkbox-option:hover {
+  border-color: var(--pawsome-primary);
+  background-color: rgba(74, 155, 142, 0.05);
+}
+
+.theme-pawsome .radio-option.selected,
+.theme-pawsome .checkbox-option.selected {
+  border-color: var(--pawsome-primary);
+  background-color: rgba(74, 155, 142, 0.1);
+}
+
+/* Rating stars */
+.theme-pawsome .rating-star {
+  color: var(--pawsome-border);
+  font-size: 1.5rem;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.theme-pawsome .rating-star.filled,
+.theme-pawsome .rating-star:hover {
+  color: var(--pawsome-secondary);
+}
+
+/* Completion page */
+.theme-pawsome .completion-container {
+  text-align: center;
+  padding: 2rem;
+}
+
+.theme-pawsome .completion-title {
+  color: var(--pawsome-primary);
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+}
+
+.theme-pawsome .completion-message {
+  color: var(--pawsome-text-secondary);
+  font-size: 1.125rem;
+  line-height: 1.6;
+}
+
+/* Playful pet-friendly touches */
+.theme-pawsome .form-container::before {
+  content: "🐕";
+  font-size: 1.25rem;
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  background-color: var(--pawsome-secondary);
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.theme-pawsome .btn-primary::after {
+  content: " 🐾";
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.theme-pawsome .btn-primary:hover::after {
+  opacity: 1;
+}
