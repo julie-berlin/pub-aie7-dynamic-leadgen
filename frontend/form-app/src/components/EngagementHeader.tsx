@@ -19,8 +19,8 @@ export default function EngagementHeader({ form, currentStep }: EngagementHeader
       {/* Step Headline as H2 - AI-generated engaging content */}
       {currentStep.headline && (
         <h2
-          className="text-2xl md:text-3xl font-semibold mb-6 text-center"
-          style={{ color: 'var(--color-primary)' }}
+          className="text-2xl md:text-4xl font-semibold mb-6 text-center"
+          style={{ color: 'var(--color-heading)' }}
         >
           {currentStep.headline}
         </h2>

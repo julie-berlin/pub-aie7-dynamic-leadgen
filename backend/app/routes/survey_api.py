@@ -158,7 +158,7 @@ async def start_session(
         form_details = result.get('form_details', {})
         
         # If not at top level, check inside frontend_response
-        if not form_details:
+        if not form_details and frontend_data:
             form_details = frontend_data.get('form_details', {})
             
         logger.debug(f"Extracted form_details: {form_details}")

@@ -80,6 +80,18 @@ export default function FormPage() {
     }
   }, [formState?.isComplete, formId, navigate]);
 
+  if (loading || !currentForm || !currentStep) {
+    return (
+      <PageLayout businessName={businessName || "Loading..."} logoUrl={logoUrl}>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <LoadingSpinner 
+            message={businessName ? `Loading ${businessName}...` : "Loading form..."}
+          />
+        </div>
+      </PageLayout>
+    );
+  }
+
   if (error) {
     return (
       <PageLayout businessName="Varyq">
@@ -91,18 +103,6 @@ export default function FormPage() {
               error}
             showRetry
             onRetry={() => window.location.reload()}
-          />
-        </div>
-      </PageLayout>
-    );
-  }
-
-  if (loading || !currentForm || !currentStep) {
-    return (
-      <PageLayout businessName={businessName || "Loading..."} logoUrl={logoUrl}>
-        <div className="flex items-center justify-center min-h-[400px]">
-          <LoadingSpinner 
-            message={businessName ? `Loading ${businessName}...` : "Loading form..."}
           />
         </div>
       </PageLayout>

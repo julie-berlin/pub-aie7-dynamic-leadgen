@@ -24,7 +24,7 @@ export default function PageHeader({ businessName, logoUrl }: PageHeaderProps) {
               />
             ) : (
             <div className="flex flex-col">
-              <span className="text-xl font-bold" style={{ color: 'var(--color-primary)' }}>
+              <span className="text-xl font-bold" style={{ color: 'var(--color-heading)' }}>
                 {businessName || 'Varyq'}
               </span>
             </div>

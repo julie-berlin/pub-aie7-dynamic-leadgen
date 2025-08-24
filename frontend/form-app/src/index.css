@@ -20,6 +20,7 @@
     --color-text: #111827;
     --color-text-light: #374151;
     --color-text-muted: #6b7280;
+    --color-heading: #3b82f6;
     --color-background: #ffffff;
     --color-background-light: #f9fafb;
     --color-border: #d1d5db;
@@ -339,4 +340,8 @@ fieldset {
         color: var(--color-text);
         text-align: center;
     }
+}
+
+h1 {
+    color: var(--color-heading);
 }
