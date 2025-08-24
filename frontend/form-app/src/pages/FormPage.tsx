@@ -84,8 +84,8 @@ export default function FormPage() {
 
   if (error) {
     return (
-      <PageLayout businessName="Form Not Available">
-        <div className="flex items-center justify-center min-h-screen py-12 px-4">
+      <PageLayout businessName="Varyq">
+        <div className="flex items-center justify-center py-12 px-4">
           <ErrorMessage
             title="Form Not Available"
             message={error.includes('not found') ? 
@@ -93,8 +93,6 @@ export default function FormPage() {
               error}
             showRetry
             onRetry={() => window.location.reload()}
-            variant="form-unavailable"
-            type="error"
           />
         </div>
       </PageLayout>
