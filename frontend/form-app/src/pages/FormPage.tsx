@@ -9,35 +9,9 @@ import EngagementHeader from '../components/EngagementHeader';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
 
-// Helper function to derive business name from clientId
-function getBusinessNameFromClientId(clientId: string): string | undefined {
-  // Common patterns for client IDs that might contain business names
-  const patterns = [
-    // Remove common prefixes/suffixes
-    /^(client_|user_|biz_)/i,
-    /(_client|_user|_biz)$/i,
-  ];
-  
-  if (!clientId) return undefined;
-  
-  let name = clientId;
-  patterns.forEach(pattern => {
-    name = name.replace(pattern, '');
-  });
-  
-  // Convert from various formats to readable name
-  name = name
-    .replace(/[_-]/g, ' ')  // Replace underscores/dashes with spaces
-    .replace(/([a-z])([A-Z])/g, '$1 $2')  // Add spaces before capital letters
-    .split(' ')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join(' ');
-  
-  return name !== clientId ? name : undefined;
-}
 
 export default function FormPage() {
-  const { clientId, formId } = useParams<{ clientId: string; formId: string }>();
+  const { formId } = useParams<{ formId: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
@@ -58,14 +32,14 @@ export default function FormPage() {
   const logoUrl = currentTheme?.logo_url || currentForm?.logoUrl;
 
   useEffect(() => {
-    if (!clientId || !formId) {
+    if (!formId) {
       navigate('/404');
       return;
     }
 
-    // Only initialize if we don't already have a form for this clientId/formId combination
+    // Only initialize if we don't already have a form for this formId
     // This prevents unnecessary re-initialization during step transitions
-    if (!currentForm || currentForm.clientId !== clientId || currentForm.id !== formId) {
+    if (!currentForm || currentForm.id !== formId) {
       // Extract tracking data from URL
       const trackingData = extractUTMParams();
 
@@ -77,19 +51,17 @@ export default function FormPage() {
       }
 
       // Initialize form only when needed
-      initializeForm(clientId, formId, trackingData).catch(err => {
+      initializeForm(formId, trackingData).catch(err => {
         console.error('Failed to initialize form:', err);
       });
     }
 
-    // Load theme separately with fallback (theme API is slow) - but only if not already loaded
-    if (!currentTheme || currentTheme.formId !== formId) {
-      loadTheme(formId).catch(err => {
-        console.warn('Theme loading failed, using default:', err);
-        // Theme store will automatically fall back to default theme
-      });
-    }
-  }, [clientId, formId, searchParams, initializeForm, loadTheme, navigate, currentForm, currentTheme]);
+    // Load theme separately with fallback (theme API is slow)
+    loadTheme(formId).catch(err => {
+      console.warn('Theme loading failed, using default:', err);
+      // Theme store will automatically fall back to default theme
+    });
+  }, [formId, searchParams, initializeForm, loadTheme, navigate, currentForm]);
 
   // Update page title with business name
   useEffect(() => {
@@ -103,12 +75,12 @@ export default function FormPage() {
   // Navigate to completion page if form is complete (using React Router for SPA navigation)
   useEffect(() => {
     if (formState?.isComplete) {
-      navigate(`/form/${clientId}/${formId}/complete`, {
+      navigate(`/form/${formId}/complete`, {
         state: { sessionId: formState.sessionId },
         replace: true // Use replace to avoid back button issues
       });
     }
-  }, [formState?.isComplete, clientId, formId, formState?.sessionId, navigate]);
+  }, [formState?.isComplete, formId, formState?.sessionId, navigate]);
 
   if (error) {
     return (

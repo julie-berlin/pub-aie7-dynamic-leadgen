@@ -6,7 +6,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorMessage from '../components/ErrorMessage';
 
 export default function CompletionPage() {
-  const { clientId, formId } = useParams<{ clientId: string; formId: string }>();
+  const { formId } = useParams<{ formId: string }>();
   const location = useLocation();
   const navigate = useNavigate();
   
@@ -15,7 +15,7 @@ export default function CompletionPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!clientId || !formId) {
+    if (!formId) {
       navigate('/404');
       return;
     }
@@ -45,7 +45,7 @@ export default function CompletionPage() {
     } finally {
       setLoading(false);
     }
-  }, [clientId, formId, location.state, navigate]);
+  }, [formId, location.state, navigate]);
 
   // Redirect after a delay if specified
   useEffect(() => {
@@ -73,7 +73,7 @@ export default function CompletionPage() {
           title="Completion Error"
           message={error}
           showRetry
-          onRetry={() => navigate(`/form/${clientId}/${formId}`)}
+          onRetry={() => navigate(`/form/${formId}`)}
         />
       </div>
     );

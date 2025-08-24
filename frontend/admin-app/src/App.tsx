@@ -1,6 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Suspense, lazy } from 'react';
+import { Suspense, lazy, useEffect } from 'react';
 import { useAdminStore } from './stores/adminStore';
 import { LoadingSpinner } from './components/ui';
 
@@ -34,7 +34,24 @@ const queryClient = new QueryClient({
 });
 
 function App() {
-  const { isAuthenticated } = useAdminStore();
+  const { isAuthenticated, isInitialized, initializeAuth } = useAdminStore();
+
+  // Initialize authentication on app startup
+  useEffect(() => {
+    initializeAuth();
+  }, [initializeAuth]);
+
+  // Show loading spinner while determining auth state
+  if (!isInitialized) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-center">
+          <LoadingSpinner />
+          <p className="mt-2 text-sm text-slate-600">Initializing...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <QueryClientProvider client={queryClient}>

@@ -39,6 +39,7 @@ export default function ThemeEditorPage() {
   // Load existing theme if editing
   useEffect(() => {
     if (isEditing && id) {
+      // Auth is guaranteed to be ready when this component renders
       loadTheme(id);
     }
   }, [isEditing, id]);

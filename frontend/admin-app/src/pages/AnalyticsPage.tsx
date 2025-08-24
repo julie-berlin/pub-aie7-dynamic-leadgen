@@ -28,6 +28,7 @@ export default function AnalyticsPage() {
   const [selectedPreset, setSelectedPreset] = useState<string>(dateRange.preset || 'last30days');
 
   useEffect(() => {
+    // Auth is guaranteed to be ready when this component renders
     fetchDashboardMetrics();
     fetchForms();
   }, [fetchDashboardMetrics, fetchForms]);

@@ -13,6 +13,7 @@ export default function ThemesPage() {
 
   // Load themes on mount
   useEffect(() => {
+    // Auth is guaranteed to be ready when this component renders
     loadThemes();
   }, []);
 

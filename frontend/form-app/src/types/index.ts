@@ -1,7 +1,6 @@
 // Form configuration and question types
 export interface FormConfig {
   id: string;
-  clientId: string;
   title: string;
   description?: string;
   businessName?: string;
@@ -139,7 +138,6 @@ export interface ThemeConfig {
 // Form state and responses
 export interface FormState {
   formId: string;
-  clientId: string;
   sessionId: string;
   currentStep: number;
   totalSteps: number;
@@ -250,7 +248,7 @@ export interface FormStore {
   error: string | null;
 
   // Actions
-  initializeForm: (clientId: string, formId: string, trackingData?: Partial<TrackingData>) => Promise<void>;
+  initializeForm: (formId: string, trackingData?: Partial<TrackingData>) => Promise<void>;
   submitStep: (stepNumber: number) => Promise<void>;
   submitResponses: (responses: Record<string, any>) => Promise<void>;
   goBack: () => Promise<void>;
@@ -286,7 +284,6 @@ export interface FormProgress {
 
 // Navigation and routing
 export interface FormRoute {
-  clientId: string;
   formId: string;
   step?: number;
   sessionId?: string;

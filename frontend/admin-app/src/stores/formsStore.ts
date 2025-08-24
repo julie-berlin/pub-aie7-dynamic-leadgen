@@ -2,6 +2,18 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { API_ENDPOINTS } from '../config/api';
 
+// Helper function to get authenticated headers
+const getAuthHeaders = () => {
+  const token = localStorage.getItem('admin_token');
+  if (!token) {
+    throw new Error('No authentication token found');
+  }
+  return {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${token}`
+  };
+};
+
 // Form interface for admin management
 export interface AdminForm {
   id: string;
@@ -129,12 +141,8 @@ export const useFormsStore = create<FormsStore>()(
           if (filters.dateRange.start) params.set('startDate', filters.dateRange.start);
           if (filters.dateRange.end) params.set('endDate', filters.dateRange.end);
           
-          const token = localStorage.getItem('admin_token');
           const response = await fetch(API_ENDPOINTS.FORMS.LIST(params), {
-            headers: { 
-              'Content-Type': 'application/json',
-              ...(token && { 'Authorization': `Bearer ${token}` })
-            },
+            headers: getAuthHeaders(),
           });
           
           if (!response.ok) {

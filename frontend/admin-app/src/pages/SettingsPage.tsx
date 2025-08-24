@@ -33,6 +33,7 @@ export default function SettingsPage() {
   const hasChanges = originalSettings ? JSON.stringify(settings) !== JSON.stringify(originalSettings) : false;
 
   useEffect(() => {
+    // Auth is guaranteed to be ready when this component renders
     loadSettings();
   }, []);
 

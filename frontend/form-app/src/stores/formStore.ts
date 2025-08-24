@@ -22,13 +22,12 @@ export const useFormStore = create<FormStore>()(
       error: null,
 
       // Actions
-      initializeForm: async (clientId: string, formId: string, trackingData?: Partial<TrackingData>) => {
+      initializeForm: async (formId: string, trackingData?: Partial<TrackingData>) => {
         const currentState = get();
         
         // Only clear state if we're switching to a different form
         // This prevents unnecessary clearing during step navigation
-        const isSameForm = currentState.currentForm?.id === formId && 
-                          currentState.currentForm?.clientId === clientId;
+        const isSameForm = currentState.currentForm?.id === formId;
         
         if (isSameForm) {
           // Just update loading state, preserve existing form data
@@ -53,7 +52,6 @@ export const useFormStore = create<FormStore>()(
           // Start or resume session
           const response = await apiClient.startSession({
             formId,
-            clientId,
             trackingData: {
               ...trackingData
               // userAgent and timestamp are not supported by backend API
@@ -65,7 +63,6 @@ export const useFormStore = create<FormStore>()(
           
           const newFormState: FormState = {
             formId,
-            clientId,
             sessionId: '', // Backend session managed via HTTP-only cookies
             currentStep: response.step.stepNumber,
             totalSteps: response.step.totalSteps,
@@ -78,7 +75,6 @@ export const useFormStore = create<FormStore>()(
           set({
             currentForm: {
               id: response.form.id,
-              clientId,
               title: response.form.title,
               description: response.form.description,
               businessName: response.form.businessName,

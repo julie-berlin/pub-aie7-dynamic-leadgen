@@ -2,6 +2,17 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { API_ENDPOINTS, API_CONFIG } from '../config/api';
 
+// Helper function to validate JWT token
+const isTokenValid = (token: string): boolean => {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    const now = Date.now() / 1000;
+    return payload.exp > now;
+  } catch {
+    return false;
+  }
+};
+
 // Admin user interface
 export interface AdminUser {
   id: string;
@@ -25,6 +36,7 @@ export interface BusinessInfo {
 interface AuthState {
   user: AdminUser | null;
   isAuthenticated: boolean;
+  isInitialized: boolean; // Track if auth check is complete
   isLoading: boolean;
   error: string | null;
   businessInfo: BusinessInfo;
@@ -32,6 +44,7 @@ interface AuthState {
 
 // Auth actions interface
 interface AuthActions {
+  initializeAuth: () => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   refreshToken: () => Promise<void>;
@@ -51,6 +64,7 @@ export const useAdminStore = create<AdminStore>()(
       // Initial auth state
       user: null,
       isAuthenticated: false,
+      isInitialized: false,
       isLoading: false,
       error: null,
       businessInfo: {
@@ -60,6 +74,86 @@ export const useAdminStore = create<AdminStore>()(
       },
 
       // Auth actions
+      initializeAuth: async () => {
+        try {
+          const token = localStorage.getItem('admin_token');
+          
+          if (!token || !isTokenValid(token)) {
+            // No token or invalid token - user not authenticated
+            set({ 
+              user: null,
+              isAuthenticated: false,
+              isInitialized: true,
+              error: null 
+            });
+            return;
+          }
+          
+          // Token exists and is valid - try to get user info
+          const response = await fetch(`${API_CONFIG.BASE_URL}/api/admin/auth/me`, {
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          
+          if (response.ok) {
+            const result = await response.json();
+            // Use the standard API format response
+            if (result.success && result.data) {
+              const userData = result.data;
+              const user: AdminUser = {
+                id: userData.id,
+                email: userData.email,
+                name: `${userData.first_name} ${userData.last_name}`,
+                role: userData.role as 'admin' | 'manager' | 'viewer',
+                clientId: userData.client_id,
+                permissions: userData.permissions || ['read', 'write', 'delete'],
+                businessName: undefined // Will be loaded separately
+              };
+            
+            set({ 
+              user,
+              isAuthenticated: true,
+              isInitialized: true,
+              error: null 
+            });
+            
+              // Load business info
+              get().loadBusinessInfo().catch(console.warn);
+            } else {
+              // Response format error
+              localStorage.removeItem('admin_token');
+              set({ 
+                user: null,
+                isAuthenticated: false,
+                isInitialized: true,
+                error: null 
+              });
+            }
+          } else {
+            // Token invalid or expired
+            localStorage.removeItem('admin_token');
+            set({ 
+              user: null,
+              isAuthenticated: false,
+              isInitialized: true,
+              error: null 
+            });
+          }
+        } catch (error) {
+          console.error('Auth initialization failed:', error);
+          // On error, assume not authenticated but mark as initialized
+          localStorage.removeItem('admin_token');
+          set({ 
+            user: null,
+            isAuthenticated: false,
+            isInitialized: true,
+            error: null 
+          });
+        }
+      },
+
       login: async (email: string, password: string) => {
         set({ isLoading: true, error: null });
         
@@ -74,17 +168,22 @@ export const useAdminStore = create<AdminStore>()(
             throw new Error('Login failed');
           }
 
-          const data = await response.json();
+          const result = await response.json();
           
-          // Backend returns { access_token, token_type, expires_in, user }
-          const { access_token, user } = data;
+          // Backend now returns standard format: { success, data: { access_token, token_type, expires_in, user }, message }
+          if (!result.success) {
+            throw new Error(result.message || 'Login failed');
+          }
+          
+          const { access_token, user } = result.data;
           
           // Store token in localStorage for API requests
           localStorage.setItem('admin_token', access_token);
           
           set({ 
             user, 
-            isAuthenticated: true, 
+            isAuthenticated: true,
+            isInitialized: true,
             isLoading: false,
             error: null 
           });
@@ -103,7 +202,8 @@ export const useAdminStore = create<AdminStore>()(
         localStorage.removeItem('admin_token');
         set({ 
           user: null, 
-          isAuthenticated: false, 
+          isAuthenticated: false,
+          isInitialized: true, // Keep initialized as true - we know the auth state
           error: null,
           businessInfo: {
             name: 'Survey Admin',
@@ -127,10 +227,14 @@ export const useAdminStore = create<AdminStore>()(
             return;
           }
 
-          const data = await response.json();
-          const { access_token, user } = data;
-          localStorage.setItem('admin_token', access_token);
-          set({ user, isAuthenticated: true });
+          const result = await response.json();
+          if (result.success && result.data) {
+            const { access_token, user } = result.data;
+            localStorage.setItem('admin_token', access_token);
+            set({ user, isAuthenticated: true });
+          } else {
+            throw new Error(result.message || 'Token refresh failed');
+          }
         } catch (error) {
           get().logout();
         }
@@ -184,11 +288,12 @@ export const useAdminStore = create<AdminStore>()(
     {
       name: 'admin-auth-storage',
       storage: createJSONStorage(() => localStorage),
-      // Only persist user data, not sensitive auth state
+      // Only persist user data, not runtime state
       partialize: (state) => ({
         user: state.user,
         isAuthenticated: state.isAuthenticated,
         businessInfo: state.businessInfo,
+        // Don't persist isInitialized - it should start false on each app load
       }),
     }
   )

@@ -40,6 +40,7 @@ export default function FormDetailPage() {
 
   useEffect(() => {
     if (id) {
+      // Auth is guaranteed to be ready when this component renders
       loadFormDetails(id);
       loadAvailableThemes();
     }

@@ -36,6 +36,7 @@ export default function FormsPage() {
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // Auth is guaranteed to be ready when this component renders
     fetchForms();
   }, [fetchForms]);
 

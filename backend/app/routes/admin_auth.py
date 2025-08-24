@@ -185,10 +185,25 @@ async def login_admin_user(login_request: AdminUserLogin):
             created_at=user_data['created_at']
         )
         
-        return AdminTokenResponse(
+        token_response = AdminTokenResponse(
             access_token=access_token,
             expires_in=expires_in,
             user=user_response
+        )
+        
+        # Convert to dict with proper datetime serialization
+        response_data = token_response.dict()
+        # Convert datetime fields to ISO strings
+        if 'user' in response_data and response_data['user']:
+            user_data = response_data['user']
+            if 'last_login_at' in user_data and user_data['last_login_at']:
+                user_data['last_login_at'] = user_data['last_login_at'].isoformat() if hasattr(user_data['last_login_at'], 'isoformat') else str(user_data['last_login_at'])
+            if 'created_at' in user_data and user_data['created_at']:
+                user_data['created_at'] = user_data['created_at'].isoformat() if hasattr(user_data['created_at'], 'isoformat') else str(user_data['created_at'])
+        
+        return success_response(
+            data=response_data,
+            message="Login successful"
         )
             
     except HTTPException:
@@ -197,22 +212,46 @@ async def login_admin_user(login_request: AdminUserLogin):
         logger.error(f"Failed to login user: {e}")
         raise HTTPException(status_code=500, detail="Failed to login user")
 
-@router.get("/me", response_model=AdminUserResponse)
+@router.get("/me")
 async def get_current_user(current_user: AdminUserResponse = Depends(get_current_admin_user)):
     """Get current authenticated user."""
-    return current_user
+    # Convert to dict with proper datetime serialization
+    user_data = current_user.dict()
+    if 'last_login_at' in user_data and user_data['last_login_at']:
+        user_data['last_login_at'] = user_data['last_login_at'].isoformat() if hasattr(user_data['last_login_at'], 'isoformat') else str(user_data['last_login_at'])
+    if 'created_at' in user_data and user_data['created_at']:
+        user_data['created_at'] = user_data['created_at'].isoformat() if hasattr(user_data['created_at'], 'isoformat') else str(user_data['created_at'])
+    
+    return success_response(
+        data=user_data,
+        message="User retrieved successfully"
+    )
 
-@router.post("/refresh", response_model=AdminTokenResponse)
+@router.post("/refresh")
 async def refresh_token(current_user: AdminUserResponse = Depends(get_current_admin_user)):
     """Refresh access token."""
     try:
         # Create new access token
         access_token, expires_in = create_access_token(current_user.id, current_user.client_id)
         
-        return AdminTokenResponse(
+        token_response = AdminTokenResponse(
             access_token=access_token,
             expires_in=expires_in,
             user=current_user
+        )
+        
+        # Convert to dict with proper datetime serialization
+        response_data = token_response.dict()
+        if 'user' in response_data and response_data['user']:
+            user_data = response_data['user']
+            if 'last_login_at' in user_data and user_data['last_login_at']:
+                user_data['last_login_at'] = user_data['last_login_at'].isoformat() if hasattr(user_data['last_login_at'], 'isoformat') else str(user_data['last_login_at'])
+            if 'created_at' in user_data and user_data['created_at']:
+                user_data['created_at'] = user_data['created_at'].isoformat() if hasattr(user_data['created_at'], 'isoformat') else str(user_data['created_at'])
+        
+        return success_response(
+            data=response_data,
+            message="Token refreshed successfully"
         )
         
     except Exception as e:

@@ -184,6 +184,7 @@ export default function LeadsPage() {
   }, [allLeads, filters.search]);
 
   useEffect(() => {
+    // Auth is guaranteed to be ready when this component renders
     fetchLeads();
     fetchSummary();
     fetchForms();

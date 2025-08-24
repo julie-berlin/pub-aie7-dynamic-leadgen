@@ -162,17 +162,25 @@ class AdminAuthMiddleware(BaseHTTPMiddleware):
         self.config = config
         self.authenticator = AdminAuthenticator(config) if config.auth_enabled else None
         
-        # Protected admin paths
+        # Protected admin paths (with and without trailing slashes for consistency)
         self.admin_paths = {
             '/admin/',
             '/internal/',
             '/debug/',
             '/system/',
             '/management/',
-            '/api/admin/',  # Admin authentication endpoints
-            '/api/clients/',  # Client management endpoints
-            '/api/analytics/',  # Analytics endpoints
-            '/api/forms/'  # Form management endpoints
+            '/api/admin',  # All admin endpoints (includes /leads, /auth, /team, /upload, /client)
+            '/api/admin/',  # Admin endpoints with trailing slash
+            '/api/clients',  # Client management endpoints
+            '/api/clients/',  # Client management endpoints with trailing slash
+            '/api/analytics',  # Analytics endpoints
+            '/api/analytics/',  # Analytics endpoints with trailing slash
+            '/api/forms',  # Form management endpoints
+            '/api/forms/',  # Form management endpoints with trailing slash
+            '/api/themes',  # Theme management endpoints
+            '/api/themes/',  # Theme management endpoints with trailing slash
+            '/api/files',  # File management endpoints
+            '/api/files/'  # File management endpoints with trailing slash
         }
         
         # Exclude authentication endpoints from middleware protection
