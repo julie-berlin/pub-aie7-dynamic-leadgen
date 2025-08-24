@@ -43,7 +43,7 @@ const defaultTheme: ThemeConfig = {
 
 // Theme cache for performance
 const themeCache = new Map<string, { theme: ThemeConfig; timestamp: number }>();
-const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
+const CACHE_DURATION = 10 * 1000; // 10 seconds for development
 
 export const useThemeStore = create<ThemeStore>()(
   persist(

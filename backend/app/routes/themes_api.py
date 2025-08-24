@@ -151,25 +151,37 @@ def transform_theme_to_frontend_format(admin_theme_config: dict) -> dict:
     primary_hover = darken_color(primary_color, 0.85)
     primary_light = lighten_color(primary_color, 0.85)
     
+    # Get additional colors from theme config
+    secondary_color = admin_theme_config.get('secondary_color', '#6b7280')
+    accent_color = admin_theme_config.get('accent_color', '#10b981')
+    text_color = admin_theme_config.get('text_color', '#111827')
+    heading_color = admin_theme_config.get('heading_color', primary_color)  # Default to primary color
+    background_color = admin_theme_config.get('background_color', '#ffffff')
+    border_color = admin_theme_config.get('border_color', '#e5e7eb')
+    error_color = admin_theme_config.get('error_color', '#ef4444')
+    success_color = admin_theme_config.get('success_color', '#10b981')
+    warning_color = admin_theme_config.get('warning_color', '#f59e0b')
+    
     theme_data = {
         "name": "Custom Theme",
         "colors": {
             "primary": primary_color,
             "primaryHover": primary_hover,
             "primaryLight": primary_light,
-            "secondary": "#6b7280",
-            "secondaryHover": "#4b5563",
-            "secondaryLight": "#f3f4f6",
-            "accent": "#10b981",
-            "text": "#111827",
-            "textLight": "#6b7280",
-            "textMuted": "#9ca3af",
-            "background": "#ffffff",
-            "backgroundLight": "#f9fafb",
-            "border": "#e5e7eb",
-            "error": "#ef4444",
-            "success": "#10b981",
-            "warning": "#f59e0b"
+            "secondary": secondary_color,
+            "secondaryHover": darken_color(secondary_color, 0.85),
+            "secondaryLight": lighten_color(secondary_color, 0.85),
+            "accent": accent_color,
+            "text": text_color,
+            "textLight": admin_theme_config.get('muted_text_color', '#6b7280'),
+            "textMuted": admin_theme_config.get('muted_text_color', '#9ca3af'),
+            "heading": heading_color,
+            "background": background_color,
+            "backgroundLight": admin_theme_config.get('light_bg_color', '#f9fafb'),
+            "border": border_color,
+            "error": error_color,
+            "success": success_color,
+            "warning": warning_color
         },
         "typography": {
             "primary": f"{font_family}, sans-serif",
@@ -545,16 +557,29 @@ async def get_form_theme(form_id: str):
         if not form_data:
             return error_response("Form not found", status_code=404)
         
-        # Check if form has a specific theme_config
+        # Check if form has a specific theme_id or theme_config (legacy)
+        theme_id = form_data.get('theme_id')
         theme_config = form_data.get('theme_config')
         
-        if theme_config:
-            logger.info(f"Found theme_config for form {form_id}: {type(theme_config)}")
-            # Transform admin-format theme config to frontend format
+        if theme_id:
+            logger.info(f"Found theme_id for form {form_id}: {theme_id}")
+            # Get theme from client_themes table
+            theme_data = db.client.table('client_themes').select('theme_config').eq('id', theme_id).execute()
+            if theme_data.data and len(theme_data.data) > 0:
+                theme_config = theme_data.data[0].get('theme_config')
+                if theme_config:
+                    logger.info(f"Loaded theme from client_themes: {theme_config.get('name', 'Unnamed')}")
+                    return success_response(
+                        data=theme_config,
+                        message="Form theme loaded successfully from client_themes"
+                    )
+        elif theme_config:
+            logger.info(f"Found legacy theme_config for form {form_id}: {type(theme_config)}")
+            # Transform admin-format theme config to frontend format (legacy)
             transformed_theme = transform_theme_to_frontend_format(theme_config)
             return success_response(
                 data=transformed_theme,
-                message="Form-specific theme loaded successfully"
+                message="Form-specific theme loaded successfully (legacy)"
             )
         
         # If no form-specific theme, try to get client's default theme

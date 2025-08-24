@@ -54,10 +54,11 @@ export default function FormPage() {
       });
     }
 
-    // Load theme separately with fallback (theme API is slow)
-    loadTheme(formId).catch(err => {
+    // Load theme with better error handling
+    loadTheme(formId).then(() => {
+      console.log('✅ Theme loaded successfully for form:', formId);
+    }).catch(err => {
       console.warn('Theme loading failed, using default:', err);
-      // Theme store will automatically fall back to default theme
     });
   }, [formId, searchParams, initializeForm, loadTheme, navigate, currentForm]);
 
@@ -79,6 +80,18 @@ export default function FormPage() {
     }
   }, [formState?.isComplete, formId, navigate]);
 
+  if (loading || !currentForm || !currentStep) {
+    return (
+      <PageLayout businessName={businessName || "Loading..."} logoUrl={logoUrl}>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <LoadingSpinner 
+            message={businessName ? `Loading ${businessName}...` : "Loading form..."}
+          />
+        </div>
+      </PageLayout>
+    );
+  }
+
   if (error) {
     return (
       <PageLayout businessName="Varyq">
@@ -90,18 +103,6 @@ export default function FormPage() {
               error}
             showRetry
             onRetry={() => window.location.reload()}
-          />
-        </div>
-      </PageLayout>
-    );
-  }
-
-  if (loading || !currentForm || !currentStep) {
-    return (
-      <PageLayout businessName={businessName || "Loading..."} logoUrl={logoUrl}>
-        <div className="flex items-center justify-center min-h-[400px]">
-          <LoadingSpinner 
-            message={businessName ? `Loading ${businessName}...` : "Loading form..."}
           />
         </div>
       </PageLayout>

@@ -1,5 +1,6 @@
 import type { FormStep } from '../types';
 import { useFormStore } from '../stores/formStore';
+import { ArrowLeftIcon, ArrowRightIcon } from '@heroicons/react/24/outline';
 
 interface FormNavigationProps {
   currentStep: FormStep;
@@ -17,7 +18,7 @@ export default function FormNavigation({ currentStep, canGoBack = false, loading
   };
 
   return (
-    <div className="flex justify-center items-center mt-12 pt-8">
+    <div className="flex justify-center items-center mt-16 pt-8">
       {/* Next/Submit Button - Centered */}
       <div className="flex gap-4 items-center">
         {canGoBack && (
@@ -43,9 +44,7 @@ export default function FormNavigation({ currentStep, canGoBack = false, loading
               }
             }}
           >
-            <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
+            <ArrowLeftIcon className="w-5 h-5 mr-3" />
             Back
           </button>
         )}
@@ -81,9 +80,7 @@ export default function FormNavigation({ currentStep, canGoBack = false, loading
           ) : (
             <>
               Continue
-              <svg className="w-5 h-5 ml-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
+              <ArrowRightIcon className="w-5 h-5 ml-3" />
             </>
           )}
         </button>
