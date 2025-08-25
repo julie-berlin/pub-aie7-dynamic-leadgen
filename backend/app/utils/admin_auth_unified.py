@@ -11,7 +11,7 @@ import time
 import hashlib
 import secrets
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
 
 logger = logging.getLogger(__name__)
@@ -34,13 +34,13 @@ class AdminAuthService:
         Create a JWT access token with consistent payload structure.
         Returns: (token, expires_in_seconds)
         """
-        expiration = datetime.utcnow() + timedelta(hours=self.jwt_expiration_hours)
+        expiration = datetime.now(timezone.utc) + timedelta(hours=self.jwt_expiration_hours)
         payload = {
             'user_id': user_id,
             'client_id': client_id,
             'role': role,
             'exp': expiration,
-            'iat': datetime.utcnow()
+            'iat': datetime.now(timezone.utc)
         }
         token = jwt.encode(payload, self.jwt_secret, algorithm=self.jwt_algorithm)
         expires_in = int(self.jwt_expiration_hours * 3600)

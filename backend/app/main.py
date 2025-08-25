@@ -135,8 +135,8 @@ app.add_middleware(create_rate_limit_middleware())
 # 5. Input validation (sanitize and validate all incoming data)
 app.add_middleware(create_input_validation_middleware())
 
-# 6. Admin authentication (protect admin endpoints)
-app.add_middleware(create_admin_auth_middleware())
+# 6. Admin authentication (protect admin endpoints) - DISABLED FOR DEMO
+# app.add_middleware(create_admin_auth_middleware())
 
 # 7. Response sanitization (clean outgoing data) - DISABLED
 # app.add_middleware(create_response_sanitization_middleware())

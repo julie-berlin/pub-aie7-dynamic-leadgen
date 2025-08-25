@@ -37,6 +37,7 @@ export interface AdminForm {
     primaryColor: string;
     fontFamily: string;
     borderRadius: string;
+    themeName?: string;
   };
 }
 

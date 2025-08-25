@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field, EmailStr, validator
 from urllib.parse import urlparse
 from typing import Dict, Any, Optional
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 
 from app.database import db
@@ -200,13 +200,13 @@ async def update_client_settings(
         
         # Build update data from non-None fields
         update_data = {}
-        for field_name, field_value in settings_request.dict(exclude_unset=True).items():
+        for field_name, field_value in settings_request.model_dump(exclude_unset=True).items():
             if field_value is not None:
                 update_data[field_name] = field_value
         
         if update_data:
             # Add updated_at timestamp
-            update_data['updated_at'] = datetime.utcnow().isoformat()
+            update_data['updated_at'] = datetime.now(timezone.utc).isoformat()
             
             # Update using Supabase
             result = db.client.table('client_settings').update(update_data).eq('client_id', current_user.client_id).execute()

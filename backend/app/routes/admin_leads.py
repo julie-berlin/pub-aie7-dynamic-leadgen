@@ -12,7 +12,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel
 from typing import List, Optional, Literal
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.database import db
 from app.utils.response_helpers import success_response, error_response
@@ -60,8 +60,10 @@ class LeadStats(BaseModel):
 
 class ConversionUpdate(BaseModel):
     """Model for updating lead conversion status."""
-    converted: bool
+    actual_conversion: bool
+    conversion_date: Optional[str] = None
     conversion_value: Optional[float] = None
+    conversion_type: Optional[str] = None
     notes: Optional[str] = None
 
 # === LEADS MANAGEMENT ENDPOINTS ===
@@ -95,7 +97,7 @@ async def get_leads(
         if not lead_sessions.data:
             return success_response({"leads": []}, "No leads found")
         
-        session_ids = [session['session_id'] for session in lead_sessions.data]
+        session_ids = [session['id'] for session in lead_sessions.data]
         
         # Get form titles for each unique form_id
         form_ids = list(set(session['form_id'] for session in lead_sessions.data))
@@ -110,38 +112,27 @@ async def get_leads(
         
         # Get conversion data from lead_outcomes
         outcomes_result = db.client.table('lead_outcomes').select(
-            'session_id, converted, conversion_value, conversion_date, conversion_type'
+            'session_id, final_status, lead_score, confidence_score, notification_sent, converted, conversion_date, conversion_value, conversion_type, contact_info'
         ).in_('session_id', session_ids).execute()
         outcomes_data = {outcome['session_id']: outcome for outcome in outcomes_result.data}
         
-        # Get contact information from responses
-        contact_data = {}
-        # Look for name, email, phone in responses
-        responses_result = db.client.table('responses').select(
-            'session_id, question_id, answer, form_questions!inner(question_text)'
-        ).in_('session_id', session_ids).execute()
-        
-        for response in responses_result.data:
-            session_id = response['session_id']
-            if session_id not in contact_data:
-                contact_data[session_id] = {}
-            
-            question_text = response['form_questions']['question_text'].lower()
-            answer = response['answer']
-            
-            if 'name' in question_text and not contact_data[session_id].get('name'):
-                contact_data[session_id]['name'] = answer
-            elif 'email' in question_text and not contact_data[session_id].get('email'):
-                contact_data[session_id]['email'] = answer
-            elif 'phone' in question_text and not contact_data[session_id].get('phone'):
-                contact_data[session_id]['phone'] = answer
+        # Contact information is already stored in lead_outcomes.contact_info JSONB
+        # No need to extract from individual responses
         
         # Build response and apply filters
         leads = []
         for session in lead_sessions.data:
-            session_tracking = tracking_data.get(session['session_id'], {})
-            session_outcome = outcomes_data.get(session['session_id'], {})
-            session_contact = contact_data.get(session['session_id'], {})
+            session_tracking = tracking_data.get(session['id'], {})  # Use UUID id for tracking
+            session_outcome = outcomes_data.get(session['id'], {})   # Use UUID id for outcomes
+            
+            # Extract contact info from lead_outcomes.contact_info JSONB
+            contact_info = session_outcome.get('contact_info', {})
+            if isinstance(contact_info, str):
+                import json
+                try:
+                    contact_info = json.loads(contact_info)
+                except:
+                    contact_info = {}
             
             # Apply utm_source filter if specified
             if utm_source and session_tracking.get('utm_source') != utm_source:
@@ -166,9 +157,9 @@ async def get_leads(
                 "utm_source": session_tracking.get('utm_source'),
                 "utm_campaign": session_tracking.get('utm_campaign'),
                 "utm_medium": session_tracking.get('utm_medium'),
-                "contact_name": session_contact.get('name'),
-                "contact_email": session_contact.get('email'),
-                "contact_phone": session_contact.get('phone'),
+                "contact_name": contact_info.get('name'),
+                "contact_email": contact_info.get('email'),  
+                "contact_phone": contact_info.get('phone'),
                 "actual_conversion": session_outcome.get('converted'),
                 "conversion_date": session_outcome.get('conversion_date'),
                 "conversion_value": session_outcome.get('conversion_value'),
@@ -240,49 +231,58 @@ async def get_lead_detail(
         logger.error(f"Failed to get lead detail: {e}")
         return error_response("Failed to retrieve lead details", 500)
 
-@router.put("/{session_id}/conversion")
+@router.put("/{lead_id}/conversion")
 async def update_lead_conversion(
-    session_id: str,
+    lead_id: str,
     conversion_data: ConversionUpdate,
     current_user: AdminUserResponse = Depends(get_current_admin_user)
 ):
     """Update lead conversion status."""
     try:
-        # Verify lead exists and belongs to user's client
-        session_result = db.client.table('lead_sessions').select('session_id, client_id').eq(
-            'session_id', session_id
+        # Verify lead exists and belongs to user's client using lead_id (lead_sessions.id)
+        session_result = db.client.table('lead_sessions').select('id, session_id, client_id, form_id').eq(
+            'id', lead_id
         ).eq('client_id', current_user.client_id).execute()
         
         if not session_result.data:
             raise HTTPException(status_code=404, detail="Lead not found")
         
-        # Update or insert lead outcome
+        session_data = session_result.data[0]
+        
+        # Update or insert lead outcome - session_id references lead_sessions.id per original design
         outcome_data = {
-            'session_id': session_id,
-            'converted': conversion_data.converted,
+            'session_id': lead_id,  # References lead_sessions.id (UUID)
+            'client_id': current_user.client_id,
+            'form_id': session_data['form_id'],
+            'converted': conversion_data.actual_conversion,
             'conversion_value': conversion_data.conversion_value,
-            'notes': conversion_data.notes,
-            'updated_at': datetime.utcnow().isoformat(),
+            'conversion_type': conversion_data.conversion_type,
+            'conversion_date': conversion_data.conversion_date,
+            'updated_at': datetime.now(timezone.utc).isoformat(),
             'updated_by_user_id': current_user.id
         }
         
+        # Add notes to follow_up_notes if provided
+        if conversion_data.notes:
+            outcome_data['follow_up_notes'] = conversion_data.notes
+        
         # Check if outcome already exists
-        existing_outcome = db.client.table('lead_outcomes').select('session_id').eq('session_id', session_id).execute()
+        existing_outcome = db.client.table('lead_outcomes').select('session_id').eq('session_id', lead_id).execute()
         
         if existing_outcome.data:
             # Update existing
-            update_result = db.client.table('lead_outcomes').update(outcome_data).eq('session_id', session_id).execute()
+            update_result = db.client.table('lead_outcomes').update(outcome_data).eq('session_id', lead_id).execute()
         else:
             # Insert new
-            outcome_data['created_at'] = datetime.utcnow().isoformat()
+            outcome_data['created_at'] = datetime.now(timezone.utc).isoformat()
             update_result = db.client.table('lead_outcomes').insert(outcome_data).execute()
         
         if not update_result.data:
             raise HTTPException(status_code=500, detail="Failed to update conversion status")
         
         return success_response({
-            "session_id": session_id,
-            "converted": conversion_data.converted
+            "lead_id": lead_id,
+            "converted": conversion_data.actual_conversion
         }, "Lead conversion status updated successfully")
         
     except HTTPException:

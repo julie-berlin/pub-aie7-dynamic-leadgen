@@ -11,7 +11,7 @@ This module provides API endpoints for:
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
 from typing import Dict, Any
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 
 from app.database import db
@@ -45,7 +45,7 @@ async def upload_logo(
         settings_update = {
             'logo_url': upload_result['url'],
             'logo_file_id': upload_result.get('file_id'),
-            'updated_at': datetime.utcnow().isoformat()
+            'updated_at': datetime.now(timezone.utc).isoformat()
         }
         
         if settings_result.data:
@@ -95,7 +95,7 @@ async def delete_logo(
             update_result = db.client.table('client_settings').update({
                 'logo_url': None,
                 'logo_file_id': None,
-                'updated_at': datetime.utcnow().isoformat()
+                'updated_at': datetime.now(timezone.utc).isoformat()
             }).eq('client_id', current_user.client_id).execute()
             
             
@@ -146,7 +146,7 @@ async def upload_favicon(
             'url': f'/api/files/clients/{current_user.client_id}/favicons/{file.filename}',
             'filename': file.filename,
             'size': len(file_content),
-            'uploaded_at': datetime.utcnow().isoformat()
+            'uploaded_at': datetime.now(timezone.utc).isoformat()
         }
         
         # Update the client_settings table with the new favicon URL
@@ -156,7 +156,7 @@ async def upload_favicon(
             # Update existing record
             update_result = db.client.table('client_settings').update({
                 'favicon_url': upload_result['url'],
-                'updated_at': datetime.utcnow().isoformat()
+                'updated_at': datetime.now(timezone.utc).isoformat()
             }).eq('client_id', current_user.client_id).execute()
             
             if not update_result.data:
@@ -201,7 +201,7 @@ async def delete_favicon(
             # Update client_settings to remove favicon_url
             update_result = db.client.table('client_settings').update({
                 'favicon_url': None,
-                'updated_at': datetime.utcnow().isoformat()
+                'updated_at': datetime.now(timezone.utc).isoformat()
             }).eq('client_id', current_user.client_id).execute()
             
             return success_response({

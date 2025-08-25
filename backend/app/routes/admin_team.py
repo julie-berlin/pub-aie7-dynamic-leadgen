@@ -12,7 +12,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field, EmailStr
 from typing import List, Literal, Optional
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 import uuid
 import secrets
 
@@ -176,7 +176,7 @@ async def remove_team_member(
         # Deactivate user instead of deleting
         update_result = db.client.table('admin_users').update({
             'is_active': False,
-            'updated_at': datetime.utcnow().isoformat()
+            'updated_at': datetime.now(timezone.utc).isoformat()
         }).eq('id', user_id).execute()
         
         if not update_result.data:
@@ -227,7 +227,7 @@ async def update_team_member_role(
         update_result = db.client.table('admin_users').update({
             'role': new_role,
             'permissions': permissions,
-            'updated_at': datetime.utcnow().isoformat()
+            'updated_at': datetime.now(timezone.utc).isoformat()
         }).eq('id', user_id).execute()
         
         if not update_result.data:
@@ -268,7 +268,7 @@ async def activate_team_member(
         # Activate user
         update_result = db.client.table('admin_users').update({
             'is_active': True,
-            'updated_at': datetime.utcnow().isoformat()
+            'updated_at': datetime.now(timezone.utc).isoformat()
         }).eq('id', user_id).execute()
         
         if not update_result.data:
