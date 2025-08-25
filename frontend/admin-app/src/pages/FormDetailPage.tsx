@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { PencilIcon, TrashIcon, PlusIcon, DocumentDuplicateIcon, SwatchIcon } from '@heroicons/react/24/outline';
+import { PencilIcon, TrashIcon, PlusIcon, DocumentDuplicateIcon, SwatchIcon, EyeIcon } from '@heroicons/react/24/outline';
 import { useFormsStore } from '../stores/formsStore';
 import type { AdminForm } from '../stores/formsStore';
 import type { FormStatus } from '../types';
@@ -289,6 +289,35 @@ export default function FormDetailPage() {
       console.error('Failed to delete question:', error);
       alert('Failed to delete question. Please try again.');
     }
+  };
+
+  const formatRubricForTooltip = (rubric: any) => {
+    if (!rubric) return "No scoring rubric defined";
+    
+    let tooltip = "Scoring Rubric:\n";
+    
+    // Handle scoring rules
+    if (rubric.scoring_rules) {
+      tooltip += "\nScoring Rules:\n";
+      Object.entries(rubric.scoring_rules).forEach(([key, value]) => {
+        tooltip += `• ${key}: ${JSON.stringify(value)}\n`;
+      });
+    }
+    
+    // Handle thresholds
+    if (rubric.thresholds) {
+      tooltip += "\nScore Thresholds:\n";
+      Object.entries(rubric.thresholds).forEach(([level, threshold]) => {
+        tooltip += `• ${level}: ${threshold}\n`;
+      });
+    }
+    
+    // Handle simple rubric structure
+    if (!rubric.scoring_rules && !rubric.thresholds) {
+      tooltip += `\n${JSON.stringify(rubric, null, 2)}`;
+    }
+    
+    return tooltip;
   };
 
   const handleStatusChange = async (newStatus: string) => {
@@ -630,11 +659,21 @@ export default function FormDetailPage() {
                         )}
                       </td>
                       <td className="admin-table-cell">
-                        {question.scoringRubric ? (
-                          <span className="admin-badge admin-badge-success">Scored</span>
-                        ) : (
-                          <span className="admin-badge">No Score</span>
-                        )}
+                        <div className="flex items-center space-x-2">
+                          {question.scoringRubric ? (
+                            <>
+                              <span className="admin-badge admin-badge-success">Scored</span>
+                              <button
+                                className="text-slate-400 hover:text-slate-600 transition-colors"
+                                title={formatRubricForTooltip(question.scoringRubric)}
+                              >
+                                <EyeIcon className="w-4 h-4" />
+                              </button>
+                            </>
+                          ) : (
+                            <span className="admin-badge">No Score</span>
+                          )}
+                        </div>
                       </td>
                       <td className="admin-table-cell">
                         <div className="flex items-center space-x-2">
