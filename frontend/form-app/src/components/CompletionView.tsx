@@ -6,7 +6,7 @@ interface CompletionViewProps {
   businessName?: string;
 }
 
-export default function CompletionView({ completionData, businessName }: CompletionViewProps) {
+export default function CompletionView({ completionData }: CompletionViewProps) {
   // Redirect after a delay if specified
   useEffect(() => {
     if (completionData?.redirectUrl) {

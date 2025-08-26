@@ -137,9 +137,11 @@ INSERT INTO responses (id, session_id, form_id, question_id, answer, answer_data
             final_status = None if base_persona['lead_type'] == 'abandoned' else base_persona['lead_type']
             
             if final_status:  # Only create outcome record if not abandoned
+                # Escape single quotes in JSON data for SQL
+                contact_info_json = json.dumps(contact_info).replace("'", "''")
                 sql_statements.append(f"""
 INSERT INTO lead_outcomes (id, session_id, client_id, form_id, final_status, contact_info, lead_score, confidence_score, notification_sent, converted, conversion_date, conversion_value, conversion_type) 
-VALUES ('{outcome_uuid}', '{session_uuid}', '{client_id}', '{form_id}', '{final_status}', '{json.dumps(contact_info)}', {base_persona['score']}, {base_persona['score']/100:.2f}, {str(base_persona['lead_type'] != 'unqualified').lower()}, false, NULL, NULL, NULL);
+VALUES ('{outcome_uuid}', '{session_uuid}', '{client_id}', '{form_id}', '{final_status}', '{contact_info_json}', {base_persona['score']}, {base_persona['score']/100:.2f}, {str(base_persona['lead_type'] != 'unqualified').lower()}, false, NULL, NULL, NULL);
 """)
     
     sql_statements.append(f"""

@@ -201,7 +201,7 @@ export interface SubmitResponseResponse {
 }
 
 export interface CompletionData {
-  leadStatus: 'yes' | 'no' | 'maybe';
+  leadStatus: 'yes' | 'no' | 'maybe' | 'unknown';
   score: number;
   message: string;
   redirectUrl?: string;
