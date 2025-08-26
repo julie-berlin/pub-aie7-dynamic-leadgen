@@ -299,6 +299,11 @@ Write only the completion message, no other text."""
                 },
                 'lead_intelligence': {
                     **state.get('lead_intelligence', {}),
+                    # CRITICAL FIX: Update current values in addition to last_classification
+                    'lead_status': final_classification.get('lead_status', 'unknown'),
+                    'final_score': final_classification.get('final_score', 0),
+                    'confidence': final_classification.get('confidence', 0),
+                    'completion_message': final_classification.get('completion_message', ''),
                     'last_classification': final_classification,
                     'classification_timestamp': datetime.now().isoformat()
                 }

@@ -331,10 +331,15 @@ async def submit_and_continue(
         logger.info(f"🔥 API DEBUG: pending_responses = {request.responses}")
         
         # Run the graph starting from response processing
+        logger.info(f"🔥 STEP: About to invoke graph with pending_responses: {request.responses}")
         result = await intelligent_survey_graph.ainvoke(
             state_update,
             {"recursion_limit": 25}
         )
+        logger.info(f"🔥 STEP: Graph invocation complete!")
+        logger.info(f"🔥 STEP RESULT: lead_intelligence = {result.get('lead_intelligence', {})}")
+        logger.info(f"🔥 STEP RESULT: route_decision = {result.get('route_decision')}")
+        logger.info(f"🔥 STEP RESULT: step_type = {result.get('step_type')}")
         
         # Save session snapshot for state persistence
         try:
@@ -402,9 +407,11 @@ async def submit_and_continue(
         
         if completed:
             # Form is complete - return completion data
+            # CRITICAL FIX: Get leadStatus and score from lead_intelligence section
+            lead_intelligence = result.get('lead_intelligence', {})
             response_data["completionData"] = {
-                "leadStatus": result.get('lead_status', 'unknown'),
-                "score": result.get('final_score', 0),
+                "leadStatus": lead_intelligence.get('lead_status', 'unknown'),
+                "score": lead_intelligence.get('final_score', 0),
                 "message": result.get('completion_message', 'Thank you for your time and interest.'),
                 "nextSteps": result.get('next_steps', [])
             }
