@@ -269,12 +269,14 @@ Write only the completion message, no other text."""
                 tool_results = self._execute_tools(comprehensive_decision)
             
             # Step 5: Validate and adjust score with tool results
+            logger.info(f"🔥 SCORING DEBUG: score_result = {score_result}")
             final_classification = self._finalize_lead_classification(
                 state,
                 score_result["calculated_score"],
                 comprehensive_decision,
                 tool_results
             )
+            logger.info(f"🔥 SCORING DEBUG: final_classification = {final_classification}")
             
             # Step 6: Update database with final status
             self._update_database_status(state, final_classification)
@@ -355,11 +357,22 @@ Write only the completion message, no other text."""
     def _calculate_lead_score(self, state: SurveyState) -> Dict[str, Any]:
         """Calculate mathematical lead score."""
         try:
-            responses = state.get("lead_intelligence", {}).get("responses", [])
+            # CRITICAL FIX: Use pending_responses, not lead_intelligence.responses
+            # pending_responses contains the current form submission we need to score
+            pending_responses = state.get("pending_responses", [])
+            logger.info(f"🔥 SCORING DEBUG: pending_responses = {pending_responses}")
+            
+            # Also get historical responses from lead_intelligence for context
+            historical_responses = state.get("lead_intelligence", {}).get("responses", [])
+            logger.info(f"🔥 SCORING DEBUG: historical_responses = {historical_responses}")
+            
+            # Combine both for complete scoring
+            all_responses = historical_responses + pending_responses
+            logger.info(f"🔥 SCORING DEBUG: all_responses count = {len(all_responses)}")
             
             # Get scoring rubrics (simplified for now)
             scoring_rubrics = {}
-            for response in responses:
+            for response in all_responses:
                 question_id = response.get("question_id")
                 # Simple scoring: longer answers = higher scores
                 scoring_rubrics[str(question_id)] = {
@@ -372,7 +385,7 @@ Write only the completion message, no other text."""
             business_rules = state.get("business_rules", {})
             
             return self.toolbelt.calculate_lead_score(
-                responses=responses,
+                responses=all_responses,
                 scoring_rubrics=scoring_rubrics,
                 business_rules=business_rules
             )
@@ -413,6 +426,7 @@ Write only the completion message, no other text."""
         # Get total responses from database
         session_id = state.get("core", {}).get("session_id")
         total_responses = self._get_total_responses_count(session_id)
+        logger.info(f"🔥 STATUS DEBUG: session_id={session_id}, total_responses={total_responses}, final_score={final_score}")
         lead_status = self._determine_lead_status(final_score, total_responses)
         logger.info(f"🎯 Lead status determined: {lead_status} (score: {final_score}, total responses: {total_responses})")
         
@@ -573,8 +587,7 @@ Write only the completion message, no other text."""
             asked_questions_from_state = set(question_strategy.get("asked_questions", []))
             
             # Add newly answered questions from current pending responses
-            if newly_asked is None:
-                newly_asked = self._mark_questions_as_asked(state)
+            newly_asked = self._mark_questions_as_asked(state)
             asked_questions_from_state.update(newly_asked)
             
             # Get available questions from state (provided by Survey Admin)

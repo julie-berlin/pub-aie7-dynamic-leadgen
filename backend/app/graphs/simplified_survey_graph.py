@@ -146,10 +146,10 @@ def route_after_initialization(state: SurveyState) -> str:
     core = state.get("core", {})
     session_id = core.get("session_id")
     
-    # CRITICAL FIX: Always go to lead intelligence first if we have pending_responses (even empty array)
-    # This ensures completion check happens when user submits empty responses
-    if pending_responses is not None:
-        logger.info("🔥 INIT ROUTING: Going to lead_intelligence to process responses or check completion")
+    # CRITICAL FIX: Only go to lead intelligence if we have actual pending responses
+    # Empty array or None means no responses to process, so go to survey admin
+    if pending_responses is not None and len(pending_responses) > 0:
+        logger.info("🔥 INIT ROUTING: Going to lead_intelligence to process responses")
         return "lead_intelligence"
     
     # Check if we already have questions prepared (continuation scenario)
