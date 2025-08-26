@@ -194,7 +194,13 @@ class SupabaseClient:
     
     def get_session_responses(self, session_id: str) -> List[Dict[str, Any]]:
         """Get all responses for a session"""
-        result = self.client.table("responses").select("*").eq("session_id", session_id).order("timestamp").execute()
+        # First get the database ID from the session_id string
+        session_record = self.client.table('lead_sessions').select('id').eq('session_id', session_id).execute()
+        if not session_record.data:
+            return []
+        
+        session_db_id = session_record.data[0]['id']
+        result = self.client.table("responses").select("*").eq("session_id", session_db_id).order("created_at").execute()
         return result.data or []
     
     def save_individual_response(self, session_id: str, response_data: Dict[str, Any]) -> Dict[str, Any]:

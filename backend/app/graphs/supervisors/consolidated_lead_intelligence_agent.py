@@ -367,8 +367,18 @@ Write only the completion message, no other text."""
             pending_responses = state.get("pending_responses", [])
             logger.info(f"🔥 SCORING DEBUG: pending_responses = {pending_responses}")
             
-            # Also get historical responses from lead_intelligence for context
-            historical_responses = state.get("lead_intelligence", {}).get("responses", [])
+            # CRITICAL FIX: Load ALL historical responses from database for complete scoring
+            session_id = state.get("core", {}).get("session_id")
+            historical_responses = []
+            if session_id:
+                try:
+                    from ...database import db
+                    historical_responses = db.get_session_responses(session_id)
+                    logger.info(f"🔥 SCORING DEBUG: loaded {len(historical_responses)} historical responses from DB")
+                except Exception as e:
+                    logger.error(f"Failed to load historical responses: {e}")
+                    historical_responses = []
+            
             logger.info(f"🔥 SCORING DEBUG: historical_responses = {historical_responses}")
             
             # Combine both for complete scoring
