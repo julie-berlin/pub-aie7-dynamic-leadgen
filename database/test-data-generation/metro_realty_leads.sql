@@ -85,7 +85,7 @@ INSERT INTO lead_outcomes (id, session_id, client_id, form_id, final_status, con
 VALUES ('010f8d57-4207-4523-8d4a-3c0607a5cdc0', '8d8a0e77-31e0-4d2d-b0bb-0540bffb054e', 'a2222222-2222-2222-2222-222222222222', 'f2222222-2222-2222-2222-222222222222', 'qualified', '{"name": "Amanda Rodriguez", "email": "arodriguez@lawfirm.com", "phone": "(617) 555-9012"}', 92, 0.92, true, false, NULL, NULL, NULL);
 
 
--- Lead 4: Unqualified - Kevin O'Brien
+-- Lead 4: Unqualified - Kevin O''Brien
 INSERT INTO lead_sessions (id, form_id, session_id, client_id, started_at, last_updated, completed_at, step, completed, current_score, final_score, lead_status, completion_type, completion_message, abandonment_status, user_agent, ip_address, metadata) 
 VALUES ('2dd93b4a-748f-4979-82e4-6e4a655c1647', 'f2222222-2222-2222-2222-222222222222', 'metro_realty_004_unqualified', 'a2222222-2222-2222-2222-222222222222', '2025-08-11T11:19:21.045465', '2025-08-11T11:54:21.045466', '2025-08-11T11:54:21.045466', 9, true, 35, 35, 'no', 'qualified', 'Thank you for your interest. While we may not be the best fit for your current needs, please reach out if your situation changes.', 'active', 'Mozilla/5.0 (Android 12; Mobile; rv:104.0) Gecko/104.0', '192.168.1.228', '{"device_type": "mobile", "completion_time": 36}');
 
@@ -109,7 +109,7 @@ INSERT INTO responses (id, session_id, form_id, question_id, answer, answer_data
 
 
 INSERT INTO lead_outcomes (id, session_id, client_id, form_id, final_status, contact_info, lead_score, confidence_score, notification_sent, converted, conversion_date, conversion_value, conversion_type) 
-VALUES ('5f04d503-ad55-4532-a23b-412108b2e4fa', '2dd93b4a-748f-4979-82e4-6e4a655c1647', 'a2222222-2222-2222-2222-222222222222', 'f2222222-2222-2222-2222-222222222222', 'unqualified', '{"name": "Kevin O'Brien", "email": "kevin.obrien@email.com", "phone": "(508) 555-3456"}', 35, 0.35, false, false, NULL, NULL, NULL);
+VALUES ('5f04d503-ad55-4532-a23b-412108b2e4fa', '2dd93b4a-748f-4979-82e4-6e4a655c1647', 'a2222222-2222-2222-2222-222222222222', 'f2222222-2222-2222-2222-222222222222', 'unqualified', '{"name": "Kevin O''Brien", "email": "kevin.obrien@email.com", "phone": "(508) 555-3456"}', 35, 0.35, false, false, NULL, NULL, NULL);
 
 
 -- Lead 5: Maybe - Lisa Martinez
@@ -220,7 +220,7 @@ INSERT INTO lead_outcomes (id, session_id, client_id, form_id, final_status, con
 VALUES ('efd2efe0-4b4b-4325-95ec-3cafb53fd3e2', 'a0285ea4-e2d9-497b-9025-d12840854cf1', 'a2222222-2222-2222-2222-222222222222', 'f2222222-2222-2222-2222-222222222222', 'qualified', '{"name": "Amanda_2 Rodriguez", "email": "arodriguez_2@lawfirm.com", "phone": "(617) 555-9012"}', 92, 0.92, true, false, NULL, NULL, NULL);
 
 
--- Lead 9: Unqualified - Kevin_2 O'Brien
+-- Lead 9: Unqualified - Kevin_2 O''Brien
 INSERT INTO lead_sessions (id, form_id, session_id, client_id, started_at, last_updated, completed_at, step, completed, current_score, final_score, lead_status, completion_type, completion_message, abandonment_status, user_agent, ip_address, metadata) 
 VALUES ('cb8cc02c-33dc-4683-bdf7-8d2f99d0ddf5', 'f2222222-2222-2222-2222-222222222222', 'metro_realty_009_unqualified', 'a2222222-2222-2222-2222-222222222222', '2025-08-14T07:19:21.045810', '2025-08-14T07:45:21.045811', '2025-08-14T07:45:21.045811', 9, true, 35, 35, 'no', 'qualified', 'Thank you for your interest. While we may not be the best fit for your current needs, please reach out if your situation changes.', 'active', 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15', '192.168.1.60', '{"device_type": "mobile", "completion_time": 26}');
 
@@ -244,7 +244,7 @@ INSERT INTO responses (id, session_id, form_id, question_id, answer, answer_data
 
 
 INSERT INTO lead_outcomes (id, session_id, client_id, form_id, final_status, contact_info, lead_score, confidence_score, notification_sent, converted, conversion_date, conversion_value, conversion_type) 
-VALUES ('b9aec36d-d4ca-4171-a6c1-7ec2fdce3fef', 'cb8cc02c-33dc-4683-bdf7-8d2f99d0ddf5', 'a2222222-2222-2222-2222-222222222222', 'f2222222-2222-2222-2222-222222222222', 'unqualified', '{"name": "Kevin_2 O'Brien", "email": "kevin.obrien_2@email.com", "phone": "(508) 555-3456"}', 35, 0.35, false, false, NULL, NULL, NULL);
+VALUES ('b9aec36d-d4ca-4171-a6c1-7ec2fdce3fef', 'cb8cc02c-33dc-4683-bdf7-8d2f99d0ddf5', 'a2222222-2222-2222-2222-222222222222', 'f2222222-2222-2222-2222-222222222222', 'unqualified', '{"name": "Kevin_2 O''Brien", "email": "kevin.obrien_2@email.com", "phone": "(508) 555-3456"}', 35, 0.35, false, false, NULL, NULL, NULL);
 
 
 -- Lead 10: Maybe - Lisa_2 Martinez
@@ -355,7 +355,7 @@ INSERT INTO lead_outcomes (id, session_id, client_id, form_id, final_status, con
 VALUES ('170b5764-3ba8-4d80-a33d-77e7e8dab51d', 'bcdb31c4-5303-4951-9ff2-2b394ae468f9', 'a2222222-2222-2222-2222-222222222222', 'f2222222-2222-2222-2222-222222222222', 'qualified', '{"name": "Amanda_3 Rodriguez", "email": "arodriguez_3@lawfirm.com", "phone": "(617) 555-9012"}', 92, 0.92, true, false, NULL, NULL, NULL);
 
 
--- Lead 14: Unqualified - Kevin_3 O'Brien
+-- Lead 14: Unqualified - Kevin_3 O''Brien
 INSERT INTO lead_sessions (id, form_id, session_id, client_id, started_at, last_updated, completed_at, step, completed, current_score, final_score, lead_status, completion_type, completion_message, abandonment_status, user_agent, ip_address, metadata) 
 VALUES ('34d0e584-aa16-4931-a621-d92b3fab8868', 'f2222222-2222-2222-2222-222222222222', 'metro_realty_014_unqualified', 'a2222222-2222-2222-2222-222222222222', '2025-08-11T07:19:21.046141', '2025-08-11T08:02:21.046142', '2025-08-11T08:02:21.046142', 10, true, 35, 35, 'no', 'qualified', 'Thank you for your interest. While we may not be the best fit for your current needs, please reach out if your situation changes.', 'active', 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15', '192.168.1.117', '{"device_type": "mobile", "completion_time": 40}');
 
@@ -379,7 +379,7 @@ INSERT INTO responses (id, session_id, form_id, question_id, answer, answer_data
 
 
 INSERT INTO lead_outcomes (id, session_id, client_id, form_id, final_status, contact_info, lead_score, confidence_score, notification_sent, converted, conversion_date, conversion_value, conversion_type) 
-VALUES ('5c202fc2-d17b-470c-859e-39dde39efadd', '34d0e584-aa16-4931-a621-d92b3fab8868', 'a2222222-2222-2222-2222-222222222222', 'f2222222-2222-2222-2222-222222222222', 'unqualified', '{"name": "Kevin_3 O'Brien", "email": "kevin.obrien_3@email.com", "phone": "(508) 555-3456"}', 35, 0.35, false, false, NULL, NULL, NULL);
+VALUES ('5c202fc2-d17b-470c-859e-39dde39efadd', '34d0e584-aa16-4931-a621-d92b3fab8868', 'a2222222-2222-2222-2222-222222222222', 'f2222222-2222-2222-2222-222222222222', 'unqualified', '{"name": "Kevin_3 O''Brien", "email": "kevin.obrien_3@email.com", "phone": "(508) 555-3456"}', 35, 0.35, false, false, NULL, NULL, NULL);
 
 
 -- Lead 15: Maybe - Lisa_3 Martinez
@@ -490,7 +490,7 @@ INSERT INTO lead_outcomes (id, session_id, client_id, form_id, final_status, con
 VALUES ('1e82caf4-c06f-467b-b9a7-5bcc3e088927', 'd15f22aa-0137-476e-8c04-e094dd78309c', 'a2222222-2222-2222-2222-222222222222', 'f2222222-2222-2222-2222-222222222222', 'qualified', '{"name": "Amanda_4 Rodriguez", "email": "arodriguez_4@lawfirm.com", "phone": "(617) 555-9012"}', 92, 0.92, true, false, NULL, NULL, NULL);
 
 
--- Lead 19: Unqualified - Kevin_4 O'Brien
+-- Lead 19: Unqualified - Kevin_4 O''Brien
 INSERT INTO lead_sessions (id, form_id, session_id, client_id, started_at, last_updated, completed_at, step, completed, current_score, final_score, lead_status, completion_type, completion_message, abandonment_status, user_agent, ip_address, metadata) 
 VALUES ('c113d503-42c8-427d-875c-668ed8a72e31', 'f2222222-2222-2222-2222-222222222222', 'metro_realty_019_unqualified', 'a2222222-2222-2222-2222-222222222222', '2025-08-14T13:19:21.046472', '2025-08-14T14:04:21.046473', '2025-08-14T14:04:21.046473', 12, true, 35, 35, 'no', 'qualified', 'Thank you for your interest. While we may not be the best fit for your current needs, please reach out if your situation changes.', 'active', 'Mozilla/5.0 (iPad; CPU OS 16_0 like Mac OS X) AppleWebKit/605.1.15', '192.168.1.233', '{"device_type": "mobile", "completion_time": 40}');
 
@@ -514,7 +514,7 @@ INSERT INTO responses (id, session_id, form_id, question_id, answer, answer_data
 
 
 INSERT INTO lead_outcomes (id, session_id, client_id, form_id, final_status, contact_info, lead_score, confidence_score, notification_sent, converted, conversion_date, conversion_value, conversion_type) 
-VALUES ('c4aff2a8-bd60-49fb-b5ba-401195db9e95', 'c113d503-42c8-427d-875c-668ed8a72e31', 'a2222222-2222-2222-2222-222222222222', 'f2222222-2222-2222-2222-222222222222', 'unqualified', '{"name": "Kevin_4 O'Brien", "email": "kevin.obrien_4@email.com", "phone": "(508) 555-3456"}', 35, 0.35, false, false, NULL, NULL, NULL);
+VALUES ('c4aff2a8-bd60-49fb-b5ba-401195db9e95', 'c113d503-42c8-427d-875c-668ed8a72e31', 'a2222222-2222-2222-2222-222222222222', 'f2222222-2222-2222-2222-222222222222', 'unqualified', '{"name": "Kevin_4 O''Brien", "email": "kevin.obrien_4@email.com", "phone": "(508) 555-3456"}', 35, 0.35, false, false, NULL, NULL, NULL);
 
 
 -- Lead 20: Maybe - Lisa_4 Martinez
@@ -625,7 +625,7 @@ INSERT INTO lead_outcomes (id, session_id, client_id, form_id, final_status, con
 VALUES ('b72c0bf0-d7c7-4b55-901d-fa1d2b5990f8', 'f4811269-cbad-4983-a9a7-f76c14ed186b', 'a2222222-2222-2222-2222-222222222222', 'f2222222-2222-2222-2222-222222222222', 'qualified', '{"name": "Amanda_5 Rodriguez", "email": "arodriguez_5@lawfirm.com", "phone": "(617) 555-9012"}', 92, 0.92, true, false, NULL, NULL, NULL);
 
 
--- Lead 24: Unqualified - Kevin_5 O'Brien
+-- Lead 24: Unqualified - Kevin_5 O''Brien
 INSERT INTO lead_sessions (id, form_id, session_id, client_id, started_at, last_updated, completed_at, step, completed, current_score, final_score, lead_status, completion_type, completion_message, abandonment_status, user_agent, ip_address, metadata) 
 VALUES ('afd66fdc-6340-4af8-9c99-5b8b9ea598bb', 'f2222222-2222-2222-2222-222222222222', 'metro_realty_024_unqualified', 'a2222222-2222-2222-2222-222222222222', '2025-08-22T14:19:21.046799', '2025-08-22T15:00:21.046800', '2025-08-22T15:00:21.046800', 8, true, 35, 35, 'no', 'qualified', 'Thank you for your interest. While we may not be the best fit for your current needs, please reach out if your situation changes.', 'active', 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15', '192.168.1.150', '{"device_type": "mobile", "completion_time": 16}');
 
@@ -649,7 +649,7 @@ INSERT INTO responses (id, session_id, form_id, question_id, answer, answer_data
 
 
 INSERT INTO lead_outcomes (id, session_id, client_id, form_id, final_status, contact_info, lead_score, confidence_score, notification_sent, converted, conversion_date, conversion_value, conversion_type) 
-VALUES ('75f2f885-ed9d-4060-88c0-1d051899bca5', 'afd66fdc-6340-4af8-9c99-5b8b9ea598bb', 'a2222222-2222-2222-2222-222222222222', 'f2222222-2222-2222-2222-222222222222', 'unqualified', '{"name": "Kevin_5 O'Brien", "email": "kevin.obrien_5@email.com", "phone": "(508) 555-3456"}', 35, 0.35, false, false, NULL, NULL, NULL);
+VALUES ('75f2f885-ed9d-4060-88c0-1d051899bca5', 'afd66fdc-6340-4af8-9c99-5b8b9ea598bb', 'a2222222-2222-2222-2222-222222222222', 'f2222222-2222-2222-2222-222222222222', 'unqualified', '{"name": "Kevin_5 O''Brien", "email": "kevin.obrien_5@email.com", "phone": "(508) 555-3456"}', 35, 0.35, false, false, NULL, NULL, NULL);
 
 
 -- Lead 25: Maybe - Lisa_5 Martinez
@@ -760,7 +760,7 @@ INSERT INTO lead_outcomes (id, session_id, client_id, form_id, final_status, con
 VALUES ('88c84f59-5c55-492b-86e0-cbe101bd7699', 'ce8f69b5-a391-4941-a419-66b1237ecd8e', 'a2222222-2222-2222-2222-222222222222', 'f2222222-2222-2222-2222-222222222222', 'qualified', '{"name": "Amanda_6 Rodriguez", "email": "arodriguez_6@lawfirm.com", "phone": "(617) 555-9012"}', 92, 0.92, true, false, NULL, NULL, NULL);
 
 
--- Lead 29: Unqualified - Kevin_6 O'Brien
+-- Lead 29: Unqualified - Kevin_6 O''Brien
 INSERT INTO lead_sessions (id, form_id, session_id, client_id, started_at, last_updated, completed_at, step, completed, current_score, final_score, lead_status, completion_type, completion_message, abandonment_status, user_agent, ip_address, metadata) 
 VALUES ('02b4dc7e-b96f-473b-9aac-62527dda7316', 'f2222222-2222-2222-2222-222222222222', 'metro_realty_029_unqualified', 'a2222222-2222-2222-2222-222222222222', '2025-08-22T12:19:21.047124', '2025-08-22T12:54:21.047125', '2025-08-22T12:54:21.047125', 7, true, 35, 35, 'no', 'qualified', 'Thank you for your interest. While we may not be the best fit for your current needs, please reach out if your situation changes.', 'active', 'Mozilla/5.0 (Android 12; Mobile; rv:104.0) Gecko/104.0', '192.168.1.130', '{"device_type": "mobile", "completion_time": 25}');
 
@@ -784,7 +784,7 @@ INSERT INTO responses (id, session_id, form_id, question_id, answer, answer_data
 
 
 INSERT INTO lead_outcomes (id, session_id, client_id, form_id, final_status, contact_info, lead_score, confidence_score, notification_sent, converted, conversion_date, conversion_value, conversion_type) 
-VALUES ('6e2e2378-0d72-415a-8c2c-2eaff4763f8d', '02b4dc7e-b96f-473b-9aac-62527dda7316', 'a2222222-2222-2222-2222-222222222222', 'f2222222-2222-2222-2222-222222222222', 'unqualified', '{"name": "Kevin_6 O'Brien", "email": "kevin.obrien_6@email.com", "phone": "(508) 555-3456"}', 35, 0.35, false, false, NULL, NULL, NULL);
+VALUES ('6e2e2378-0d72-415a-8c2c-2eaff4763f8d', '02b4dc7e-b96f-473b-9aac-62527dda7316', 'a2222222-2222-2222-2222-222222222222', 'f2222222-2222-2222-2222-222222222222', 'unqualified', '{"name": "Kevin_6 O''Brien", "email": "kevin.obrien_6@email.com", "phone": "(508) 555-3456"}', 35, 0.35, false, false, NULL, NULL, NULL);
 
 
 -- Lead 30: Maybe - Lisa_6 Martinez

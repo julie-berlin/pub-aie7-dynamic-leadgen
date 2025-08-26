@@ -472,7 +472,7 @@ def qualified_message_generation_node(state: SurveyGraphState) -> Dict[str, Any]
         
         if client_info.get('client'):
             client_data = client_info['client']
-            business_name = client_data.get('business_name', client_data.get('name', business_name))
+            business_name = client_data.get('name', business_name)
             business_type = client_data.get('business_type', client_data.get('industry', business_type))
             owner_name = client_data.get('owner_name', client_data.get('contact_name', owner_name))
         

@@ -170,6 +170,7 @@ export interface StartSessionResponse {
     businessName?: string;
     logoUrl?: string;
     theme?: ThemeConfig;
+    clientId?: string;  // Client ID for additional API calls (UUID, safe to expose)
   };
   step: FormStep;
 }
@@ -200,7 +201,7 @@ export interface SubmitResponseResponse {
 }
 
 export interface CompletionData {
-  leadStatus: 'yes' | 'no' | 'maybe';
+  leadStatus: 'yes' | 'no' | 'maybe' | 'unknown';
   score: number;
   message: string;
   redirectUrl?: string;

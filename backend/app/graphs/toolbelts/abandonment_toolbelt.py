@@ -316,7 +316,7 @@ class AbandonmentToolbelt:
         
         # Customize based on client info if available
         if client_info:
-            business_name = client_info.get("business_name", "we")
+            business_name = client_info.get("name", "we")  # Updated to use 'name' column
             strategy["message_suggestions"] = [
                 msg.replace("us", business_name).replace("we", business_name)
                 for msg in strategy["message_suggestions"]

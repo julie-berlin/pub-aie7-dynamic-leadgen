@@ -6,9 +6,9 @@
  */
 export default function PageFooter() {
   return (
-    <footer className="w-full bg-neutral-100">
+    <footer className="w-full" style={{ color: 'var(--color-background-light' }}>
       <div className="container mx-auto p-4 text-center">
-        <p className="text-sm text-neutral-400">Varyq - Intelligent Leads</p>
+        <p className="text-xs" style={{ color: 'var(--color-text-light' }}>Varyq - Intelligent Leads</p>
       </div>
     </footer>
   );

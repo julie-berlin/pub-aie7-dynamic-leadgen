@@ -20,28 +20,56 @@ class ConsolidatedLeadIntelligenceAgent(SupervisorAgent):
     def __init__(self, **kwargs):
         super().__init__(
             name="ConsolidatedLeadIntelligenceAgent",
-            model_name="gpt-3.5-turbo",
+            model_name="gpt-4.1-nano",
             temperature=0.1,
             max_tokens=1500,  # Reduced for faster responses
             timeout_seconds=10,  # Reduced timeout for faster responses
             **kwargs
         )
-        self.llm = get_chat_model(model_name="gpt-3.5-turbo", temperature=0.2)
+        self.llm = get_chat_model(model_name="gpt-4.1-nano", temperature=0.1)
         self.toolbelt = lead_intelligence_toolbelt
     
     def get_system_prompt(self) -> str:
-        """Get the system prompt for lead intelligence processing."""
-        return """You are a Lead Intelligence Agent responsible for processing customer responses and determining lead qualification.
+        """System prompt defining the Lead Qualification Specialist role."""
+        return """# LEAD QUALIFICATION SPECIALIST
+You are a Lead Qualification Expert specializing in customer response analysis and lead assessment for service businesses.
 
-Your responsibilities:
-1. Save customer responses to database
-2. Calculate lead scores based on responses
-3. Determine if external verification tools are needed
-4. Analyze business fit for the customer
-5. Generate completion messages for qualified leads
-6. Make routing decisions for survey continuation
+## YOUR EXPERTISE
+You excel at analyzing customer survey responses to determine lead quality and make strategic decisions about survey flow continuation.
 
-Always provide clear, data-driven assessments and maintain professional communication."""
+## CORE COMPETENCIES
+
+### 1. LEAD ASSESSMENT - Evaluate customer-business fit
+- Analyze responses against business criteria (location, budget, needs, engagement)
+- Identify red flags and qualification indicators
+- Score lead quality using multiple factors
+- Classify leads as: qualified, maybe, or unqualified
+
+### 2. SURVEY FLOW DECISIONS - Optimize lead capture strategy
+- Determine when to continue gathering information vs end survey
+- Balance lead quality assessment with survey completion rates
+- Route qualified leads through optimal question paths
+- End surveys appropriately for poor-fit prospects
+
+### 3. RESPONSE INTELLIGENCE - Extract insights from customer answers
+- Identify information requiring external research (breed safety, location validation)
+- Detect engagement patterns and response quality
+- Recognize qualifying vs disqualifying information
+- Assess authenticity and commitment level
+
+### 4. PERSONALIZED MESSAGING - Craft appropriate completion communications
+- Generate tailored messages based on lead classification
+- Match tone and content to qualification level
+- Use customer-specific details for personalization
+- Focus on customer benefits (B2C perspective)
+
+## DECISION-MAKING APPROACH
+- **Data-driven**: Base assessments on objective response analysis
+- **Strategic**: Consider business goals and lead quality thresholds
+- **Customer-focused**: Maintain positive experience even for unqualified leads
+- **Efficient**: Balance thoroughness with survey completion optimization
+
+You make intelligent lead qualification decisions that maximize business ROI while maintaining excellent customer experience."""
     
     def make_decision(self, state: SurveyState, context: Dict[str, Any] = None) -> SupervisorDecision:
         """Make lead intelligence decision - delegates to process_lead_responses."""
@@ -58,68 +86,114 @@ Always provide clear, data-driven assessments and maintain professional communic
         )
     
     def _get_tool_recommendation_prompt(self) -> str:
-        """Simple prompt for tool recommendations."""
-        return """You are analyzing customer responses to recommend verification tools.
+        """Clear prompt for tool recommendations with correct use cases."""
+        return """# TOOL RECOMMENDATION TASK
+Analyze customer responses to recommend research tools for lead scoring.
 
-Based on the customer responses, should we verify anything externally?
+# AVAILABLE TOOLS
+- **tavily**: Research information that affects lead scoring (e.g., dangerous dog breeds, product safety, industry regulations)
+- **maps**: Validate locations and check if customer is in service area
+- **both**: Use both tools when needed  
+- **none**: No external research required
 
-AVAILABLE TOOLS:
-- Tavily Search: Check business legitimacy, verify company names, reputation
-- Google Maps: Validate distances, check if location is in service area
+# DECISION EXAMPLES
+Customer says "I have a Pit Bull" → **tavily** (research breed for scoring)
+Customer mentions "I'm in Austin, TX" → **maps** (check service area)
+Customer says "I have a Rottweiler in Dallas" → **both** (research breed + check location)
+Customer says "I need help with my project" → **none** (no research needed)
 
-Respond with ONLY one of these options:
-- "tavily" - if we should verify a business name or check legitimacy
-- "maps" - if we should check distance/location 
-- "both" - if we need both verifications
-- "none" - if no external verification needed
+# RESPONSE FORMAT
+Respond with exactly ONE word: tavily, maps, both, or none
 
-Consider: Do they mention a business name to verify? Do they provide a location that might need distance checking?"""
+# DECISION CRITERIA
+- Use **tavily** when answers mention things that need research for lead scoring (breeds, products, regulations, etc.)
+- Use **maps** when customer provides location that needs service area validation
+- Use **both** when you need research AND location checking
+- Use **none** when responses don't require external research or location validation"""
 
     def _get_business_weight_prompt(self) -> str:
-        """Simple prompt for business fit weighting."""
-        return """You are analyzing how well a customer fits the business based on their responses.
+        """Business fit assessment with clear criteria and examples."""
+        return """# BUSINESS FIT ASSESSMENT TASK
+Analyze how well the customer fits this business based on their responses.
 
-Rate the overall customer fit:
+# FIT LEVELS & CRITERIA
 
-PERFECT_FIT: Ideal customer (meets all key criteria, strong indicators)
-GOOD_FIT: Solid prospect (meets most criteria, minor concerns)
-OKAY_FIT: Average prospect (meets some criteria, some concerns)
-POOR_FIT: Weak prospect (few criteria met, major concerns)
-BAD_FIT: Wrong customer (major misalignment, clear red flags)
+**PERFECT_FIT**: Ideal customer - meets all major criteria
+- In service area with reasonable budget
+- Clear immediate need matching services offered  
+- High engagement, detailed responses
+- No obvious red flags or restrictions
 
-Consider factors like:
-- Location fit for service area
-- Budget alignment
-- Service needs matching offerings
-- Urgency and commitment level
-- Overall engagement quality
+**GOOD_FIT**: Strong prospect - meets most criteria  
+- Good location/budget fit
+- Clear need with minor concerns
+- Engaged responses
+- Few or minor red flags
 
-Respond with ONLY the fit level: PERFECT_FIT, GOOD_FIT, OKAY_FIT, POOR_FIT, or BAD_FIT"""
+**OKAY_FIT**: Average prospect - mixed signals
+- Acceptable location/budget 
+- Some service alignment
+- Moderate engagement
+- Some concerns but manageable
+
+**POOR_FIT**: Weak prospect - significant issues
+- Budget/location challenges
+- Limited service need alignment
+- Low engagement or concerning responses
+- Multiple red flags
+
+**BAD_FIT**: Wrong customer - major disqualifiers
+- Outside service area or budget
+- No service need alignment  
+- Very low engagement or hostile
+- Serious red flags (safety, legal, etc.)
+
+# ASSESSMENT FACTORS
+1. **Location**: Within service area vs too far
+2. **Budget**: Aligns with service pricing vs too low
+3. **Need Match**: Services needed match what's offered
+4. **Engagement**: Response quality and detail level
+5. **Red Flags**: Safety issues, difficult customers, legal concerns
+
+# RESPONSE FORMAT
+Respond with exactly ONE fit level: PERFECT_FIT, GOOD_FIT, OKAY_FIT, POOR_FIT, or BAD_FIT"""
 
     def _get_completion_message_prompt(self, lead_status: str) -> str:
-        """Simple prompt for completion message."""
-        return f"""Write a personalized completion message for a {lead_status.upper()} lead.
+        """Completion message prompt without complex conditionals."""
+        # Map lead status to tone descriptions
+        tone_map = {
+            "yes": "Enthusiastic and welcoming",
+            "maybe": "Encouraging but not pushy", 
+            "no": "Kind and helpful"
+        }
+        tone = tone_map.get(lead_status, "Professional and friendly")
+        
+        return f"""# COMPLETION MESSAGE TASK
+Write a personalized completion message for a {lead_status.upper()} lead.
 
-STATUS: {lead_status.upper()}
+# LEAD STATUS
+{lead_status.upper()} - Use {tone.lower()} tone
 
-CRITICAL INSTRUCTIONS:
-- Write ONLY for the customer who filled out the form (B2C perspective)
-- Do NOT include business-to-business language like "help your business grow"
+# CRITICAL REQUIREMENTS
+- Write for the CUSTOMER who filled out the form (B2C perspective)
+- Do NOT use business-to-business language like "help your business grow"
 - Focus on the SERVICE being provided TO the customer
 - Use customer details from their responses to personalize
 - The business context describes the SERVICE PROVIDER, not the customer
 
-Keep it:
-- {lead_status.upper()} tone: {"Enthusiastic and welcoming" if lead_status == "yes" else "Encouraging but not pushy" if lead_status == "maybe" else "Kind and helpful"}
-- Customer-focused (the person who filled out the form)
-- Personal (use their specific responses like names, needs, preferences)
-- Professional but friendly
-- 2-3 sentences max
+# MESSAGE GUIDELINES
+- Tone: {tone}
+- Audience: Customer who filled out the form
+- Length: 2-3 sentences maximum
+- Style: Personal using their specific responses (names, needs, preferences)
+- Approach: Professional but friendly
 
-WRONG: "Let's work together to help your business grow!"
-RIGHT: "We're excited to help you with your dog walking needs!"
+# EXAMPLES
+❌ WRONG: "Let's work together to help your business grow!"
+✅ RIGHT: "We're excited to help you with your dog walking needs!"
 
-Just write the message, no other text."""
+# RESPONSE FORMAT
+Write only the completion message, no other text."""
     
     def process_lead_responses(self, state: SurveyState) -> Dict[str, Any]:
         """Main entry point - processes all lead intelligence tasks."""
@@ -195,12 +269,14 @@ Just write the message, no other text."""
                 tool_results = self._execute_tools(comprehensive_decision)
             
             # Step 5: Validate and adjust score with tool results
+            logger.info(f"🔥 SCORING DEBUG: score_result = {score_result}")
             final_classification = self._finalize_lead_classification(
                 state,
                 score_result["calculated_score"],
                 comprehensive_decision,
                 tool_results
             )
+            logger.info(f"🔥 SCORING DEBUG: final_classification = {final_classification}")
             
             # Step 6: Update database with final status
             self._update_database_status(state, final_classification)
@@ -223,6 +299,11 @@ Just write the message, no other text."""
                 },
                 'lead_intelligence': {
                     **state.get('lead_intelligence', {}),
+                    # CRITICAL FIX: Update current values in addition to last_classification
+                    'lead_status': final_classification.get('lead_status', 'unknown'),
+                    'final_score': final_classification.get('final_score', 0),
+                    'confidence': final_classification.get('confidence', 0),
+                    'completion_message': final_classification.get('completion_message', ''),
                     'last_classification': final_classification,
                     'classification_timestamp': datetime.now().isoformat()
                 }
@@ -281,11 +362,22 @@ Just write the message, no other text."""
     def _calculate_lead_score(self, state: SurveyState) -> Dict[str, Any]:
         """Calculate mathematical lead score."""
         try:
-            responses = state.get("lead_intelligence", {}).get("responses", [])
+            # CRITICAL FIX: Use pending_responses, not lead_intelligence.responses
+            # pending_responses contains the current form submission we need to score
+            pending_responses = state.get("pending_responses", [])
+            logger.info(f"🔥 SCORING DEBUG: pending_responses = {pending_responses}")
+            
+            # Also get historical responses from lead_intelligence for context
+            historical_responses = state.get("lead_intelligence", {}).get("responses", [])
+            logger.info(f"🔥 SCORING DEBUG: historical_responses = {historical_responses}")
+            
+            # Combine both for complete scoring
+            all_responses = historical_responses + pending_responses
+            logger.info(f"🔥 SCORING DEBUG: all_responses count = {len(all_responses)}")
             
             # Get scoring rubrics (simplified for now)
             scoring_rubrics = {}
-            for response in responses:
+            for response in all_responses:
                 question_id = response.get("question_id")
                 # Simple scoring: longer answers = higher scores
                 scoring_rubrics[str(question_id)] = {
@@ -298,7 +390,7 @@ Just write the message, no other text."""
             business_rules = state.get("business_rules", {})
             
             return self.toolbelt.calculate_lead_score(
-                responses=responses,
+                responses=all_responses,
                 scoring_rubrics=scoring_rubrics,
                 business_rules=business_rules
             )
@@ -339,6 +431,7 @@ Just write the message, no other text."""
         # Get total responses from database
         session_id = state.get("core", {}).get("session_id")
         total_responses = self._get_total_responses_count(session_id)
+        logger.info(f"🔥 STATUS DEBUG: session_id={session_id}, total_responses={total_responses}, final_score={final_score}")
         lead_status = self._determine_lead_status(final_score, total_responses)
         logger.info(f"🎯 Lead status determined: {lead_status} (score: {final_score}, total responses: {total_responses})")
         
@@ -411,7 +504,7 @@ Just write the message, no other text."""
         
         # Re-evaluate with tool results
         client_info = state.get("client_info", {})
-        client_name = client_info.get("business_name", "our team")
+        client_name = client_info.get("name", "our team")
         
         # Adjust score based on tool results
         final_score = decision["final_score"]
@@ -499,8 +592,7 @@ Just write the message, no other text."""
             asked_questions_from_state = set(question_strategy.get("asked_questions", []))
             
             # Add newly answered questions from current pending responses
-            if newly_asked is None:
-                newly_asked = self._mark_questions_as_asked(state)
+            newly_asked = self._mark_questions_as_asked(state)
             asked_questions_from_state.update(newly_asked)
             
             # Get available questions from state (provided by Survey Admin)
@@ -800,8 +892,8 @@ Just write the message, no other text."""
             # Build context string
             context_parts = []
             
-            if client.get('business_name'):
-                context_parts.append(f"Business: {client['business_name']}")
+            if client.get('name'):
+                context_parts.append(f"Business: {client['name']}")
             
             if client.get('business_type'):
                 context_parts.append(f"Type: {client['business_type']}")

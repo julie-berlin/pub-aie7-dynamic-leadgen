@@ -91,18 +91,31 @@ export default function LeadsPage() {
       if (filters.converted) params.append('converted', filters.converted);
       if (filters.form_id) params.append('form_id', filters.form_id);
       
+      console.log('Fetching leads with filters:', filters);
+      console.log('API URL params:', params.toString());
+      
       const token = localStorage.getItem('admin_token');
-      const response = await fetch(buildApiUrl(`/api/admin/leads/?${params}`), {
+      const url = buildApiUrl(`/api/admin/leads/?${params}`);
+      console.log('Full API URL:', url);
+      
+      const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
       });
-      if (!response.ok) throw new Error('Failed to fetch leads');
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API Error:', response.status, errorText);
+        throw new Error(`Failed to fetch leads: ${response.status}`);
+      }
       
       const data = await response.json();
+      console.log('Leads API response:', data);
+      
       if (data.success) {
         setAllLeads(data.data.leads);
+        console.log('Updated leads count:', data.data.leads.length);
       }
     } catch (error) {
       console.error('Error fetching leads:', error);
@@ -184,6 +197,11 @@ export default function LeadsPage() {
   }, [allLeads, filters.search]);
 
   useEffect(() => {
+    console.log('useEffect triggered by filter changes:', { 
+      status: filters.status, 
+      converted: filters.converted, 
+      form_id: filters.form_id 
+    });
     // Auth is guaranteed to be ready when this component renders
     fetchLeads();
     fetchSummary();
@@ -360,7 +378,10 @@ export default function LeadsPage() {
           <select
             className="admin-select"
             value={filters.status}
-            onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
+            onChange={(e) => {
+              console.log('Status filter changed:', e.target.value);
+              setFilters(prev => ({ ...prev, status: e.target.value }));
+            }}
           >
             <option value="">All Status</option>
             <option value="yes">Qualified (Yes)</option>
@@ -372,7 +393,10 @@ export default function LeadsPage() {
           <select
             className="admin-select"
             value={filters.converted}
-            onChange={(e) => setFilters(prev => ({ ...prev, converted: e.target.value }))}
+            onChange={(e) => {
+              console.log('Converted filter changed:', e.target.value);
+              setFilters(prev => ({ ...prev, converted: e.target.value }));
+            }}
           >
             <option value="">All Conversions</option>
             <option value="true">Converted</option>
@@ -382,7 +406,10 @@ export default function LeadsPage() {
           <select
             className="admin-select"
             value={filters.form_id}
-            onChange={(e) => setFilters(prev => ({ ...prev, form_id: e.target.value }))}
+            onChange={(e) => {
+              console.log('Form filter changed:', e.target.value);
+              setFilters(prev => ({ ...prev, form_id: e.target.value }));
+            }}
           >
             <option value="">All Forms</option>
             {forms.map(form => (
