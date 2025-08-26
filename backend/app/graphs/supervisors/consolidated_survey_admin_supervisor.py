@@ -42,43 +42,54 @@ class ConsolidatedSurveyAdminSupervisor(SupervisorAgent):
         )
 
     def get_system_prompt(self) -> str:
-        """Simple system prompt for the 3 core LLM responsibilities."""
-        return """You are a Survey Administration AI with exactly 3 responsibilities:
+        """System prompt defining the Marketing & Engagement Specialist role."""
+        return """# MARKETING & ENGAGEMENT SPECIALIST
+You are a Marketing Copywriting Expert specializing in survey engagement and customer attraction for service businesses.
 
-1. QUESTION SELECTION: Choose 1-4 questions from the available pool
-   - Consider conversation context and user responses
-   - Vary count: 1 for sensitive topics, 2-3 standard, 4 for quick gathering
-   - Never repeat already-asked questions
-   - Early steps: 1-2 questions to build trust
-   - Later steps: 3-4 questions when momentum established
+## YOUR EXPERTISE
+You excel at classic marketing copywriting techniques to project business benefits in the best light and attract ideal customers through engaging survey experiences.
 
-2. QUESTION REPHRASING: Analyze intent and rephrase precisely
-   - Read the original question and understand what specific information it needs
-   - Rephrase to collect exactly that information and only that information
-   - Use user's name if known and make conversational
-   - Exception: textarea questions can ask for broader, multi-faceted responses
-   - NEVER add extra requests beyond the original question's intent
+## CORE SPECIALIZATIONS
 
-3. ENGAGEMENT MESSAGING: Business context + completion encouragement
-   - Include specific business services/benefits
-   - Show company personality
-   - Encourage completion (never suggest ending)
-   - Keep message under 50 words
+### 1. STRATEGIC QUESTION SELECTION - Optimize visitor engagement
+- Select 1-3 questions that build momentum and trust
+- Vary count based on visitor engagement signals
+- Choose questions that showcase business value
+- Progress visitors through an engaging discovery journey
 
-OUTPUT FORMAT (exactly this structure):
+### 2. MARKETING COPYWRITING - Transform questions into compelling conversation
+- Rephrase questions using proven copywriting techniques
+- Make every question feel valuable and worth answering
+- Use conversational, benefit-focused language
+- Maintain original question intent while maximizing engagement
+
+### 3. CUSTOMER ATTRACTION - Project business benefits strategically
+- Highlight unique business strengths and qualifications
+- Emphasize value propositions and customer success stories
+- Create desire for the business's services
+- Position the business as the ideal solution
+
+### 4. ENGAGEMENT OPTIMIZATION - Create irresistible survey experiences
+- Craft compelling headlines that encourage participation
+- Write benefit-driven messages that build excitement
+- Use psychological triggers to maintain visitor interest
+- Balance information gathering with value delivery
+
+## MARKETING PRINCIPLES
+- **Benefit-Focused**: Always emphasize what's in it for the customer
+- **Trust-Building**: Use credentials, experience, and social proof
+- **Conversational**: Make questions feel like helpful consultation, not interrogation  
+- **Value-Driven**: Every interaction should feel valuable to the visitor
+- **Customer-Centric**: Focus on solving visitor problems, not business needs
+
+## OUTPUT FORMAT REQUIREMENTS
 SELECTED: [comma-separated question numbers]
-QUESTION_[number]: [rephrased question text]
-QUESTION_[number]: [rephrased question text]
-HEADLINE: [engaging headline]
-MESSAGE: [business context + encouragement, under 50 words]
+QUESTION_[number]: [rephrased with marketing copywriting]
+QUESTION_[number]: [rephrased with marketing copywriting]
+HEADLINE: [compelling, benefit-focused headline]
+MESSAGE: [marketing message highlighting business benefits under 50 words]
 
-Example:
-SELECTED: 2,7,9
-QUESTION_2: Hi Sarah, what's your budget range for this project?
-QUESTION_7: How soon are you looking to get started?
-QUESTION_9: What's your biggest concern about choosing a service provider?
-HEADLINE: Let's find the perfect solution for you!
-MESSAGE: At Pawsome Dog Walking, we've helped over 500 pet owners. Tell us more so we can create a custom plan that fits your needs perfectly."""
+You create survey experiences that visitors genuinely enjoy while strategically attracting the ideal customers the business seeks."""
 
     def process_survey_step(self, state: SurveyState) -> Dict[str, Any]:
         """Main entry point - processes entire survey administration step."""
@@ -301,7 +312,7 @@ MESSAGE: At Pawsome Dog Walking, we've helped over 500 pet owners. Tell us more 
                     client_info = {}
                     # Continue with default values instead of failing
 
-            business_name = client_info.get('business_name', 'our business')
+            business_name = client_info.get('name', 'our business')
             industry = client_info.get('industry', 'service business')
 
             # Create numbered question list for LLM using original question_id as the number
@@ -317,19 +328,7 @@ MESSAGE: At Pawsome Dog Walking, we've helped over 500 pet owners. Tell us more 
                         "category": q.get("category", "")
                     })
 
-            # Determine recommended approach based on analysis
-            if analysis["risk_level"] == "high":
-                recommended_count = 1
-                engagement_approach = "urgent"
-                phrasing_tone = "encouraging"
-            elif analysis["risk_level"] == "medium":
-                recommended_count = 2
-                engagement_approach = "motivational"
-                phrasing_tone = "friendly"
-            else:
-                recommended_count = 2 if analysis["questions_asked"] < 5 else 3
-                engagement_approach = "casual"
-                phrasing_tone = "conversational"
+            # Note: Approach logic now handled by system prompt based on user context
 
             # Extract user information from responses for personalization
             user_name = None
@@ -346,69 +345,36 @@ MESSAGE: At Pawsome Dog Walking, we've helped over 500 pet owners. Tell us more 
                 if answer and answer != "ASKED_PLACEHOLDER":
                     user_info[question_text] = answer
 
-            # Get detailed client info for engagement
-            client_data = client_info.get('client', {}) if client_info else {}
-            business_background = client_data.get('background', '')
-            business_goals = client_data.get('goals', '')
-            target_audience = client_data.get('target_audience', '')
+            # Get detailed client info for engagement (using correct database column names)
+            business_background = client_info.get('background', '')
+            business_goals = client_info.get('goals', '')
+            target_audience = client_info.get('target_audience', '')
 
-            user_prompt = f"""Select and rephrase questions for this survey step:
+            # USER PROMPT: Simple data + task (no duplicate instructions)
+            user_context = f"User: {user_name or 'unknown'}"
+            if analysis['questions_asked'] > 0:
+                user_context += f" | {analysis['questions_asked']} answered"
+            if analysis['risk_level'] != 'low':
+                user_context += f" | {analysis['risk_level']} engagement"
+            
+            # Build comprehensive business context using all available database data
+            business_context = f"Business: {business_name} ({industry})"
+            if business_background:
+                business_context += f"\nBackground: {business_background[:100]}"
+            if business_goals:
+                business_context += f"\nGoals: {business_goals[:100]}"
+            if target_audience:
+                business_context += f"\nTarget: {target_audience[:100]}"
+            
+            user_prompt = f"""# DATA FOR THIS REQUEST
+{business_context}
+{user_context}
 
-BUSINESS PROVIDING SERVICE: {business_name} ({industry})
-- Background: {business_background[:150]}
-- Goals: {business_goals[:150]}
-- Target: {target_audience[:150]}
-
-USER FILLING OUT FORM:
-- Name: {user_name if user_name else 'not provided yet'}
-- Questions answered: {analysis['questions_asked']}
-- Engagement risk: {analysis['risk_level']}
-- Recent responses: {json.dumps(responses[-2:] if responses else [], indent=1)}
-
-AVAILABLE QUESTIONS:
+# AVAILABLE QUESTIONS
 {chr(10).join([f"{q['number']}. {q['question_text']}" for q in numbered_questions])}
 
-CRITICAL INSTRUCTIONS:
-1. Select 1-4 questions (vary the count - don't always pick same number)
-2. Rephrase questions FOR THE USER (person filling out form)
-3. Use user's name ({user_name if user_name else ''}) ONLY if known - NOT business owner info
-4. Questions ask about USER'S needs/info - NOT business owner's info
-5. **MANDATORY**: Understand the original question's intent and rephrase to get exactly that
-   - Read what information the original question is trying to collect
-   - Rephrase to get exactly that information and nothing extra
-   - For text/select/radio: single focused answer
-   - For textarea: can be broader and ask for detailed explanation
-   - NEVER add additional requests beyond the original question's scope
-6. ENGAGEMENT MESSAGES (HEADLINE + MESSAGE): Use business info to entice user
-   - Mention {business_name}'s background, qualifications, experience
-   - Highlight specific services and benefits offered
-   - Show why the business is perfect for the user's needs
-   - Reference business owner's expertise to build trust
-7. NEVER mix business owner details into user questions
-
-QUESTION PHRASING RULES - MATCH THE ORIGINAL INTENT:
-ORIGINAL: "What is your full name?" 
-WRONG REPHRASE: "What's your name and what should we call you?" (adds extra request)
-RIGHT REPHRASE: "What's your name?" (matches original intent exactly)
-
-ORIGINAL: "What is your email address?"
-WRONG REPHRASE: "What's your email and phone number?" (adds extra request) 
-RIGHT REPHRASE: "What's your email address?" (matches original intent exactly)
-
-ORIGINAL: "Tell us about your project requirements" (textarea)
-RIGHT REPHRASE: "Tell us about your project - what are you looking to accomplish and what challenges are you facing?" (textarea can be broader)
-
-OTHER EXAMPLES:
-WRONG: "What should we call you, the dog-loving recent Psychology graduate?"
-WRONG: "How well-behaved is your dog on walks, None?"
-RIGHT: "What should we call you?" or "Hi {user_name if user_name else ''}, what should we call you?"
-RIGHT: "How well-behaved is your dog on walks?" (without name if not known)
-
-ENGAGEMENT MESSAGING:
-GOOD: "As a Psychology graduate who loves dogs, [Business] provides expert care..."
-GOOD: "With experience hiking and jogging with dogs, we understand..."
-
-Use the exact output format specified in your instructions."""
+# TASK
+Select and rephrase questions for this survey step. Follow your system instructions for format and rules."""
 
             # Get LLM response
             messages = [
@@ -475,7 +441,7 @@ Use the exact output format specified in your instructions."""
             return self._create_fallback_decision(available_questions, analysis)
 
     def _parse_simple_response(self, content: str, available_questions: List[Dict]) -> Dict[str, Any]:
-        """Parse simple structured response from LLM."""
+        """Parse structured response from LLM with robust error handling."""
         result = {
             "action": "continue",
             "selected_questions": [],
@@ -485,38 +451,50 @@ Use the exact output format specified in your instructions."""
         }
 
         try:
+            import re
+            
+            # More flexible parsing using regex patterns
             lines = [line.strip() for line in content.split('\n') if line.strip()]
             selected_numbers = []
             rephrased_questions = {}
 
             for line in lines:
-                if line.startswith('SELECTED:'):
-                    # Parse selected question numbers
-                    numbers_text = line.split(':', 1)[1].strip()
+                # Parse SELECTED with flexible matching
+                selected_match = re.match(r'^SELECTED\s*:\s*(.+)$', line, re.IGNORECASE)
+                if selected_match:
+                    numbers_text = selected_match.group(1).strip()
                     try:
-                        selected_numbers = [int(n.strip()) for n in numbers_text.split(',')]
+                        # Handle various separators: comma, semicolon, space
+                        number_strings = re.split(r'[,;\s]+', numbers_text)
+                        selected_numbers = [int(n.strip()) for n in number_strings if n.strip().isdigit()]
                         logger.info(f"🔥 PARSED SELECTION: {selected_numbers}")
                     except ValueError as e:
                         logger.error(f"Failed to parse selected numbers: {numbers_text}, error: {e}")
+                        # Try to extract any numbers found
+                        numbers = re.findall(r'\d+', numbers_text)
+                        selected_numbers = [int(n) for n in numbers[:4]]  # Max 4 questions
+                        logger.info(f"🔥 FALLBACK SELECTION: {selected_numbers}")
 
-                elif line.startswith('QUESTION_'):
-                    # Parse rephrased questions
+                # Parse QUESTION_ with flexible matching
+                question_match = re.match(r'^QUESTION[_\s]*(\d+)\s*:\s*(.+)$', line, re.IGNORECASE)
+                if question_match:
                     try:
-                        parts = line.split(':', 1)
-                        if len(parts) == 2:
-                            question_key = parts[0].strip()  # e.g., "QUESTION_2"
-                            question_text = parts[1].strip()
-                            question_num = int(question_key.split('_')[1])
-                            rephrased_questions[question_num] = question_text
-                            logger.info(f"🔥 PARSED REPHRASE: Q{question_num} = '{question_text[:50]}...'")
+                        question_num = int(question_match.group(1))
+                        question_text = question_match.group(2).strip()
+                        rephrased_questions[question_num] = question_text
+                        logger.info(f"🔥 PARSED REPHRASE: Q{question_num} = '{question_text[:50]}...'")
                     except (ValueError, IndexError) as e:
                         logger.error(f"Failed to parse question line: {line}, error: {e}")
 
-                elif line.startswith('HEADLINE:'):
-                    result["engagement_headline"] = line.split(':', 1)[1].strip()
+                # Parse HEADLINE with flexible matching
+                headline_match = re.match(r'^HEADLINE\s*:\s*(.+)$', line, re.IGNORECASE)
+                if headline_match:
+                    result["engagement_headline"] = headline_match.group(1).strip()
 
-                elif line.startswith('MESSAGE:'):
-                    result["engagement_message"] = line.split(':', 1)[1].strip()
+                # Parse MESSAGE with flexible matching  
+                message_match = re.match(r'^MESSAGE\s*:\s*(.+)$', line, re.IGNORECASE)
+                if message_match:
+                    result["engagement_message"] = message_match.group(1).strip()
 
             # Build selected questions list using question_id matching
             for num in selected_numbers:

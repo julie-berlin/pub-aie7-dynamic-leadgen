@@ -170,6 +170,7 @@ export interface StartSessionResponse {
     businessName?: string;
     logoUrl?: string;
     theme?: ThemeConfig;
+    clientId?: string;  // Client ID for additional API calls (UUID, safe to expose)
   };
   step: FormStep;
 }

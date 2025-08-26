@@ -43,6 +43,7 @@ interface BackendStartSessionResponse {
     businessName?: string;
     logoUrl?: string;
     theme?: ThemeConfig;
+    clientId?: string;  // Client ID resolved from form (UUID, safe to expose)
   };
   step: BackendFormStep;
 }
@@ -242,7 +243,7 @@ class APIClient {
       method: 'POST',
       body: JSON.stringify({
         form_id: params.formId,
-        // Don't send client_id - backend will extract it from form details
+        // client_id is automatically extracted by backend from form record
         utm_source: params.trackingData?.utmSource,
         utm_medium: params.trackingData?.utmMedium,
         utm_campaign: params.trackingData?.utmCampaign,
@@ -259,7 +260,8 @@ class APIClient {
         description: response.form.description,
         businessName: response.form.businessName,
         logoUrl: response.form.logoUrl,
-        theme: response.form.theme
+        theme: response.form.theme,
+        clientId: response.form.clientId  // Pass through client ID for additional API calls
       },
       step: this.transformFormStep(response.step)
     };

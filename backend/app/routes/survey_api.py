@@ -74,11 +74,28 @@ async def start_session(
         session_id = str(uuid.uuid4())
         logger.info(f"🔥 START: Creating new session with ID: {session_id}")
         
+        # Look up client_id from form if not provided in request
+        client_id = request.client_id
+        if not client_id:
+            form = db.get_form(request.form_id)
+            if not form:
+                return error_response(
+                    f"Form {request.form_id} not found",
+                    status_code=404
+                )
+            client_id = form.get('client_id')
+            if not client_id:
+                return error_response(
+                    f"Form {request.form_id} does not have a client_id configured",
+                    status_code=400
+                )
+            logger.info(f"🔥 START: Extracted client_id {client_id} from form {request.form_id}")
+        
         # Create session data for HTTP session
         session_data = {
             "session_id": session_id,
             "form_id": request.form_id,
-            "client_id": request.client_id,
+            "client_id": client_id,
             "created_at": datetime.now().isoformat(),
             "utm_data": {
                 "utm_source": request.utm_source,
@@ -95,7 +112,7 @@ async def start_session(
             db_session_data = {
                 'session_id': session_id,
                 'form_id': request.form_id,
-                'client_id': request.client_id,
+                'client_id': client_id,
                 'started_at': datetime.now().isoformat(),
                 'last_updated': datetime.now().isoformat(),
                 'step': 0,
@@ -120,7 +137,7 @@ async def start_session(
             'metadata': {
                 'session_id': session_id,  # Pass the pre-created session ID
                 'form_id': request.form_id,
-                'client_id': request.client_id,
+                'client_id': client_id,
                 'utm_source': request.utm_source,
                 'utm_medium': request.utm_medium,
                 'utm_campaign': request.utm_campaign,
@@ -199,7 +216,8 @@ async def start_session(
                     "description": form_details.get('description'),
                     "businessName": business_name,
                     "logoUrl": logo_url,
-                    "theme": frontend_data.get('theme')
+                    "theme": frontend_data.get('theme'),
+                    "clientId": client_id  # Include resolved client_id for frontend
                 },
                 "step": {
                     "stepNumber": frontend_data.get('step', 1),
