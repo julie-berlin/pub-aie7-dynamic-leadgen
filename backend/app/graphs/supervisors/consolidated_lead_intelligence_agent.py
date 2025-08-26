@@ -20,13 +20,13 @@ class ConsolidatedLeadIntelligenceAgent(SupervisorAgent):
     def __init__(self, **kwargs):
         super().__init__(
             name="ConsolidatedLeadIntelligenceAgent",
-            model_name="gpt-3.5-turbo",
+            model_name="gpt-4.1-nano",
             temperature=0.1,
             max_tokens=1500,  # Reduced for faster responses
             timeout_seconds=10,  # Reduced timeout for faster responses
             **kwargs
         )
-        self.llm = get_chat_model(model_name="gpt-3.5-turbo", temperature=0.2)
+        self.llm = get_chat_model(model_name="gpt-4.1-nano", temperature=0.1)
         self.toolbelt = lead_intelligence_toolbelt
     
     def get_system_prompt(self) -> str:
@@ -874,8 +874,8 @@ Write only the completion message, no other text."""
             # Build context string
             context_parts = []
             
-            if client.get('business_name'):
-                context_parts.append(f"Business: {client['business_name']}")
+            if client.get('name'):
+                context_parts.append(f"Business: {client['name']}")
             
             if client.get('business_type'):
                 context_parts.append(f"Type: {client['business_type']}")

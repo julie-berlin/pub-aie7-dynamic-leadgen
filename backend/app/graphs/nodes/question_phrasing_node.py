@@ -52,7 +52,7 @@ def question_phrasing_node(state: SurveyGraphState) -> Dict[str, Any]:
             if 'client' in client_info:
                 # Database format: {"client": {...}}
                 client_data = client_info['client']
-                business_name = client_data.get('business_name', client_data.get('name', 'Our Business'))
+                business_name = client_data.get('name', 'Our Business')
                 business_type = client_data.get('business_type', client_data.get('industry', 'service provider'))
             elif 'information' in client_info:
                 # JSON file format: {"information": {...}}
