@@ -154,6 +154,10 @@ body {
     line-height: 140%;
 }
 
+legend.question-label {
+    margin-top: var(--spacing-element);
+}
+
 label {
     line-height: 140%;
 }

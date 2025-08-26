@@ -28,7 +28,7 @@ export default function CompletionView({ completionData, businessName }: Complet
             </svg>
           </div>
         )}
-        
+
         {completionData?.leadStatus === 'maybe' && (
           <div className="w-16 h-16 mx-auto mb-4 bg-warning rounded-full flex items-center justify-center">
             <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -36,7 +36,7 @@ export default function CompletionView({ completionData, businessName }: Complet
             </svg>
           </div>
         )}
-        
+
         {completionData?.leadStatus === 'no' && (
           <div className="w-16 h-16 mx-auto mb-4 bg-secondary rounded-full flex items-center justify-center">
             <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -54,12 +54,12 @@ export default function CompletionView({ completionData, businessName }: Complet
         )}
       </div>
 
-      <h1 className="text-3xl font-bold text-text mb-6">
+      <h1 className="text-3xl font-bold mb-6" style={{ color: 'var(--color-heading)' }}>
         Thank You!
       </h1>
 
-      <div className="text-text-light text-lg mb-8">
-        {completionData?.message || 'Your form has been submitted successfully.'}
+      <div className="text-text text-2xl my-8 leading-6">
+        {completionData?.message || 'Your information has been submitted successfully.'}
       </div>
 
       {completionData?.nextSteps && completionData.nextSteps.length > 0 && (

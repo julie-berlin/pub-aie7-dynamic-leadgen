@@ -20,7 +20,7 @@ export default function PageHeader({ businessName, logoUrl }: PageHeaderProps) {
               <img
                 src={logoUrl}
                 alt={`${businessName}`}
-                className="object-contain max-h-[250px] w-auto"
+                className="object-contain max-w-[250px] w-auto"
               />
             ) : (
             <div className="flex flex-col">
