@@ -1,0 +1,18 @@
+{
+  "dependencies": [
+    "."
+  ],
+  "graphs": {
+    "survey_flow": {
+      "path": "./graph/simplified_survey_graph.py:simplified_survey_graph"
+    }
+  },
+  "env": {
+    "OPENAI_API_KEY": null,
+    "ANTHROPIC_API_KEY": null,
+    "TAVILY_API_KEY": null,
+    "GOOGLE_MAPS_API_KEY": null,
+    "LANGCHAIN_TRACING_V2": null,
+    "LANGCHAIN_PROJECT": null
+  }
+}

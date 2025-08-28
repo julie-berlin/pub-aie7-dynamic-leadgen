@@ -1,6 +1,6 @@
 """LangGraph survey flow components."""
 
-from .simplified_survey_graph import (
+from graph.simplified_survey_graph import (
     simplified_survey_graph,
     run_survey_sync,
     start_simplified_survey,
