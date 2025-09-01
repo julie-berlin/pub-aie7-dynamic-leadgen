@@ -63,14 +63,13 @@ class APIClient {
    * Transform backend question data to frontend format
    */
   private transformQuestion(backendQuestion: BackendQuestion, index: number): Question {
-    // CRITICAL FIX: Use actual question_id from backend for proper tracking
-    // Backend now sends question_id - use them instead of generating from index
-    const questionId = backendQuestion.question_id 
-      ? String(backendQuestion.question_id)  // Convert to string (can be UUID or number)
-      : (index + 1).toString();              // Fallback only if no ID provided
+    // Always use question_id from backend, never generate IDs
+    if (!backendQuestion.question_id) {
+      throw new Error(`Backend question missing question_id at index ${index}`);
+    }
     
     return {
-      id: questionId,
+      id: String(backendQuestion.question_id),  // Always convert to string for frontend
       type: backendQuestion.input_type as QuestionType,  // Use input_type directly for frontend rendering
       text: backendQuestion.phrased_question || backendQuestion.question,
       description: backendQuestion.description,

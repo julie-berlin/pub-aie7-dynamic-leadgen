@@ -58,7 +58,7 @@ export default function CompletionView({ completionData }: CompletionViewProps) 
         Thank You!
       </h1>
 
-      <div className="text-text text-2xl my-8 leading-6">
+      <div className="text-text text-2xl my-8" style={{ lineHeight: '1.7' }}>
         {completionData?.message || 'Your information has been submitted successfully.'}
       </div>
 

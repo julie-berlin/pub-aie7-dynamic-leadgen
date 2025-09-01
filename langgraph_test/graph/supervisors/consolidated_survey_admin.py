@@ -6,7 +6,7 @@ import logging
 from datetime import datetime
 import random
 
-from .base_supervisor import SupervisorAgent, SupervisorDecision
+from graph.supervisors.base_supervisor import SupervisorAgent, SupervisorDecision
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))

@@ -27,6 +27,7 @@ export type QuestionType =
   | 'text' 
   | 'textarea' 
   | 'email' 
+  | 'phone'
   | 'tel'
   | 'number'
   | 'radio' 
@@ -189,7 +190,7 @@ export interface FormStep {
 
 export interface SubmitResponseRequest {
   responses: {
-    question_id: number;
+    question_id: string | number;  // Backend sends question_id, can be UUID string or number
     answer: any;
   }[];
 }

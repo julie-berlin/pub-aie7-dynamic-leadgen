@@ -88,7 +88,6 @@ export const useThemeStore = create<ThemeStore>()(
         Object.entries(theme.colors).forEach(([key, value]) => {
           const cssVar = key.replace(/([A-Z])/g, '-$1').toLowerCase();
           root.style.setProperty(`--color-${cssVar}`, value);
-          console.log(`Set CSS var: --color-${cssVar} = ${value}`);
         });
 
         // Apply typography
@@ -107,7 +106,6 @@ export const useThemeStore = create<ThemeStore>()(
         // Apply border radius
         root.style.setProperty('--border-radius', theme.borderRadius);
         root.style.setProperty('--border-radius-lg', theme.borderRadiusLg);
-        console.log(`Set border radius: ${theme.borderRadius}, lg: ${theme.borderRadiusLg}`);
 
         // Apply shadows
         root.style.setProperty('--shadow', theme.shadow);
@@ -126,11 +124,7 @@ export const useThemeStore = create<ThemeStore>()(
           document.head.appendChild(styleElement);
         }
         
-        console.log('✅ Applied theme:', theme.name);
-        console.log('🎨 Primary color:', theme.colors.primary);
-        console.log('🟠 Secondary color:', theme.colors.secondary);
-        if (theme.logo_url) console.log('🖼️ Logo URL:', theme.logo_url);
-        if (theme.custom_css) console.log('📝 Custom CSS applied');
+        console.log(`Applied theme: ${theme.name}`);
       },
 
       validateTheme: (theme: ThemeConfig): ThemeConfig => {

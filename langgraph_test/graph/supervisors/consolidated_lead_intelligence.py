@@ -5,8 +5,8 @@ import json
 import logging
 from datetime import datetime
 
-from .base_supervisor import SupervisorAgent, SupervisorDecision
-from ..toolbelts.lead_intelligence_toolbelt import lead_intelligence_toolbelt
+from graph.supervisors.base_supervisor import SupervisorAgent, SupervisorDecision
+from graph.toolbelts.lead_intelligence_toolbelt import lead_intelligence_toolbelt
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))

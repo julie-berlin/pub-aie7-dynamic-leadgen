@@ -6,9 +6,9 @@ import logging
 from datetime import datetime
 import uuid
 
-from .state import SurveyState
-from .supervisors.consolidated_survey_admin import consolidated_survey_admin_node
-from .supervisors.consolidated_lead_intelligence import consolidated_lead_intelligence_node
+from graph.state import SurveyState
+from graph.supervisors.consolidated_survey_admin import consolidated_survey_admin_node
+from graph.supervisors.consolidated_lead_intelligence import consolidated_lead_intelligence_node
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +65,7 @@ def initialize_session_with_tracking_node(state: SurveyState) -> Dict[str, Any]:
                 "question_strategy": {},
                 "selection_history": []
             },
-            "lead_intelligence": {
+            "lead_intelligence_agent": {
                 "responses": [],
                 "current_score": 0,
                 "score_history": [],
@@ -117,10 +117,10 @@ def build_simplified_survey_graph() -> StateGraph:
     graph.add_node("initialize_with_tracking", initialize_session_with_tracking_node)
     
     # Consolidated Survey Administration
-    graph.add_node("survey_administration", consolidated_survey_admin_node)
+    graph.add_node("question_flow_agent", consolidated_survey_admin_node)
     
     # Consolidated Lead Intelligence
-    graph.add_node("lead_intelligence", consolidated_lead_intelligence_node)
+    graph.add_node("lead_intelligence_agent", consolidated_lead_intelligence_node)
     
     # Abandonment handling
     graph.add_node("check_abandonment", check_abandonment_node)
@@ -130,33 +130,26 @@ def build_simplified_survey_graph() -> StateGraph:
     # Entry point
     graph.set_entry_point("initialize_with_tracking")
     
-    # After initialization, conditional routing
-    graph.add_conditional_edges(
-        "initialize_with_tracking",
-        route_after_initialization,
-        {
-            "survey_administration": "survey_administration",
-            "lead_intelligence": "lead_intelligence"
-        }
-    )
+    # After initialization, always go to question flow agent
+    graph.add_edge("initialize_with_tracking", "question_flow_agent")
     
     # After survey admin prepares questions
     graph.add_conditional_edges(
-        "survey_administration",
+        "question_flow_agent",
         route_after_survey_admin,
         {
             END: END,
             "check_abandonment": "check_abandonment",
-            "lead_intelligence": "lead_intelligence"
+            "lead_intelligence_agent": "lead_intelligence_agent"
         }
     )
     
     # After lead intelligence processing
     graph.add_conditional_edges(
-        "lead_intelligence",
+        "lead_intelligence_agent",
         route_after_lead_intelligence,
         {
-            "survey_administration": "survey_administration",
+            "question_flow_agent": "question_flow_agent",
             END: END
         }
     )
@@ -168,26 +161,7 @@ def build_simplified_survey_graph() -> StateGraph:
 
 # === ROUTING FUNCTIONS ===
 
-def route_after_initialization(state: SurveyState) -> str:
-    """Determine routing after initialization."""
-    pending_responses = state.get("pending_responses")
-    
-    # Check if this is a continuation (existing session_id with responses)
-    core = state.get("core", {})
-    session_id = core.get("session_id")
-    
-    if pending_responses and len(pending_responses) > 0:
-        logger.info("🔀 Routing to lead_intelligence (pending responses)")
-        return "lead_intelligence"
-    
-    # Check if we already have questions prepared (continuation scenario)
-    question_strategy = state.get("question_strategy", {})
-    if session_id and question_strategy.get("all_questions"):
-        logger.info("🔀 Routing to survey_administration (continuing session)")
-        return "survey_administration"
-    
-    logger.info("🔀 Routing to survey_administration (new session)")
-    return "survey_administration"
+# Removed route_after_initialization since we now use direct edge
 
 def route_after_survey_admin(state: SurveyState) -> str:
     """Determine routing after survey administration."""
@@ -195,12 +169,12 @@ def route_after_survey_admin(state: SurveyState) -> str:
     # Check if survey admin indicated to route to lead intelligence
     if state.get("route_to_lead_intelligence"):
         logger.info("🔀 Routing to lead_intelligence (admin flag)")
-        return "lead_intelligence"
+        return "lead_intelligence_agent"
     
     # Check if we have pending responses
     if state.get("pending_responses"):
         logger.info("🔀 Routing to lead_intelligence (pending responses)")
-        return "lead_intelligence"
+        return "lead_intelligence_agent"
     
     # Check for abandonment
     if state.get("check_abandonment", False):
@@ -240,7 +214,7 @@ def route_after_lead_intelligence(state: SurveyState) -> str:
     # Continue survey if route decision is continue
     if route_decision == "continue":
         logger.info("🔀 Continuing to survey_administration")
-        return "survey_administration"
+        return "question_flow_agent"
     
     # Default to end
     logger.info("🔀 Default to END")

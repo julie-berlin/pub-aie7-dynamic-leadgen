@@ -44,13 +44,13 @@ export const useFormStore = create<FormStore>()(
         }
         
         try {
-          // Check if we have an existing session for this form
-          const existingState = get().formState;
+          // Validate form exists before starting session
+          const formValidation = await apiClient.validateFormAccess(formId);
+          if (!formValidation.valid) {
+            throw new Error(formValidation.error || 'Form not available');
+          }
 
-          // Note: Real session ID is managed by backend via HTTP-only cookies
-          // Frontend state is separate from backend session management
-
-          // Start or resume session
+          // Start fresh session (backend handles session management via HTTP-only cookies)
           const response = await apiClient.startSession({
             formId,
             trackingData: {
@@ -59,17 +59,15 @@ export const useFormStore = create<FormStore>()(
             }
           });
 
-          // Note: Backend manages session via HTTP-only cookies, no frontend session ID needed
-          // Frontend state tracks progress independently of backend session management
-          
+          // Create completely fresh form state - no persistence conflicts
           const newFormState: FormState = {
             formId,
             sessionId: '', // Backend session managed via HTTP-only cookies
             currentStep: response.step.stepNumber,
             totalSteps: response.step.totalSteps,
-            responses: existingState?.responses || {},
+            responses: {}, // Always fresh - backend manages real state
             isComplete: response.step.isComplete,
-            startedAt: existingState?.startedAt || new Date(),
+            startedAt: new Date(),
             lastUpdated: new Date()
           };
 
@@ -134,9 +132,9 @@ export const useFormStore = create<FormStore>()(
 
         try {
           // Convert responses to the expected API format
-          // CRITICAL FIX: Backend expects numeric question IDs
+          // Use question_id as-is from backend (string or number)
           const apiResponses = Object.entries(responses).map(([questionId, value]) => ({
-            question_id: parseInt(questionId, 10),  // Convert to number for backend
+            question_id: questionId,  // Pass question_id directly as backend sent it
             answer: value
           }));
 
@@ -190,10 +188,39 @@ export const useFormStore = create<FormStore>()(
 
         } catch (error) {
           console.error('Failed to submit responses:', error);
+          
+          // Enhanced error handling with recovery suggestions
+          let errorMessage = 'Failed to submit responses';
+          let shouldRetry = false;
+          
+          if (error instanceof Error) {
+            if (error.message.includes('401') || error.message.includes('session')) {
+              errorMessage = 'Your session has expired. Please refresh the page to continue.';
+              shouldRetry = false;
+            } else if (error.message.includes('400') || error.message.includes('validation')) {
+              errorMessage = 'Please check your answers and try again.';
+              shouldRetry = true;
+            } else if (error.message.includes('500') || error.message.includes('Internal Server')) {
+              errorMessage = 'Our service is temporarily unavailable. Please try again in a moment.';
+              shouldRetry = true;
+            } else if (error.message.includes('fetch') || error.message.includes('Network')) {
+              errorMessage = 'Connection problem. Please check your internet and try again.';
+              shouldRetry = true;
+            } else {
+              errorMessage = error.message;
+            }
+          }
+          
           set({ 
-            error: error instanceof Error ? error.message : 'Failed to submit responses',
+            error: errorMessage,
             loading: false 
           });
+          
+          // Don't clear responses on recoverable errors
+          if (!shouldRetry) {
+            // Session expired - clear state to force re-initialization
+            setTimeout(() => get().clearForm(), 5000);
+          }
         }
       },
 
@@ -298,17 +325,13 @@ export const useFormStore = create<FormStore>()(
     {
       name: 'form-storage',
       storage: createJSONStorage(() => localStorage),
-      // Only persist minimal form state (no questions data)
+      // Only persist form ID for recovery, nothing else to prevent conflicts
       partialize: (state) => ({
-        formState: state.formState ? {
-          ...state.formState,
-          // Don't persist responses to avoid stale data
-          responses: {}
-        } : null
-        // Don't persist currentStep - always fetch fresh from backend
+        // Only persist form ID for recovery purposes
+        lastFormId: state.currentForm?.id || null
       }),
-      // Skip hydration for sensitive data
-      skipHydration: false,
+      // Skip hydration to always fetch fresh state from backend
+      skipHydration: true,
     }
   )
 );
